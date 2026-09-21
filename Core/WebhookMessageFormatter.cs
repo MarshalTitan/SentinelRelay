@@ -29,8 +29,7 @@ public static class WebhookMessageFormatter
                 [new DiscordEmbedPayload(
                     index == 0 ? $"【{channel}】 {senderLabel}" : $"【{channel}】 {senderLabel} (continued)",
                     chunk,
-                    ChannelPolicy.GetDiscordColor(chat.ChatType),
-                    DateTime.SpecifyKind(chat.TimestampUtc, DateTimeKind.Utc))],
+                    ChannelPolicy.GetDiscordColor(chat.ChatType))],
                 index == 0 ? alert.AllowedMentions : NoMentions)).ToArray();
         }
 

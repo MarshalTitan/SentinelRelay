@@ -14,5 +14,4 @@ public sealed record DiscordAllowedMentions(
 public sealed record DiscordEmbedPayload(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
-    [property: JsonPropertyName("color")] int Color,
-    [property: JsonPropertyName("timestamp")] DateTime Timestamp);
+    [property: JsonPropertyName("color")] int Color);

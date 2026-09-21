@@ -22,7 +22,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("bounded queue preserves order", Sync(QueuePreservesOrder)),
     ("bounded queue rejects overflow", Sync(QueueRejectsOverflow)),
     ("formatter splits long Discord messages safely", Sync(LongMessagesAreSplit)),
-    ("embed formatter includes channel color and timestamp", Sync(EmbedFormattingWorks)),
+    ("embed formatter is compact and omits a duplicate timestamp", Sync(EmbedFormattingWorks)),
     ("malformed and non-Discord webhooks are rejected", Sync(MalformedWebhooksAreRejected)),
     ("valid Discord webhook is normalized with wait=true", Sync(ValidWebhookIsNormalized)),
     ("Discord allowed_mentions is always empty", Sync(AllowedMentionsAreDisabled)),
@@ -228,8 +228,11 @@ static void EmbedFormattingWorks()
     var embed = payload.Embeds?.Single() ?? throw new InvalidOperationException("embed missing");
     Assert(embed.Title.Contains("【FC】", StringComparison.Ordinal), "channel label missing");
     Assert(embed.Title.Contains("Example World", StringComparison.Ordinal), "world missing");
+    Assert(embed.Description == "maps tonight?", "message body changed");
     Assert(embed.Color == ChannelPolicy.GetDiscordColor(RelayChatType.FreeCompany), "channel color mismatch");
-    Assert(embed.Timestamp.Kind == DateTimeKind.Utc, "timestamp was not UTC");
+    var json = JsonSerializer.Serialize(payload);
+    Assert(!json.Contains("\"timestamp\"", StringComparison.OrdinalIgnoreCase), "embed timestamp was serialized");
+    Assert(!json.Contains("\"footer\"", StringComparison.OrdinalIgnoreCase), "timestamp footer was substituted");
 }
 
 static void MalformedWebhooksAreRejected()
