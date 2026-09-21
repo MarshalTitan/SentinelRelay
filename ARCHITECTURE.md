@@ -2,13 +2,13 @@
 
 ## Scope
 
-Sentinel Relay's stable path is a direct-webhook Dalamud plugin:
+Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 
 ```text
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The `0.2.0.0` development line adds a separately optional, experimental REST-polling path:
+The live `0.2.0.0` release adds a separately optional, experimental REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed /freecompany submission

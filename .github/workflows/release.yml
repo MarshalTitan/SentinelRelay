@@ -95,7 +95,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes 'Live Sentinel Relay release with direct, per-character FFXIV-to-Discord webhook delivery.'
+            --notes 'Live Sentinel Relay release with compact direct-webhook chat delivery and optional, disabled-by-default authorized /fc replies. No hosted relay service or companion program is required.'
 
       - name: Remove personal wording from superseded release notes
         shell: pwsh

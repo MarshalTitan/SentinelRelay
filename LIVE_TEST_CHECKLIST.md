@@ -1,7 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Stable fallback: `0.1.0.1`
-Experimental build: `0.2.0.0` development artifact (not the live catalog)
+Live catalog version: `0.2.0.0`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -15,31 +14,9 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. For stable one-way checks, confirm version `0.1.0.1`. For the separately installed reply artifact, confirm version `0.2.0.0`. Verify the active character shown in the header.
+5. Confirm version `0.2.0.0` and verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
-
-## Install the experimental artifact
-
-Use this only for the `/fc` proof. It does not replace the live catalog release.
-
-1. Open the [experimental branch Build runs](https://github.com/MarshalTitan/SentinelRelay/actions/workflows/build.yml?query=branch%3Aexperimental-discord-replies).
-2. Open the newest successful run and download the `SentinelRelay-0.2.0.0` artifact.
-3. Extract the downloaded outer artifact ZIP. It contains the validated plugin package `latest.zip`.
-4. Extract `latest.zip` into a permanent test folder. Do not run the DLL directly.
-5. In `/xlplugins`, disable or uninstall the catalog copy of Sentinel Relay without deleting its configuration.
-6. Run `/xlsettings`, open **Experimental**, and add either the extracted folder or its full `SentinelRelay.dll` path under **Dev Plugin Locations**.
-7. Save, then run `/xlplugins`. Under **Installed Dev Plugins**, load Sentinel Relay.
-8. Run `/srelay` and confirm version `0.2.0.0` before configuring replies.
-
-Rollback after the experiment:
-
-1. Unload the dev plugin.
-2. Remove its Dev Plugin Location and extracted test folder.
-3. Reinstall or re-enable the live catalog copy.
-4. Confirm `/srelay` reports `0.1.0.1`.
-
-Do not run the catalog and dev copies simultaneously because they share the same internal plugin name and configuration.
 
 ## Preconditions
 
@@ -220,4 +197,4 @@ Only after section L passes for the first profile:
 - [ ] Release workflow run: ______________________________
 - [ ] Catalog URL/version verified from a clean Dalamud install
 
-Failures in routing isolation, disabled-filter privacy, pause behavior, webhook/bot-token masking, mention safety, checkpointing, or real server-side FC delivery require a follow-up fix. Until the `/fc` proof passes, keep `0.1.0.1` as the live catalog fallback.
+Failures in routing isolation, disabled-filter privacy, pause behavior, webhook/bot-token masking, mention safety, or checkpointing require a follow-up fix. If real server-side FC delivery fails, disable **Discord → FFXIV Replies**; the independent FFXIV → Discord webhook relay remains available.

@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV → Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The `0.2.0.0` development line also contains an **optional experimental** reply reader. While FFXIV is running, it polls one configured private Discord channel and recognizes only an authorized ordinary text message beginning with `/fc `. It does not register a Discord slash command and does not change the webhook relay's independent operation.
+The live `0.2.0.0` release also contains an **optional experimental** reply reader. While FFXIV is running, it polls one configured private Discord channel and recognizes only an authorized ordinary text message beginning with `/fc `. It does not register a Discord slash command and does not change the webhook relay's independent operation.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -54,7 +54,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-The stable `0.1.0.1` one-way release remains available from the live Sentinel catalog. The experimental reply build is distributed separately until an actual second FFXIV client confirms that `/fc` produces server-visible Free Company chat. Neither build requires a hosted relay service.
+Version `0.2.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -87,7 +87,7 @@ A match can be highlighted in the relay channel and optionally ping one explicit
 | `/srelay resume` | Resume enabled webhook delivery and restart enabled reply polling at a fresh checkpoint |
 | `/srelay debug` | Show non-secret queue and delivery diagnostics |
 
-There are no registered Discord application commands. In the experimental build, `/fc hello` is an ordinary text message read through Discord's authenticated REST API. Each client polls only its own configured channel, and all routing and author checks must pass before the fixed Free Company mapping can run. The stable FFXIV → Discord webhook relay does not depend on the bot reader.
+There are no registered Discord application commands. When experimental replies are enabled, `/fc hello` is an ordinary text message read through Discord's authenticated REST API. Each client polls only its own configured channel, and all routing and author checks must pass before the fixed Free Company mapping can run. The FFXIV → Discord webhook relay does not depend on the bot reader.
 
 ## Experimental `/fc` replies
 
