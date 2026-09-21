@@ -5,7 +5,7 @@ namespace SentinelRelay;
 
 public sealed class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
 
     public Dictionary<string, CharacterProfile> CharacterProfiles { get; set; } = new(StringComparer.Ordinal);
 
@@ -27,6 +27,7 @@ public sealed class Configuration : IPluginConfiguration
         profile.CharacterName = characterName;
         profile.HomeWorld = homeWorld;
         profile.EnabledInboundChannels ??= [];
+        profile.EnabledOutboundChannels ??= [];
         profile.Keywords ??= [];
         return profile;
     }

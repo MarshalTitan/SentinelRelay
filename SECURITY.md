@@ -2,19 +2,22 @@
 
 ## Security properties
 
-### No inbound control path
+### Narrow experimental reply path
 
-Sentinel Relay is FFXIV → Discord only. It does not:
+The stable FFXIV → Discord webhook path remains independent. The optional experimental reply path:
 
-- connect to a Discord Gateway;
-- poll Discord;
-- accept WebSocket or HTTP connections;
-- execute FFXIV commands;
-- expose slash commands;
-- load macros; or
-- send text from Discord into the game.
+- makes outbound authenticated Discord REST reads only;
+- connects to no Discord Gateway and accepts no inbound network connection;
+- recognizes no registered application/slash command;
+- accepts one exact channel ID and one exact user ID per active character profile;
+- ignores messages authored by bots or webhooks;
+- uses a persistent Discord snowflake checkpoint and a two-minute freshness window;
+- exposes only the locally enabled `/fc` mapping to `/freecompany`;
+- has no generic "execute this slash command" operation;
+- never loads macros; and
+- is disabled by default.
 
-Removing the inbound path also removes the earlier architecture's remote-command, pairing, replay-token, and cross-user authorization risks.
+The checkpoint is saved before game submission. This deliberately favors dropping a command during a crash over replaying it. Every reader start/reconnect first advances to the newest current Discord message, so messages posted while the reader is offline are not executed later.
 
 ### Local privacy enforcement
 
@@ -36,6 +39,12 @@ A Discord webhook URL contains a secret token. Sentinel Relay:
 
 DPAPI protects the local file at rest but cannot protect secrets from malware or another process already running as the same Windows user.
 
+### Discord bot credential protection
+
+The experimental reader stores its bot token per character using Windows DPAPI with entropy separate from webhook protection. The token is masked after entry and excluded from status, debug output, errors, and logs.
+
+A bot token represents the bot anywhere it has permissions and is more powerful than one channel's webhook. Use a dedicated bot with only **View Channel** and **Read Message History** access to the intended private relay channel. Do not grant Administrator. Reset the token in the Discord Developer Portal immediately if it may have leaked, then replace it on each intended client.
+
 ### Mention safety
 
 FFXIV text is untrusted. Sentinel Relay removes control/private-use characters, normalizes whitespace, neutralizes `@everyone`, `@here`, user/role mention syntax, and channel mention syntax, and uses Discord's `allowed_mentions` field.
@@ -44,7 +53,7 @@ Keyword alerts are the sole exception: a rule may explicitly allow one locally c
 
 ### Network and rate-limit safety
 
-The plugin opens no listening port. It makes outbound HTTPS POST requests directly to Discord. One background worker owns a bounded FIFO queue, so network delay never blocks the FFXIV chat/framework thread.
+The plugin opens no listening port. The stable sender makes outbound HTTPS POST requests directly to Discord; the optional reader makes outbound HTTPS GET requests. Background workers own all network waits, so Discord never blocks the FFXIV chat/framework thread.
 
 Automatic HTTP redirects are disabled, keeping the webhook credential on the already validated Discord origin. Pausing, removing/replacing a webhook, or changing characters cancels active delivery and clears pending work on a best-effort basis.
 
@@ -57,13 +66,15 @@ Sent to Discord for each enabled message:
 - selected chat-type label;
 - sanitized sender name;
 - sender world when available and enabled;
-- sanitized message text; and
-- timestamp in embed mode.
+- sanitized message text.
 
 Stored locally per character:
 
 - character content-ID-derived key, name, and world;
 - DPAPI-protected webhook URL;
+- optional DPAPI-protected Discord bot token;
+- optional exact relay channel ID and authorized Discord user ID;
+- reply enabled state, `/fc` allowlist, and last processed message snowflake;
 - enabled filters and formatting choices;
 - pause state;
 - keyword rules and optional Discord user ID; and
@@ -72,11 +83,10 @@ Stored locally per character:
 Not stored or operated by Sentinel Relay:
 
 - chat history database;
-- Discord bot token;
 - Discord OAuth secret;
 - Railway or hosting credential;
 - backend authentication token; or
-- remotely supplied FFXIV command.
+- arbitrary remotely supplied FFXIV command or macro.
 
 Discord receives delivered content under the server/account's normal Discord data and retention rules. Deleting a message in FFXIV does not remove its already delivered Discord copy.
 
@@ -96,6 +106,7 @@ Deleting the webhook invalidates the old URL. Each character uses a separate URL
 Normal logs contain lifecycle information and sanitized HTTP/status errors. They do not include:
 
 - webhook URL or token;
+- Discord bot token;
 - message body;
 - sender text;
 - keyword text; or
@@ -113,6 +124,9 @@ Normal logs contain lifecycle information and sanitized HTTP/status errors. They
 - Immediate identical sender/channel/message events inside the duplicate window may be treated as duplicates.
 - `SeString.TextValue` produces a safe plain-text approximation; interactive item/map/player links are not recreated as Discord links.
 - The plugin cannot verify who can read a Discord channel. Channel permissions remain the server owner's responsibility.
+- Discord message-content access requires the Message Content privileged intent on the bot application.
+- The reverse path uses an internal FFXIV chat-shell interface. Automated tests can verify policy and construction, but only a second live FFXIV client can prove a server-visible FC send after a game/API update.
+- REST polling is intentionally near-real-time rather than instantaneous and functions only while the configured FFXIV client/plugin is running.
 
 ## Dependency and licensing review
 

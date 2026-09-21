@@ -62,9 +62,13 @@ public sealed class MainWindow : Window
     private readonly Func<CharacterProfile?> getProfile;
     private readonly Func<Uri?> getWebhookEndpoint;
     private readonly WebhookRelayClient relay;
+    private readonly DiscordReplyReader replyReader;
     private readonly Func<string, WebhookConfigurationResult> saveWebhook;
     private readonly Action removeWebhook;
     private readonly Func<bool> testWebhook;
+    private readonly Func<DiscordReplyConfigurationInput, WebhookConfigurationResult> saveReplySettings;
+    private readonly Action removeDiscordBotCredential;
+    private readonly Func<bool> testDiscordReader;
     private readonly Action<bool> setPaused;
     private readonly Action save;
     private string webhookInput = string.Empty;
@@ -79,6 +83,13 @@ public sealed class MainWindow : Window
     private readonly HashSet<RelayChatType> newKeywordChannels = [];
     private bool keywordChannelsInitialized;
     private string? lastCharacterKey;
+    private string botTokenInput = string.Empty;
+    private string replyChannelId = string.Empty;
+    private string authorizedUserId = string.Empty;
+    private bool repliesEnabled;
+    private bool allowFreeCompany;
+    private string? replyFeedback;
+    private bool replyFeedbackIsError;
 
     public MainWindow(
         Func<CharacterIdentity?> getIdentity,
@@ -88,6 +99,10 @@ public sealed class MainWindow : Window
         Func<string, WebhookConfigurationResult> saveWebhook,
         Action removeWebhook,
         Func<bool> testWebhook,
+        DiscordReplyReader replyReader,
+        Func<DiscordReplyConfigurationInput, WebhookConfigurationResult> saveReplySettings,
+        Action removeDiscordBotCredential,
+        Func<bool> testDiscordReader,
         Action<bool> setPaused,
         Action save)
         : base("Sentinel Relay###SentinelRelayMain")
@@ -96,9 +111,13 @@ public sealed class MainWindow : Window
         this.getProfile = getProfile;
         this.getWebhookEndpoint = getWebhookEndpoint;
         this.relay = relay;
+        this.replyReader = replyReader;
         this.saveWebhook = saveWebhook;
         this.removeWebhook = removeWebhook;
         this.testWebhook = testWebhook;
+        this.saveReplySettings = saveReplySettings;
+        this.removeDiscordBotCredential = removeDiscordBotCredential;
+        this.testDiscordReader = testDiscordReader;
         this.setPaused = setPaused;
         this.save = save;
         SizeConstraints = new WindowSizeConstraints
@@ -118,7 +137,13 @@ public sealed class MainWindow : Window
             webhookInput = string.Empty;
             webhookFeedback = null;
             keywordFeedback = null;
+            replyFeedback = null;
             mentionUserId = profile?.DiscordMentionUserId ?? string.Empty;
+            botTokenInput = string.Empty;
+            replyChannelId = profile?.DiscordRelayChannelId ?? string.Empty;
+            authorizedUserId = profile?.AuthorizedDiscordUserId ?? string.Empty;
+            repliesEnabled = profile?.DiscordRepliesEnabled ?? false;
+            allowFreeCompany = profile?.EnabledOutboundChannels.Contains(RelayChatType.FreeCompany) ?? false;
             newKeywordChannels.Clear();
             keywordChannelsInitialized = false;
         }
@@ -148,6 +173,11 @@ public sealed class MainWindow : Window
             DrawWebhook(identity, profile);
             ImGui.EndTabItem();
         }
+        if (ImGui.BeginTabItem("Experimental Replies"))
+        {
+            DrawExperimentalReplies(identity, profile);
+            ImGui.EndTabItem();
+        }
         if (ImGui.BeginTabItem("Debug"))
         {
             DrawDebug(identity, profile);
@@ -169,7 +199,10 @@ public sealed class MainWindow : Window
         var status = profile?.Paused == true ? "PAUSED" : configured ? "READY" : "NOT CONFIGURED";
         ImGui.TextColored(color, status);
         ImGui.SameLine();
-        ImGui.TextUnformatted($" | {identity?.CharacterName ?? "No character"} | FFXIV → Discord only");
+        var direction = profile?.DiscordRepliesEnabled == true
+            ? "FFXIV → Discord | replies experimental"
+            : "FFXIV → Discord";
+        ImGui.TextUnformatted($" | {identity?.CharacterName ?? "No character"} | {direction}");
     }
 
     private void DrawGeneral(CharacterIdentity? identity, CharacterProfile? profile)
@@ -190,7 +223,7 @@ public sealed class MainWindow : Window
         if (profile.Paused)
         {
             ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f),
-                "RELAY PAUSED — no FFXIV chat is being sent to Discord.");
+                "RELAY PAUSED — webhook delivery and experimental replies are stopped.");
             if (ImGui.Button("Resume Relay"))
                 setPaused(false);
         }
@@ -201,6 +234,91 @@ public sealed class MainWindow : Window
 
         ImGui.Spacing();
         ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
+    }
+
+    private void DrawExperimentalReplies(CharacterIdentity? identity, CharacterProfile? profile)
+    {
+        if (profile is null || identity is null)
+        {
+            ImGui.TextUnformatted("Log into a character to configure experimental Discord replies.");
+            return;
+        }
+
+        ImGui.TextColored(new Vector4(1f, 0.72f, 0.2f, 1f), "EXPERIMENTAL — /fc only");
+        ImGui.TextWrapped("This optional reader checks one private Discord channel and may submit authorized /fc messages as real Free Company chat. It does not use a hosted Sentinel service or Discord Gateway connection.");
+        ImGui.Spacing();
+        ImGui.TextWrapped("The bot token is a powerful secret. Use a dedicated bot with only View Channel and Read Message History access to the single relay channel. It is masked here and protected locally with Windows DPAPI.");
+        ImGui.Spacing();
+
+        ImGui.Checkbox("Enable Discord → FFXIV Replies", ref repliesEnabled);
+        ImGui.Checkbox("Allow /fc (Free Company) replies", ref allowFreeCompany);
+        ImGui.TextUnformatted($"Discord Bot Credential: {(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken) ? "Not Configured" : "Configured (secret hidden)")}");
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
+        ImGui.TextDisabled(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
+            ? "Paste the token once. It is never displayed again."
+            : "Leave blank to keep the saved credential, or paste a replacement.");
+        ImGui.SetNextItemWidth(300);
+        ImGui.InputText("Relay Channel ID", ref replyChannelId, 24);
+        ImGui.SetNextItemWidth(300);
+        ImGui.InputText("Authorized Discord User ID", ref authorizedUserId, 24);
+        ImGui.TextDisabled("Discord Developer Mode: right-click the channel/user, then Copy ID.");
+
+        if (ImGui.Button("Save Reply Settings"))
+        {
+            var result = saveReplySettings(new DiscordReplyConfigurationInput(
+                repliesEnabled,
+                botTokenInput,
+                replyChannelId,
+                authorizedUserId,
+                allowFreeCompany));
+            replyFeedback = result.Success
+                ? "Reply settings saved. Starting the reader establishes a fresh checkpoint so old messages cannot execute."
+                : result.Error;
+            replyFeedbackIsError = !result.Success;
+            if (result.Success)
+                botTokenInput = string.Empty;
+        }
+        ImGui.SameLine();
+        var hasBotCredential = !string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken);
+        if (!hasBotCredential)
+            ImGui.BeginDisabled();
+        if (ImGui.Button("Test Discord Reader"))
+        {
+            var started = testDiscordReader();
+            replyFeedback = started
+                ? "Reader test started. The result will appear in FFXIV chat."
+                : "Save a valid bot token and channel ID before testing.";
+            replyFeedbackIsError = !started;
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Remove Bot Credential"))
+        {
+            removeDiscordBotCredential();
+            botTokenInput = string.Empty;
+            repliesEnabled = false;
+            replyFeedback = "Bot credential removed and Discord replies disabled for this character.";
+            replyFeedbackIsError = false;
+        }
+        if (!hasBotCredential)
+            ImGui.EndDisabled();
+
+        if (!string.IsNullOrWhiteSpace(replyFeedback))
+        {
+            var color = replyFeedbackIsError
+                ? new Vector4(0.95f, 0.35f, 0.38f, 1f)
+                : new Vector4(0.35f, 0.85f, 1f, 1f);
+            ImGui.TextColored(color, replyFeedback);
+        }
+
+        ImGui.Separator();
+        var readerStatus = profile.DiscordRepliesEnabled ? replyReader.State.ToString() : "Disabled";
+        ImGui.TextUnformatted($"Reader Status: {readerStatus}");
+        ImGui.TextUnformatted($"Last Reader Success: {FormatTimestamp(profile.LastDiscordReaderSuccessUtc)}");
+        ImGui.TextUnformatted($"Checkpoint: {(string.IsNullOrWhiteSpace(profile.LastProcessedDiscordMessageId) ? "not established" : "established")}");
+        if (!string.IsNullOrWhiteSpace(replyReader.LastError))
+            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Reader Error: {replyReader.LastError}");
+        ImGui.TextDisabled("Sentinel Relay never prints the bot token and never treats Discord text as an arbitrary FFXIV command.");
     }
 
     private void DrawFilters(CharacterProfile? profile)
@@ -459,7 +577,10 @@ public sealed class MainWindow : Window
         ImGui.TextUnformatted($"Dropped messages: {relay.DroppedCount}");
         ImGui.TextUnformatted($"Last successful delivery: {FormatTimestamp(relay.LastSuccessUtc)}");
         ImGui.TextUnformatted($"Last error: {relay.LastError ?? "none"}");
-        ImGui.TextDisabled("Webhook URLs and message bodies are intentionally excluded from diagnostics and logs.");
+        ImGui.TextUnformatted($"Discord reply reader: {replyReader.State}");
+        ImGui.TextUnformatted($"Reader last success: {FormatTimestamp(replyReader.LastSuccessUtc)}");
+        ImGui.TextUnformatted($"Reader last error: {replyReader.LastError ?? "none"}");
+        ImGui.TextDisabled("Webhook URLs, bot tokens, and message bodies are intentionally excluded from diagnostics and logs.");
     }
 
     private static string FormatTimestamp(DateTime? value) => value?.ToLocalTime().ToString("G") ?? "never";

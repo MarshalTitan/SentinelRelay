@@ -1,4 +1,5 @@
 using SentinelRelay.Models;
+using System.Text;
 
 namespace SentinelRelay.Core;
 
@@ -8,8 +9,45 @@ public static class ChannelPolicy
     public const int DiscordEmbedDescriptionLimit = 4096;
     public const int SafeDiscordContentLimit = 1900;
     public const int SafeDiscordEmbedDescriptionLimit = 3900;
+    public const int MaxOutboundMessageCharacters = 180;
+    public const int MaxOutboundMessageUtf8Bytes = 400;
 
     public static readonly IReadOnlyList<RelayChatType> InboundChannels = Enum.GetValues<RelayChatType>();
+
+    // This prototype intentionally exposes only FC. Adding an enum here does not
+    // create a command: the parser and game sender must also explicitly support it.
+    public static readonly IReadOnlySet<RelayChatType> ImplementedOutboundChannels =
+        new HashSet<RelayChatType> { RelayChatType.FreeCompany };
+
+    public static string GetCommandPrefix(RelayChatType channel) => channel switch
+    {
+        RelayChatType.FreeCompany => "/freecompany",
+        _ => throw new InvalidOperationException($"{channel} is not an implemented outbound chat destination."),
+    };
+
+    public static bool IsValidOutboundMessage(string value, out string error)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            error = "The message is empty.";
+            return false;
+        }
+
+        if (value.EnumerateRunes().Count() > MaxOutboundMessageCharacters)
+        {
+            error = $"The message exceeds {MaxOutboundMessageCharacters} characters.";
+            return false;
+        }
+
+        if (Encoding.UTF8.GetByteCount(value) > MaxOutboundMessageUtf8Bytes)
+        {
+            error = $"The message exceeds {MaxOutboundMessageUtf8Bytes} UTF-8 bytes.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
 
     public static string GetLabel(RelayChatType channel) => channel switch
     {

@@ -1,0 +1,84 @@
+using SentinelRelay.Models;
+
+namespace SentinelRelay.Core;
+
+public enum DiscordReplyRejection
+{
+    None,
+    Disabled,
+    Paused,
+    NoActiveCharacter,
+    WrongCharacter,
+    WrongChannel,
+    WrongUser,
+    BotAuthor,
+    WebhookAuthor,
+    InvalidMessageId,
+    Duplicate,
+    Stale,
+    UnknownOrInvalidCommand,
+    DestinationNotAllowed,
+}
+
+public static class DiscordReplyPolicy
+{
+    public static readonly TimeSpan MaximumCommandAge = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan MaximumFutureSkew = TimeSpan.FromSeconds(30);
+
+    public static bool TryAuthorize(
+        CharacterProfile profile,
+        CharacterIdentity? activeIdentity,
+        DiscordChannelMessage source,
+        string checkpointBeforeBatch,
+        DateTime utcNow,
+        out DiscordReplyCommand? command,
+        out DiscordReplyRejection rejection)
+    {
+        command = null;
+        rejection = DiscordReplyRejection.None;
+
+        if (!profile.DiscordRepliesEnabled)
+            return Reject(DiscordReplyRejection.Disabled, out rejection);
+        if (profile.Paused)
+            return Reject(DiscordReplyRejection.Paused, out rejection);
+        if (activeIdentity is null)
+            return Reject(DiscordReplyRejection.NoActiveCharacter, out rejection);
+        if (!string.Equals(profile.CharacterKey, activeIdentity.CharacterKey, StringComparison.Ordinal))
+            return Reject(DiscordReplyRejection.WrongCharacter, out rejection);
+        if (!string.Equals(profile.DiscordRelayChannelId, source.ChannelId, StringComparison.Ordinal))
+            return Reject(DiscordReplyRejection.WrongChannel, out rejection);
+        if (source.Author.Bot)
+            return Reject(DiscordReplyRejection.BotAuthor, out rejection);
+        if (!string.IsNullOrWhiteSpace(source.WebhookId))
+            return Reject(DiscordReplyRejection.WebhookAuthor, out rejection);
+        if (!string.Equals(profile.AuthorizedDiscordUserId, source.Author.Id, StringComparison.Ordinal))
+            return Reject(DiscordReplyRejection.WrongUser, out rejection);
+        if (!DiscordSnowflake.IsValid(source.Id))
+            return Reject(DiscordReplyRejection.InvalidMessageId, out rejection);
+        if (DiscordSnowflake.Compare(source.Id, checkpointBeforeBatch) <= 0)
+            return Reject(DiscordReplyRejection.Duplicate, out rejection);
+
+        var timestamp = source.Timestamp.UtcDateTime;
+        if (timestamp < utcNow - MaximumCommandAge || timestamp > utcNow + MaximumFutureSkew)
+            return Reject(DiscordReplyRejection.Stale, out rejection);
+        if (!DiscordReplyCommandParser.TryParse(source.Content, out var destination, out var message))
+            return Reject(DiscordReplyRejection.UnknownOrInvalidCommand, out rejection);
+        if (!ChannelPolicy.ImplementedOutboundChannels.Contains(destination)
+            || !profile.EnabledOutboundChannels.Contains(destination))
+            return Reject(DiscordReplyRejection.DestinationNotAllowed, out rejection);
+
+        command = new DiscordReplyCommand(
+            source.Id,
+            profile.CharacterKey,
+            destination,
+            message,
+            utcNow);
+        return true;
+    }
+
+    private static bool Reject(DiscordReplyRejection value, out DiscordReplyRejection rejection)
+    {
+        rejection = value;
+        return false;
+    }
+}

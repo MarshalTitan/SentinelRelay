@@ -23,10 +23,23 @@ var tests = new (string Name, Func<Task> Run)[]
     ("bounded queue rejects overflow", Sync(QueueRejectsOverflow)),
     ("formatter splits long Discord messages safely", Sync(LongMessagesAreSplit)),
     ("embed formatter is compact and omits a duplicate timestamp", Sync(EmbedFormattingWorks)),
+    ("/fc parser preserves message text", Sync(FreeCompanyCommandParses)),
+    ("empty and unknown Discord commands are rejected", Sync(InvalidReplyCommandsAreRejected)),
+    ("authorized /fc command is accepted", Sync(AuthorizedReplyIsAccepted)),
+    ("wrong channel is rejected", Sync(WrongReplyChannelIsRejected)),
+    ("wrong Discord user is rejected", Sync(WrongReplyUserIsRejected)),
+    ("bot and webhook messages are rejected", Sync(AutomatedReplySourcesAreRejected)),
+    ("wrong FFXIV character is rejected", Sync(WrongCharacterIsRejected)),
+    ("disabled replies are rejected", Sync(DisabledRepliesAreRejected)),
+    ("paused replies are rejected", Sync(PausedRepliesAreRejected)),
+    ("duplicate and stale commands are rejected", Sync(ReplayAndStaleRepliesAreRejected)),
+    ("outbound allowlist blocks unapproved destinations", Sync(OutboundAllowlistIsRequired)),
+    ("local reply rate limit is enforced", Sync(ReplyRateLimitIsEnforced)),
     ("malformed and non-Discord webhooks are rejected", Sync(MalformedWebhooksAreRejected)),
     ("valid Discord webhook is normalized with wait=true", Sync(ValidWebhookIsNormalized)),
     ("Discord allowed_mentions is always empty", Sync(AllowedMentionsAreDisabled)),
     ("429 response is delayed and retried", RateLimitIsRetried),
+    ("Discord reader honors 429 and preserves message order data", DiscordReaderRateLimitIsRetried),
     ("webhook test reports successful delivery", WebhookTestSucceeds),
     ("configuration model survives serialization", Sync(ConfigurationModelPersists)),
 };
@@ -235,6 +248,154 @@ static void EmbedFormattingWorks()
     Assert(!json.Contains("\"footer\"", StringComparison.OrdinalIgnoreCase), "timestamp footer was substituted");
 }
 
+static void FreeCompanyCommandParses()
+{
+    Assert(DiscordReplyCommandParser.TryParse(
+        "/fc I'll be there in about 5 minutes!",
+        out var destination,
+        out var message), "valid /fc command was rejected");
+    Assert(destination == RelayChatType.FreeCompany, "wrong destination");
+    Assert(message == "I'll be there in about 5 minutes!", "spaces or punctuation changed");
+}
+
+static void InvalidReplyCommandsAreRejected()
+{
+    Assert(!DiscordReplyCommandParser.TryParse("/fc", out _, out _), "empty /fc was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/fc   ", out _, out _), "blank /fc was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/say hello", out _, out _), "unknown command was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse(" /fc hello", out _, out _), "non-prefix command was accepted");
+}
+
+static void AuthorizedReplyIsAccepted()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/fc hi", now),
+        "100000000000000001",
+        now,
+        out var command,
+        out var rejection);
+    Assert(accepted, $"authorized command was rejected: {rejection}");
+    Assert(command?.Destination == RelayChatType.FreeCompany && command.Message == "hi", "wrong parsed command");
+}
+
+static void WrongReplyChannelIsRejected()
+{
+    var now = DateTime.UtcNow;
+    var source = ReplyMessage("100000000000000002", "/fc hi", now);
+    source.ChannelId = "999999999999999999";
+    AssertReplyRejected(source, now, DiscordReplyRejection.WrongChannel);
+}
+
+static void WrongReplyUserIsRejected()
+{
+    var now = DateTime.UtcNow;
+    var source = ReplyMessage("100000000000000002", "/fc hi", now);
+    source.Author.Id = "999999999999999999";
+    AssertReplyRejected(source, now, DiscordReplyRejection.WrongUser);
+}
+
+static void AutomatedReplySourcesAreRejected()
+{
+    var now = DateTime.UtcNow;
+    var bot = ReplyMessage("100000000000000002", "/fc hi", now);
+    bot.Author.Bot = true;
+    AssertReplyRejected(bot, now, DiscordReplyRejection.BotAuthor);
+
+    var webhook = ReplyMessage("100000000000000003", "/fc hi", now);
+    webhook.WebhookId = "777777777777777777";
+    AssertReplyRejected(webhook, now, DiscordReplyRejection.WebhookAuthor);
+}
+
+static void WrongCharacterIsRejected()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        new CharacterIdentity("cid:other", "Other Character", "Example World", 2),
+        ReplyMessage("100000000000000002", "/fc hi", now),
+        "100000000000000001",
+        now,
+        out _,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.WrongCharacter, "wrong character was accepted");
+}
+
+static void DisabledRepliesAreRejected()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    profile.DiscordRepliesEnabled = false;
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/fc hi", now),
+        "100000000000000001",
+        now,
+        out _,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.Disabled, "disabled feature accepted a command");
+}
+
+static void PausedRepliesAreRejected()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    profile.Paused = true;
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/fc hi", now),
+        "100000000000000001",
+        now,
+        out _,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.Paused, "paused feature accepted a command");
+}
+
+static void ReplayAndStaleRepliesAreRejected()
+{
+    var now = DateTime.UtcNow;
+    AssertReplyRejected(
+        ReplyMessage("100000000000000001", "/fc duplicate", now),
+        now,
+        DiscordReplyRejection.Duplicate);
+    AssertReplyRejected(
+        ReplyMessage("100000000000000002", "/fc old", now.Subtract(TimeSpan.FromMinutes(3))),
+        now,
+        DiscordReplyRejection.Stale);
+}
+
+static void OutboundAllowlistIsRequired()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    profile.EnabledOutboundChannels.Clear();
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/fc hi", now),
+        "100000000000000001",
+        now,
+        out _,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.DestinationNotAllowed, "disabled destination was accepted");
+}
+
+static void ReplyRateLimitIsEnforced()
+{
+    var limiter = new SlidingWindowRateLimiter(2, TimeSpan.FromSeconds(30));
+    var now = DateTime.UtcNow;
+    Assert(limiter.TryAcquire(now, out _), "first message blocked");
+    Assert(limiter.TryAcquire(now.AddSeconds(1), out _), "second message blocked");
+    Assert(!limiter.TryAcquire(now.AddSeconds(2), out var retry) && retry > TimeSpan.Zero, "limit was not enforced");
+    Assert(limiter.TryAcquire(now.AddSeconds(31), out _), "expired rate-limit entry was not released");
+}
+
 static void MalformedWebhooksAreRejected()
 {
     Assert(!WebhookEndpoint.TryCreate("https://example.com/api/webhooks/123/token", out _, out _), "foreign host accepted");
@@ -283,6 +444,36 @@ static async Task RateLimitIsRetried()
     Assert(delays.Count == 1 && delays[0] >= TimeSpan.FromMilliseconds(100), "retry delay was not honored");
 }
 
+static async Task DiscordReaderRateLimitIsRetried()
+{
+    var handler = new SequenceHandler(
+        () => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("{\"retry_after\":0.25}"),
+        },
+        () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("[{\"id\":\"100000000000000003\",\"channel_id\":\"123456789012345678\",\"content\":\"/fc hi\",\"timestamp\":\"2026-09-21T12:00:00+00:00\",\"author\":{\"id\":\"234567890123456789\",\"bot\":false}}]"),
+        });
+    using var http = new HttpClient(handler);
+    var delays = new List<TimeSpan>();
+    var client = new DiscordRestMessageClient(http, (duration, _) =>
+    {
+        delays.Add(duration);
+        return Task.CompletedTask;
+    });
+    var result = await client.GetAfterAsync(
+        "a-valid-looking-token-that-is-never-real",
+        "123456789012345678",
+        "100000000000000001",
+        CancellationToken.None);
+
+    Assert(result.Success, result.Error ?? "reader retry failed");
+    Assert(result.WasRateLimited, "reader rate-limit flag missing");
+    Assert(result.Messages.Single().Content == "/fc hi", "message content changed");
+    Assert(delays.Count == 1 && delays[0] >= TimeSpan.FromMilliseconds(100), "reader retry delay was not honored");
+}
+
 static async Task WebhookTestSucceeds()
 {
     var handler = new SequenceHandler(() => new HttpResponseMessage(HttpStatusCode.NoContent));
@@ -306,6 +497,12 @@ static void ConfigurationModelPersists()
     first.EnabledInboundChannels = [RelayChatType.FreeCompany, RelayChatType.Shout];
     first.DiscordMentionUserId = "123456789012345678";
     first.Keywords = [new KeywordRule { Keyword = "ready", Channels = [RelayChatType.FreeCompany] }];
+    first.ProtectedDiscordBotToken = "dpapi-bot-ciphertext-one";
+    first.DiscordRepliesEnabled = true;
+    first.DiscordRelayChannelId = "123456789012345678";
+    first.AuthorizedDiscordUserId = "234567890123456789";
+    first.LastProcessedDiscordMessageId = "345678901234567890";
+    first.EnabledOutboundChannels = [RelayChatType.FreeCompany];
     var second = original.GetOrCreateProfile("cid:DEF", "Second Character", "Example World");
     second.ProtectedWebhookUrl = "dpapi-ciphertext-two";
     second.EnabledInboundChannels = [RelayChatType.Party];
@@ -321,6 +518,53 @@ static void ConfigurationModelPersists()
     Assert(restoredSecond.EnabledInboundChannels.SetEquals(second.EnabledInboundChannels), "second filters were lost");
     Assert(restoredFirst.Paused && restoredFirst.UseDiscordEmbeds && !restoredFirst.IncludeSenderWorld, "preferences were lost");
     Assert(restoredFirst.Keywords.Single().Keyword == "ready", "keyword was lost");
+    Assert(restoredFirst.ProtectedDiscordBotToken == first.ProtectedDiscordBotToken, "protected bot credential was lost");
+    Assert(restoredFirst.DiscordRepliesEnabled, "reply enabled state was lost");
+    Assert(restoredFirst.DiscordRelayChannelId == first.DiscordRelayChannelId, "reply channel was lost");
+    Assert(restoredFirst.AuthorizedDiscordUserId == first.AuthorizedDiscordUserId, "authorized user was lost");
+    Assert(restoredFirst.LastProcessedDiscordMessageId == first.LastProcessedDiscordMessageId, "checkpoint was lost");
+    Assert(restoredFirst.EnabledOutboundChannels.SetEquals([RelayChatType.FreeCompany]), "outbound allowlist was lost");
+}
+
+static CharacterProfile ConfiguredReplyProfile() => new()
+{
+    CharacterKey = "cid:one",
+    DiscordRepliesEnabled = true,
+    DiscordRelayChannelId = "123456789012345678",
+    AuthorizedDiscordUserId = "234567890123456789",
+    EnabledOutboundChannels = [RelayChatType.FreeCompany],
+};
+
+static CharacterIdentity ActiveIdentity() =>
+    new("cid:one", "Example Character", "Example World", 1);
+
+static DiscordChannelMessage ReplyMessage(string id, string content, DateTime timestamp) => new()
+{
+    Id = id,
+    ChannelId = "123456789012345678",
+    Content = content,
+    Timestamp = new DateTimeOffset(DateTime.SpecifyKind(timestamp, DateTimeKind.Utc)),
+    Author = new DiscordMessageAuthor
+    {
+        Id = "234567890123456789",
+        Bot = false,
+    },
+};
+
+static void AssertReplyRejected(
+    DiscordChannelMessage source,
+    DateTime now,
+    DiscordReplyRejection expected)
+{
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        ConfiguredReplyProfile(),
+        ActiveIdentity(),
+        source,
+        "100000000000000001",
+        now,
+        out _,
+        out var rejection);
+    Assert(!accepted && rejection == expected, $"expected {expected}, got {rejection}");
 }
 
 static CharacterProfile ConfiguredProfile(params RelayChatType[] channels) => new()

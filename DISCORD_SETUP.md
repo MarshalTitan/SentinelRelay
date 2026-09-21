@@ -85,6 +85,89 @@ For each character:
 
 Use [LIVE_TEST_CHECKLIST.md](LIVE_TEST_CHECKLIST.md) after updates or configuration changes.
 
+## 7. Optional experimental `/fc` replies
+
+The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for the experimental Discord → FFXIV `/fc` reader.
+
+This feature does **not** register a Discord slash command. `/fc hi` is an ordinary message posted in the private text channel. Do not configure BotGhost or another bot to own `/fc` for Sentinel Relay.
+
+### A. Restrict the existing bot to the relay channel
+
+The existing Sentinel Relay Discord application may be used. In each intended relay channel:
+
+1. Open **Edit Channel → Permissions**.
+2. Add the **Sentinel Relay** bot or its bot role.
+3. Allow **View Channel**.
+4. Allow **Read Message History**.
+5. Do not grant **Administrator** for this feature.
+6. Do not grant Send Messages, Manage Messages, Manage Channels, or other permissions unless a separate feature genuinely needs them.
+7. Ensure the bot cannot view the other character's relay channel unless that other client is intentionally configured for it.
+
+The reader uses Discord REST only; it does not open a Gateway session. Two game clients can therefore poll their separate channel IDs without duplicate Gateway command handling.
+
+### B. Enable the one required privileged intent
+
+Discord otherwise omits ordinary message content from bot API responses.
+
+1. Go to <https://discord.com/developers/applications>.
+2. Open the existing **Sentinel Relay** application.
+3. Select **Bot** in the left sidebar.
+4. Find **Privileged Gateway Intents**.
+5. Enable **Message Content Intent**.
+6. Save changes if Discord shows a save button.
+
+Presence Intent and Server Members Intent are not required. Although the prototype does not use a Gateway connection, Discord applies the message-content access rule to the bot's message data.
+
+### C. Copy the bot token securely
+
+1. On the application's **Bot** page, select **Reset Token** only if the current token is unavailable or may have leaked.
+2. Copy the token once.
+3. Never paste it into GitHub, a Discord message, a screenshot, a support ticket, `repo.json`, or a log.
+4. Treat it as more sensitive than a webhook URL: the token represents the bot wherever it has permissions.
+5. If it leaks, return to the Bot page, reset it immediately, and replace the saved credential on each intended client.
+
+Sentinel Relay masks the token and stores it with Windows DPAPI under the current Windows account. It cannot recover or display the plaintext token later.
+
+### D. Copy the channel and user IDs
+
+1. In Discord, open **User Settings → Advanced** and enable **Developer Mode**.
+2. Right-click the intended private relay channel and select **Copy Channel ID**.
+3. Right-click the one Discord account allowed to control that character and select **Copy User ID**.
+4. Do not use channel names, display names, or usernames; the plugin requires the numeric IDs.
+
+### E. Configure one character profile
+
+While the intended FFXIV character is logged in:
+
+1. Run `/srelay`.
+2. Confirm the active character shown in the header.
+3. Open **Experimental Replies**.
+4. Paste the Discord bot token.
+5. Paste that character's **Relay Channel ID**.
+6. Paste the single **Authorized Discord User ID**.
+7. Check **Allow /fc (Free Company) replies**.
+8. Check **Enable Discord → FFXIV Replies**.
+9. Select **Save Reply Settings**.
+10. Select **Test Discord Reader** and wait for the success notice in FFXIV chat.
+
+Saving or starting the reader establishes a checkpoint at the newest current Discord message. Old `/fc` messages are not executed.
+
+### F. Prove the real round trip
+
+1. Keep the configured character logged in and confirm the reader shows **Connected**.
+2. From the authorized Discord account, post exactly:
+
+   ```text
+   /fc hi
+   ```
+
+3. On a second FFXIV character/account in the same Free Company, verify that `hi` appears as a real Free Company message from the configured character.
+4. The normal webhook relay should then post that real outgoing FC event back into Discord once. Its webhook-authored message is ignored by the reader.
+
+`IChatGui.Print()` output is not proof. A second client/account must see the server-side FC message.
+
+Configure a second character separately with its own channel ID and authorized user ID. Never copy one character's channel ID into the other character's profile.
+
 ## If a webhook URL leaks
 
 Treat a leaked URL like a leaked password:
@@ -105,5 +188,8 @@ The deleted URL stops working. Other characters' separate webhooks do not need t
 - **Test appears in the wrong channel:** remove the saved webhook from `/srelay`, create a new webhook in the correct channel, and paste it while the correct FFXIV character is active.
 - **Normal chat does not appear:** the test must pass, the relay must be resumed, and that exact chat type must be enabled.
 - **Keyword highlight appears but no ping:** save the correct Discord User ID and enable **Ping configured user** on the keyword rule.
+- **Reader test returns HTTP 401:** the bot token is invalid or was reset. Replace it in the character profile.
+- **Reader test returns HTTP 403:** the bot lacks View Channel or Read Message History in that exact channel.
+- **Reader connects but `/fc` is ignored:** verify Message Content Intent, the exact numeric channel/user IDs, both experimental checkboxes, the active FFXIV character, and the literal `/fc ` prefix.
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for diagnostic steps.

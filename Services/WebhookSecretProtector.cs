@@ -7,9 +7,18 @@ namespace SentinelRelay.Services;
 public sealed class WebhookSecretProtector
 {
     private const uint CryptProtectUiForbidden = 0x1;
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("SentinelRelay/discord-webhook/v1");
+    private static readonly byte[] WebhookEntropy = Encoding.UTF8.GetBytes("SentinelRelay/discord-webhook/v1");
+    private static readonly byte[] BotTokenEntropy = Encoding.UTF8.GetBytes("SentinelRelay/discord-bot-token/v1");
 
-    public string Protect(string plaintext)
+    public string Protect(string plaintext) => Protect(plaintext, WebhookEntropy);
+
+    public string? Unprotect(string protectedValue) => Unprotect(protectedValue, WebhookEntropy);
+
+    public string ProtectDiscordBotToken(string plaintext) => Protect(plaintext, BotTokenEntropy);
+
+    public string? UnprotectDiscordBotToken(string protectedValue) => Unprotect(protectedValue, BotTokenEntropy);
+
+    private static string Protect(string plaintext, byte[] entropyBytes)
     {
         if (string.IsNullOrEmpty(plaintext))
             return string.Empty;
@@ -19,7 +28,7 @@ public sealed class WebhookSecretProtector
 
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
         using var input = DataBlob.FromBytes(plaintextBytes);
-        using var entropy = DataBlob.FromBytes(Entropy);
+        using var entropy = DataBlob.FromBytes(entropyBytes);
         if (!CryptProtectData(ref input.Value, null, ref entropy.Value, IntPtr.Zero, IntPtr.Zero, CryptProtectUiForbidden, out var output))
             throw new Win32Exception(Marshal.GetLastWin32Error());
 
@@ -36,7 +45,7 @@ public sealed class WebhookSecretProtector
         }
     }
 
-    public string? Unprotect(string protectedValue)
+    private static string? Unprotect(string protectedValue, byte[] entropyBytes)
     {
         if (string.IsNullOrWhiteSpace(protectedValue))
             return null;
@@ -48,7 +57,7 @@ public sealed class WebhookSecretProtector
         {
             var protectedBytes = Convert.FromBase64String(protectedValue);
             using var input = DataBlob.FromBytes(protectedBytes);
-            using var entropy = DataBlob.FromBytes(Entropy);
+            using var entropy = DataBlob.FromBytes(entropyBytes);
             if (!CryptUnprotectData(ref input.Value, IntPtr.Zero, ref entropy.Value, IntPtr.Zero, IntPtr.Zero, CryptProtectUiForbidden, out var output))
                 return null;
 

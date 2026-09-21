@@ -74,9 +74,29 @@ Settings are per FFXIV content ID. Confirm the intended character is fully logge
 
 If the protected URL becomes unreadable after moving a Dalamud configuration file to another Windows account/PC, paste that character's webhook again. Windows DPAPI intentionally ties protection to the original Windows user.
 
-## Discord bot is offline
+## Discord reader test fails
 
-The bot is unrelated to this revision. Sentinel Relay sends directly through incoming webhooks and works whether the bot is online, offline, or removed from the server.
+- **HTTP 401:** the bot token is invalid or has been reset. Paste the current token in **Experimental Replies** and save.
+- **HTTP 403:** the bot lacks **View Channel** or **Read Message History** in the configured channel.
+- **HTTP 404:** the Relay Channel ID is wrong or the channel is unavailable to the bot.
+- **Reader connected but content is ignored:** enable **Message Content Intent** on the application Bot page, verify the exact Authorized Discord User ID, and verify both reply checkboxes.
+
+The webhook relay still works if the bot reader is disabled or broken. The bot is not required for FFXIV → Discord.
+
+## `/fc hi` does nothing
+
+1. Confirm the intended FFXIV character is logged in and `/srelay` shows its profile.
+2. Confirm the reader state is **Connected**, not merely configured.
+3. Confirm the message was posted as ordinary text beginning exactly with `/fc `.
+4. Confirm it came from the configured user in the configured channel.
+5. Confirm **Allow /fc** and **Enable Discord → FFXIV Replies** are both saved.
+6. Confirm the relay is not paused and the local rate limit has not been reached.
+
+Do not use `/fc message: hi`, quote syntax, BotGhost, or a registered slash command. A local FFXIV notice is not proof of delivery; check from a second account/client in the same Free Company.
+
+## An old `/fc` message did not send after restart
+
+This is intentional. Starting, resuming, reconnecting, or switching characters advances to the newest current Discord message before polling. Commands written while the reader was offline are never replayed later.
 
 ## Safe diagnostic information to share
 
@@ -89,4 +109,4 @@ The bot is unrelated to this revision. Sentinel Relay sends directly through inc
 - last success time; and
 - last sanitized error.
 
-Never share the webhook URL, a screenshot containing it, or the local protected-secret value.
+Never share the webhook URL, bot token, a screenshot containing either, or a local protected-secret value.

@@ -1,6 +1,7 @@
 # Sentinel Relay live-test checklist
 
-Target release: `0.1.0.1`
+Stable fallback: `0.1.0.1`
+Experimental build: `0.2.0.0` development artifact (not the live catalog)
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +15,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Run `/srelay`, confirm version `0.1.0.1`, and verify the active character shown in the header.
+5. For stable one-way checks, confirm version `0.1.0.1`. For the separately installed reply artifact, confirm version `0.2.0.0`. Verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
@@ -110,7 +111,8 @@ For a character that can access each chat type:
 ## H — Formatting, sanitization, and duplicates
 
 - [ ] Compact text mode displays a clean `【CHANNEL】 Sender: message` form.
-- [ ] Embed mode displays channel/sender, message, color, and timestamp cleanly on desktop and mobile.
+- [ ] Embed mode displays channel/sender, message, and color cleanly on desktop and mobile.
+- [ ] No embed timestamp or timestamp footer is present; only Discord's native message timestamp remains.
 - [ ] Unicode survives in readable form.
 - [ ] Item, map, and player links become harmless readable plain text.
 - [ ] Control characters do not create malformed Discord output.
@@ -136,6 +138,58 @@ For a character that can access each chat type:
 
 - [ ] PASS
 
+## K — Experimental reader setup (first profile only)
+
+Do not enable the second profile yet.
+
+1. Give the Sentinel Relay bot only **View Channel** and **Read Message History** in the first private relay channel.
+2. Enable the bot application's **Message Content Intent**; do not enable Presence or Server Members intents for this feature.
+3. In `/srelay` → **Experimental Replies**, paste the protected bot token, first channel ID, and first authorized user ID.
+4. Enable **Allow /fc** and **Discord → FFXIV Replies**, then save.
+5. Select **Test Discord Reader** and confirm success.
+6. Confirm the reader reports **Connected** and the checkpoint reports **established**.
+
+- [ ] PASS
+
+## L — Real `/fc` proof
+
+1. Keep the first configured character logged in.
+2. From the exact authorized Discord account in the exact first relay channel, post the ordinary message:
+
+   ```text
+   /fc hi
+   ```
+
+3. On a second FFXIV account/client in the same Free Company, confirm a real FC message `hi` from the configured character.
+4. Confirm the natural outgoing-game webhook relay appears once in Discord.
+5. Confirm the webhook post does not trigger another game send.
+
+Local plugin output is not proof. The second FFXIV client must see the server-side message.
+
+- [ ] PASS
+
+## M — Authorization and replay rejection
+
+- [ ] The same `/fc hi` message ID executes at most once.
+- [ ] An `/fc` message posted while FFXIV/replies are off does not execute after restart/resume.
+- [ ] A different Discord user is ignored.
+- [ ] The same authorized user in a different channel is ignored.
+- [ ] `/say hi`, `/logout`, and empty `/fc` are ignored.
+- [ ] Bot and webhook posts are ignored.
+- [ ] Pausing stops both directions and clears the outgoing queue.
+- [ ] A burst above the local limit is dropped rather than spammed into FFXIV.
+
+## N — Second profile isolation
+
+Only after section L passes for the first profile:
+
+1. Configure the second profile with its own relay channel ID and authorized Discord user ID.
+2. Test `/fc second profile isolation` from the second authorized account/channel.
+3. Confirm only the second FFXIV character sends it.
+4. Post `/fc wrong route` in each wrong channel/user combination and confirm neither profile sends it.
+
+- [ ] PASS
+
 ## Final sign-off
 
 - [ ] First tester: ____________________ Date: __________
@@ -144,4 +198,4 @@ For a character that can access each chat type:
 - [ ] Release workflow run: ______________________________
 - [ ] Catalog URL/version verified from a clean Dalamud install
 
-Failures in routing isolation, disabled-filter privacy, pause behavior, webhook masking, mention safety, or direct delivery require a follow-up fix.
+Failures in routing isolation, disabled-filter privacy, pause behavior, webhook/bot-token masking, mention safety, checkpointing, or real server-side FC delivery require a follow-up fix. Until the `/fc` proof passes, keep `0.1.0.1` as the live catalog fallback.

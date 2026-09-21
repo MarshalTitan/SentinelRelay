@@ -11,6 +11,15 @@ FFXIV / Dalamud
   → private Discord relay channel
 ```
 
+The optional experimental reply path also runs inside the same Dalamud plugin:
+
+```text
+private Discord relay channel
+  → outbound HTTPS REST polling by Sentinel Relay
+  → local authorization and fixed /fc allowlist
+  → active FFXIV character
+```
+
 There is nothing to deploy to Railway, Render, Fly.io, a VPS, a home server, Docker, Node.js, SQLite, Tailscale, or a router.
 
 ## Cost
@@ -26,6 +35,7 @@ No purchase or hosting signup is required.
 ## Network behavior
 
 - The plugin makes outbound HTTPS requests only when an enabled FFXIV chat message or explicit webhook test must be delivered.
+- If experimental replies are enabled, the plugin also makes small outbound Discord message-history requests about every two seconds while that character is logged in.
 - It accepts only Discord webhook URLs on Discord-owned HTTPS hosts.
 - It never opens a listening port.
 - It does not expose the PC to inbound Internet connections.
@@ -37,13 +47,13 @@ No purchase or hosting signup is required.
 The earlier prototype's following components have been retired from the production repository:
 
 - Node/TypeScript relay service
-- Discord Gateway bot dependency
+- Discord Gateway bot dependency (the optional reader uses REST, not Gateway)
 - WebSocket client/server protocol
 - Railway configuration
 - Docker image and Compose configuration
 - SQLite link/routing database
 - pairing codes and client authentication tokens
-- Discord-to-FFXIV command routing
+- hosted Discord-to-FFXIV command routing
 
 ## Updates
 

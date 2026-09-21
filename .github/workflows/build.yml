@@ -1,8 +1,9 @@
 name: Build
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, experimental-discord-replies]
   pull_request:
     branches: [main]
 
