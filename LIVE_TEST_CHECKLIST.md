@@ -5,6 +5,19 @@ Required testers: Wrothy Minioa, Elektra Minoa, and at least one independent FFX
 
 Do not publish the catalog entry as production-ready until every release-blocking item passes. Record date, Dalamud API, FFXIV patch, plugin commit, service commit, and tester initials.
 
+## Install the pre-release build
+
+The catalog is intentionally not updated until the real outbound-chat checks pass. Install the validated CI package as a development plugin on each test PC:
+
+1. Open the successful **Build** workflow run for the release commit and download the `SentinelRelay-0.1.0.0` artifact.
+2. Extract the downloaded artifact. It contains `latest.zip`; extract that archive into a stable local folder such as `C:\DalamudDevPlugins\SentinelRelay`.
+3. Confirm the folder contains `SentinelRelay.dll`, `SentinelRelay.json`, `SentinelRelay.deps.json`, and `assets\icon.png` together.
+4. In FFXIV, run `/xlsettings`, open **Experimental**, and add the full path to `SentinelRelay.dll` under **Dev Plugin Locations**. Dalamud also accepts the containing folder, but selecting the DLL avoids loading unrelated DLLs.
+5. Select **Save and Close**, run `/xlplugins`, open **Dev Tools** → **Installed Dev Plugins**, and enable **Sentinel Relay**.
+6. Run `/srelay` and verify version `0.1.0.0` before pairing.
+
+After the signed-off release is available through the Sentinel catalog, disable/remove this dev-plugin entry before installing the catalog copy so two copies cannot load.
+
 ## Preconditions
 
 - [ ] Backend `/ready` returns HTTP 200 with Discord `connected`.
