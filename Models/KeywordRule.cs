@@ -8,8 +8,7 @@ public sealed class KeywordRule
 
     public bool WholeWord { get; set; }
 
-    public AlertMethod AlertMethod { get; set; } = AlertMethod.DirectMessage;
+    public bool PingDiscordUser { get; set; }
 
     public HashSet<RelayChatType> Channels { get; set; } = [];
 }
-

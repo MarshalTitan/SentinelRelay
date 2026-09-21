@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       live_tested:
-        description: 'I completed LIVE_TEST_CHECKLIST.md, including independent FC and Say visibility.'
+        description: 'I completed LIVE_TEST_CHECKLIST.md for both character webhooks and filter isolation.'
         required: true
         default: false
         type: boolean
@@ -17,38 +17,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  service-quality:
-    runs-on: ubuntu-latest
+  publish:
+    runs-on: windows-latest
 
     steps:
       - name: Require live-test attestation
         if: inputs.live_tested != true
-        run: |
-          echo 'Complete LIVE_TEST_CHECKLIST.md before publishing.' >&2
-          exit 1
+        shell: pwsh
+        run: throw 'Complete LIVE_TEST_CHECKLIST.md before publishing.'
 
-      - name: Check out release source
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: service/package-lock.json
-
-      - name: Install and test service
-        working-directory: service
-        run: npm ci && npm run check && npm test && npm run build
-
-      - name: Build production container
-        run: docker build --tag sentinel-relay-service:release .
-
-  publish:
-    needs: service-quality
-    runs-on: windows-latest
-
-    steps:
       - name: Check out release source
         uses: actions/checkout@v7
 
@@ -124,7 +101,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }} beta" `
-            --notes "First Sentinel Relay beta: two-way, per-character Discord relay. Live-test attestation was required before publication. See SECURITY.md and LIVE_TEST_CHECKLIST.md." `
+            --notes "First Sentinel Relay beta: direct per-character FFXIV-to-Discord webhook relay with no hosted backend. Live-test attestation was required before publication. See SECURITY.md and LIVE_TEST_CHECKLIST.md." `
             --prerelease
 
       - name: Verify public release asset

@@ -1,10 +1,9 @@
 {
   "Name": "Sentinel Relay",
   "Author": "MTitan",
-  "Punchline": "Private, two-way FFXIV and Discord chat relay.",
-  "Description": "Relays explicitly selected FFXIV chat channels to Discord and allows a linked Discord user to send strictly whitelisted chat messages through their own logged-in character.",
+  "Punchline": "Private FFXIV-to-Discord chat relay with no hosted backend.",
+  "Description": "Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off; no bot, paid hosting, or Discord-to-FFXIV control is required.",
   "RepoUrl": "https://github.com/MarshalTitan/SentinelRelay",
   "IconUrl": "https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png",
   "Tags": ["chat", "discord", "relay", "utility", "sentinel"]
 }
-

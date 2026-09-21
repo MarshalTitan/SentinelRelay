@@ -62,36 +62,3 @@ jobs:
           name: SentinelRelay-${{ steps.version.outputs.value }}
           path: bin/Release/SentinelRelay/latest.zip
           if-no-files-found: error
-
-  service:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: service/package-lock.json
-
-      - name: Install locked dependencies
-        working-directory: service
-        run: npm ci
-
-      - name: Type-check service
-        working-directory: service
-        run: npm run check
-
-      - name: Run service tests
-        working-directory: service
-        run: npm test
-
-      - name: Build service
-        working-directory: service
-        run: npm run build
-
-      - name: Build production container
-        run: docker build --tag sentinel-relay-service:test .

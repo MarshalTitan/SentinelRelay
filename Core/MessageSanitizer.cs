@@ -35,28 +35,17 @@ public static class MessageSanitizer
         return builder.ToString().Trim();
     }
 
-    public static bool IsValidOutbound(string value, out string error)
+    public static string SanitizeForDiscord(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            error = "Message cannot be empty.";
-            return false;
-        }
+        var sanitized = SanitizePlainText(value);
+        if (sanitized.Length == 0)
+            return sanitized;
 
-        if (value.EnumerateRunes().Count() > ChannelPolicy.MaxMessageCharacters)
-        {
-            error = $"Message exceeds {ChannelPolicy.MaxMessageCharacters} characters.";
-            return false;
-        }
-
-        if (Encoding.UTF8.GetByteCount(value) > ChannelPolicy.MaxMessageUtf8Bytes)
-        {
-            error = $"Message exceeds {ChannelPolicy.MaxMessageUtf8Bytes} UTF-8 bytes.";
-            return false;
-        }
-
-        error = string.Empty;
-        return true;
+        return sanitized
+            .Replace("@everyone", "@\u200Beveryone", StringComparison.OrdinalIgnoreCase)
+            .Replace("@here", "@\u200Bhere", StringComparison.OrdinalIgnoreCase)
+            .Replace("<@", "<@\u200B", StringComparison.Ordinal)
+            .Replace("<#", "<#\u200B", StringComparison.Ordinal);
     }
 
     public static string Signature(string value) => SanitizePlainText(value).Normalize(NormalizationForm.FormKC);
@@ -68,4 +57,3 @@ public static class MessageSanitizer
         previousWasSpace = true;
     }
 }
-

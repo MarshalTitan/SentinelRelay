@@ -1,186 +1,171 @@
 # Sentinel Relay live-test checklist
 
 Target release: `0.1.0.0`  
-Required testers: Wrothy Minioa, Elektra Minoa, and at least one independent FFXIV observer for network-visible outbound verification.
+Required testers: Wrothy Minioa and Elektra Minoa
 
-Do not publish the catalog entry as production-ready until every release-blocking item passes. Record date, Dalamud API, FFXIV patch, plugin commit, service commit, and tester initials.
+Do not publish the catalog entry until every release-blocking item passes. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the pre-release build
 
-The catalog is intentionally not updated until the real outbound-chat checks pass. Install the validated CI package as a development plugin on each test PC:
+The catalog is intentionally not updated until this checklist passes:
 
-1. Open the successful **Build** workflow run for the release commit and download the `SentinelRelay-0.1.0.0` artifact.
-2. Extract the downloaded artifact. It contains `latest.zip`; extract that archive into a stable local folder such as `C:\DalamudDevPlugins\SentinelRelay`.
-3. Confirm the folder contains `SentinelRelay.dll`, `SentinelRelay.json`, `SentinelRelay.deps.json`, and `assets\icon.png` together.
-4. In FFXIV, run `/xlsettings`, open **Experimental**, and add the full path to `SentinelRelay.dll` under **Dev Plugin Locations**. Dalamud also accepts the containing folder, but selecting the DLL avoids loading unrelated DLLs.
-5. Select **Save and Close**, run `/xlplugins`, open **Dev Tools** → **Installed Dev Plugins**, and enable **Sentinel Relay**.
-6. Run `/srelay` and verify version `0.1.0.0` before pairing.
+1. Open the successful **Build** workflow run for the candidate commit.
+2. Download the `SentinelRelay-0.1.0.0` artifact.
+3. Extract the downloaded artifact; it contains `latest.zip`.
+4. Extract `latest.zip` into a stable folder such as `C:\DalamudDevPlugins\SentinelRelay`.
+5. Confirm the folder contains `SentinelRelay.dll`, `SentinelRelay.json`, `SentinelRelay.deps.json`, and `assets\icon.png`.
+6. In FFXIV, run `/xlsettings` → **Experimental** → **Dev Plugin Locations** and select `SentinelRelay.dll`.
+7. Save, run `/xlplugins`, open **Dev Tools** → **Installed Dev Plugins**, and enable **Sentinel Relay**.
+8. Run `/srelay` and confirm version `0.1.0.0`.
 
-After the signed-off release is available through the Sentinel catalog, disable/remove this dev-plugin entry before installing the catalog copy so two copies cannot load.
+Remove this development-plugin entry before installing the eventual catalog copy.
 
 ## Preconditions
 
-- [ ] Backend `/ready` returns HTTP 200 with Discord `connected`.
-- [ ] Plugin and backend both report version `0.1.0`/`0.1.0.0` as appropriate.
-- [ ] Wrothy and Elektra use separate Discord accounts.
-- [ ] `#relay-wrothy` and `#relay-elektra` have private, non-overlapping member permissions.
-- [ ] Sentinel Relay bot has only View Channels, Send Messages, and Embed Links.
-- [ ] All privileged Discord intents are off.
-- [ ] Backend logs do not print secrets or chat bodies.
+- [ ] `#relay-wrothy` and `#relay-elektra` are private channels.
+- [ ] Each channel has its own webhook; the two URLs are not the same.
+- [ ] No webhook URL is committed, posted, logged, or visible in screenshots.
+- [ ] No Railway/Docker/Node/WebSocket service is running or required.
+- [ ] The Discord bot may be offline; webhook tests still work.
+- [ ] All chat filters begin off for a fresh character profile.
 
-## A — Wrothy FFXIV → Discord
+## A — Wrothy webhook and routing
 
-1. Log in as **Wrothy Minioa** and run `/srelay status`.
-2. Enable Say, Free Company, and Shout; leave other filters off.
-3. Send, in order:
+1. Log in as **Wrothy Minioa**.
+2. Run `/srelay` and verify Wrothy appears in the header.
+3. Paste only the `#relay-wrothy` webhook, save, and test.
+4. Confirm this appears in `#relay-wrothy`:
 
    ```text
-   Say: Sentinel Relay Wrothy Say test A1
-   FC: Sentinel Relay Wrothy FC test A2
-   Shout: Sentinel Relay Wrothy Shout test A3
+   Sentinel Relay connected successfully for Wrothy Minioa.
    ```
 
-4. Verify three ordered embeds in `#relay-wrothy` with correct labels, sender, readable text, and timestamps.
-5. Verify none appears in `#relay-elektra`.
+5. Confirm nothing appears in `#relay-elektra`.
 
 - [ ] PASS
 
-## B — Elektra FFXIV → Discord
+## B — Wrothy chat relay
 
-1. Log in as **Elektra Minoa** in the independent client/profile.
-2. Enable Say, Free Company, and Shout.
-3. Send equivalent B1/B2/B3 messages.
-4. Verify they appear only in `#relay-elektra`, never `#relay-wrothy`.
+1. Enable Say, Free Company, and Shout only.
+2. Send unique messages in this order:
+
+   ```text
+   Say: Sentinel Relay Wrothy Say B1
+   FC: Sentinel Relay Wrothy FC B2
+   Shout: Sentinel Relay Wrothy Shout B3
+   ```
+
+3. Confirm three ordered messages in `#relay-wrothy` with correct labels, sender, readable text, and optional world.
+4. Confirm none appears in `#relay-elektra`.
 
 - [ ] PASS
 
-## C — Local filtering
+## C — Elektra webhook and routing
+
+1. Log in as **Elektra Minoa** and wait for the header to change.
+2. Confirm Elektra initially shows her own webhook state and filters—not Wrothy's values.
+3. Paste only the `#relay-elektra` webhook, save, and test.
+4. Confirm the Elektra success message appears only in `#relay-elektra`.
+
+- [ ] PASS
+
+## D — Elektra independent filters
+
+1. Enable Party and Yell for Elektra, leaving FC and Shout disabled.
+2. Send a Party message and a Yell; confirm both reach `#relay-elektra`.
+3. Send an FC message and a Shout; confirm neither reaches Discord.
+4. Switch back to Wrothy and confirm Wrothy still has Say/FC/Shout enabled and her own webhook.
+
+- [ ] PASS
+
+## E — Sensitive channel opt-in
+
+For a character that can access each chat type:
+
+- [ ] Incoming Tell works only when Incoming Tell is enabled.
+- [ ] Outgoing Tell works only when Outgoing Tell is enabled.
+- [ ] Party and Cross-world Party are independently selectable.
+- [ ] Alliance and PvP Team remain off unless explicitly enabled.
+- [ ] LS 1–8 mappings match their selected numbers.
+- [ ] CWLS 1–8 mappings match their selected numbers.
+- [ ] Novice Network remains off unless explicitly enabled.
+- [ ] Standard and Custom Emotes are independently selectable.
+
+## F — Local filtering proof
 
 1. On Wrothy, disable Shout and keep Say enabled.
-2. Send `Sentinel Relay disabled Shout test C1` in Shout.
-3. Send `Sentinel Relay enabled Say control C2` in Say.
-4. Verify C1 never reaches the backend/Discord and C2 reaches `#relay-wrothy`.
+2. Send `Sentinel Relay disabled Shout F1` in Shout.
+3. Send `Sentinel Relay enabled Say F2` in Say.
+4. Confirm only F2 reaches Discord.
+5. Check `/srelay debug`; no queue activity should result from F1.
 
 - [ ] PASS
 
-## D — Keyword alert
+## G — Pause/resume
 
-1. On Wrothy, add keyword `Wrothy`, contains mode, Discord DM, monitoring enabled FC/Say/Shout.
-2. From another character, say in an enabled channel: `Wrothy are you coming?`
-3. Verify one relay-channel embed and exactly one DM containing keyword, channel, sender, and context.
-4. Add a second matching keyword temporarily and repeat; verify one bundled DM, not one DM per keyword.
-
-- [ ] PASS
-
-## E — Discord → real Free Company chat
-
-1. Keep an independent FC member/client watching FC chat.
-2. In `#relay-wrothy`, from Wrothy's linked Discord account, run:
-
-   ```text
-   /fc message:Sentinel Relay FC test E1
-   ```
-
-3. Verify the command receives an ephemeral success only after FFXIV echo.
-4. Verify the independent FC member genuinely sees E1 sent by Wrothy Minioa.
-5. Verify `#relay-wrothy` shows exactly one outbound confirmation and no loop.
-
-- [ ] PASS — independent observer confirmed
-
-## F — Discord → real Say chat
-
-1. Keep another nearby FFXIV character/client watching Say.
-2. In `#relay-wrothy`, run:
-
-   ```text
-   /say message:Sentinel Relay Say test F1
-   ```
-
-3. Verify the nearby observer genuinely sees F1 from Wrothy.
-4. Verify one Discord confirmation and no relay-back duplicate.
-
-- [ ] PASS — independent observer confirmed
-
-## Initial channel verification extension
-
-Repeat inbound and outbound visibility for these minimum V1 channels:
-
-- [ ] Yell inbound/outbound
-- [ ] Shout inbound/outbound
-- [ ] Party inbound/outbound with another party member
-- [ ] Free Company inbound/outbound
-- [ ] Say inbound/outbound
-
-Then test memberships that exist on each character:
-
-- [ ] LS 1 using `/ls channel:1 message:Sentinel Relay LS1 test`
-- [ ] At least one non-1 LS mapping if configured
-- [ ] CWLS 1 using `/cwls channel:1 message:Sentinel Relay CWLS1 test`
-- [ ] At least one non-1 CWLS mapping if configured
-- [ ] Alliance and PvP Team in valid game contexts, or mark deferred with reason
-
-Tell outbound is not implemented and is not a release criterion.
-
-## G — User and route isolation
-
-1. From Wrothy's Discord account, run an outbound command in `#relay-elektra`; expect rejection.
-2. From Elektra's account, run one in `#relay-wrothy`; expect rejection.
-3. From an unlinked third account with channel visibility, attempt `/say`; expect `not linked`.
-4. Confirm no rejected text reaches either FFXIV client.
+1. Run `/srelay pause`.
+2. Send an otherwise enabled message; confirm Discord receives nothing.
+3. Run `/srelay status`; confirm **paused**.
+4. Run `/srelay resume`, send fresh text, and confirm delivery resumes.
 
 - [ ] PASS
 
-## H — Character/client offline
+## H — Keyword highlight and optional ping
 
-1. Close Wrothy's FFXIV client and wait at least 30 seconds.
-2. Confirm `#relay-wrothy` receives one offline status.
-3. Attempt `/fc message:Offline test H1`.
-4. Verify the bot says Wrothy is offline and does not queue H1.
-5. Keep Elektra online and confirm her relay remains functional.
-
-- [ ] PASS
-
-## I — Backend outage
-
-1. Pause or stop the hosted backend for two minutes.
-2. Verify both FFXIV clients remain responsive/stable and show Offline/Reconnecting.
-3. Send several FFXIV test lines during the outage.
-4. Restart the backend.
-5. Verify clients reconnect with backoff and no old chat burst appears in Discord.
-6. Verify current new chat relays normally.
+1. In Wrothy's **Keywords** tab, save Wrothy's numeric Discord User ID.
+2. Add keyword `Wrothy`, contains mode, Free Company, **Ping configured user** enabled.
+3. From another character, send `Wrothy are you coming?` in FC.
+4. Confirm one relayed chat item includes a keyword alert and pings only Wrothy.
+5. Add a second matching keyword and repeat; confirm one bundled alert, not one ping per rule.
+6. Test literal `@everyone`, `@here`, `<@user>`, `<@&role>`, and `<#channel>` text; confirm none creates an unintended mention.
 
 - [ ] PASS
 
-## J — Reload and persistence
+## I — Formatting, sanitization, and duplicates
 
-1. Record each character's enabled filters, keyword, pause setting, Discord link, and channel.
+- [ ] Compact text mode displays a clean `【CHANNEL】 Sender: message` form.
+- [ ] Embed mode displays channel/sender, message, color, and timestamp cleanly on desktop/mobile.
+- [ ] Unicode survives in readable form.
+- [ ] Item, map, and player links become harmless readable plain text.
+- [ ] Control characters do not create malformed Discord output.
+- [ ] One duplicated chat event is not posted twice.
+- [ ] Distinct messages remain in original order.
+
+## J — Outage and rate behavior
+
+1. Temporarily block/disconnect Internet access or wait for a safe Discord maintenance test window.
+2. Confirm FFXIV remains responsive and Sentinel Relay reports an error without freezing.
+3. Restore connectivity and use **Test Webhook**.
+4. Confirm the queue does not dump messages older than two minutes.
+5. During a normal chat burst, confirm message order is maintained and Discord is not hammered with rapid retries.
+
+- [ ] PASS
+
+## K — Restart and persistence
+
+1. Record both characters' webhook state, filters, formatting, keyword rules, and pause state.
 2. Restart/reload Dalamud and, if practical, restart FFXIV.
-3. Verify per-character local configuration survives.
-4. Verify the DPAPI-protected credential reconnects without relinking.
-5. Restart the backend without deleting `/data`; verify both links/channels survive.
+3. Log into Wrothy and verify her settings and webhook test.
+4. Log into Elektra and verify her independent settings and webhook test.
+5. Confirm neither saved webhook URL is visible in UI, status, debug, or logs.
 
 - [ ] PASS
 
-## Additional safety tests
+## L — Scope-removal checks
 
-- [ ] `/srelay pause` immediately blocks both directions and is visually obvious.
-- [ ] `/srelay resume` restores both directions without relinking.
-- [ ] A 181-character Discord message is rejected.
-- [ ] Newline/control-character input cannot inject a second FFXIV command.
-- [ ] Six rapid outbound commands trigger rate/queue rejection without a delayed flood.
-- [ ] Repeating/replaying an event ID does not duplicate a game send.
-- [ ] `/logout`, `/teleport`, `/target`, `/xlplugins`, and arbitrary command names do not exist in Discord and cannot be encoded as a `chatType`.
-- [ ] Unicode, item link text, map link text, player links, standard emotes, and custom emotes arrive as safe/readable text or a harmless plain-text approximation.
-- [ ] Wrong/expired pairing code fails; used pairing code cannot be reused.
-- [ ] `/relay unlink` revokes the plugin session; relinking issues a new credential.
-- [ ] Service logs contain no bot token, client token, keyword rule, or message body.
+- [ ] No Discord → FFXIV command exists.
+- [ ] No `/srelay link` or `/srelay unlink` exists.
+- [ ] No pairing code appears.
+- [ ] No bot token is requested.
+- [ ] No Railway, Docker, Node, SQLite, Tailscale, port-forwarding, or local service instruction remains.
+- [ ] Normal delivery works while the old Sentinel Relay bot is offline.
 
 ## Final sign-off
 
-- [ ] Wrothy tester sign-off: ____________________ Date: __________
-- [ ] Elektra tester sign-off: ___________________ Date: __________
-- [ ] Independent FC/Say observer: ______________ Date: __________
-- [ ] Release commit/tag recorded: _______________________________
+- [ ] Wrothy tester: ____________________ Date: __________
+- [ ] Elektra tester: ___________________ Date: __________
+- [ ] Candidate commit: __________________________________
+- [ ] Release workflow run: _______________________________
 - [ ] Catalog URL/version verified from a clean Dalamud install
 
-Any failure in E, F, G, pause behavior, arbitrary-command prevention, credential isolation, or cross-channel routing blocks release.
+Failures in routing isolation, disabled-filter privacy, pause behavior, webhook masking, mention safety, or no-backend operation block release.

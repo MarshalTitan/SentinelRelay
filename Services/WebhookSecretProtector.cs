@@ -4,10 +4,10 @@ using System.Text;
 
 namespace SentinelRelay.Services;
 
-public sealed class CredentialProtector
+public sealed class WebhookSecretProtector
 {
     private const uint CryptProtectUiForbidden = 0x1;
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("SentinelRelay/client-token/v1");
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("SentinelRelay/discord-webhook/v1");
 
     public string Protect(string plaintext)
     {
@@ -15,7 +15,7 @@ public sealed class CredentialProtector
             return string.Empty;
 
         if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Sentinel Relay client credentials require Windows DPAPI.");
+            throw new PlatformNotSupportedException("Sentinel Relay webhook protection requires Windows DPAPI.");
 
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
         using var input = DataBlob.FromBytes(plaintextBytes);

@@ -29,8 +29,8 @@ if ($matches.Count -gt 1) {
 $values = [ordered]@{
     Author = 'MTitan'
     Name = 'Sentinel Relay'
-    Punchline = 'Private, two-way FFXIV and Discord chat relay.'
-    Description = 'Relays explicitly selected FFXIV chat channels to Discord and allows a linked Discord user to send strictly whitelisted chat messages through their own logged-in character.'
+    Punchline = 'Private FFXIV-to-Discord chat relay with no hosted backend.'
+    Description = 'Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off; no bot, paid hosting, or Discord-to-FFXIV control is required.'
     InternalName = 'SentinelRelay'
     AssemblyVersion = $Version
     TestingAssemblyVersion = $Version

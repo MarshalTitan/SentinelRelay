@@ -4,68 +4,18 @@ namespace SentinelRelay.Core;
 
 public static class ChannelPolicy
 {
-    public const int MaxMessageCharacters = 180;
-    public const int MaxMessageUtf8Bytes = 400;
+    public const int DiscordContentLimit = 2000;
+    public const int DiscordEmbedDescriptionLimit = 4096;
+    public const int SafeDiscordContentLimit = 1900;
+    public const int SafeDiscordEmbedDescriptionLimit = 3900;
 
     public static readonly IReadOnlyList<RelayChatType> InboundChannels = Enum.GetValues<RelayChatType>();
 
-    public static readonly IReadOnlySet<RelayChatType> OutboundChannels = new HashSet<RelayChatType>
-    {
-        RelayChatType.Say,
-        RelayChatType.Yell,
-        RelayChatType.Shout,
-        RelayChatType.Party,
-        RelayChatType.Alliance,
-        RelayChatType.FreeCompany,
-        RelayChatType.PvPTeam,
-        RelayChatType.Linkshell1,
-        RelayChatType.Linkshell2,
-        RelayChatType.Linkshell3,
-        RelayChatType.Linkshell4,
-        RelayChatType.Linkshell5,
-        RelayChatType.Linkshell6,
-        RelayChatType.Linkshell7,
-        RelayChatType.Linkshell8,
-        RelayChatType.CrossWorldLinkshell1,
-        RelayChatType.CrossWorldLinkshell2,
-        RelayChatType.CrossWorldLinkshell3,
-        RelayChatType.CrossWorldLinkshell4,
-        RelayChatType.CrossWorldLinkshell5,
-        RelayChatType.CrossWorldLinkshell6,
-        RelayChatType.CrossWorldLinkshell7,
-        RelayChatType.CrossWorldLinkshell8,
-    };
-
-    public static string GetCommandPrefix(RelayChatType channel) => channel switch
-    {
-        RelayChatType.Say => "/say",
-        RelayChatType.Yell => "/yell",
-        RelayChatType.Shout => "/shout",
-        RelayChatType.Party => "/party",
-        RelayChatType.Alliance => "/alliance",
-        RelayChatType.FreeCompany => "/freecompany",
-        RelayChatType.PvPTeam => "/pvpteam",
-        RelayChatType.Linkshell1 => "/linkshell1",
-        RelayChatType.Linkshell2 => "/linkshell2",
-        RelayChatType.Linkshell3 => "/linkshell3",
-        RelayChatType.Linkshell4 => "/linkshell4",
-        RelayChatType.Linkshell5 => "/linkshell5",
-        RelayChatType.Linkshell6 => "/linkshell6",
-        RelayChatType.Linkshell7 => "/linkshell7",
-        RelayChatType.Linkshell8 => "/linkshell8",
-        RelayChatType.CrossWorldLinkshell1 => "/cwlinkshell1",
-        RelayChatType.CrossWorldLinkshell2 => "/cwlinkshell2",
-        RelayChatType.CrossWorldLinkshell3 => "/cwlinkshell3",
-        RelayChatType.CrossWorldLinkshell4 => "/cwlinkshell4",
-        RelayChatType.CrossWorldLinkshell5 => "/cwlinkshell5",
-        RelayChatType.CrossWorldLinkshell6 => "/cwlinkshell6",
-        RelayChatType.CrossWorldLinkshell7 => "/cwlinkshell7",
-        RelayChatType.CrossWorldLinkshell8 => "/cwlinkshell8",
-        _ => throw new InvalidOperationException($"{channel} is not an allowed outbound channel."),
-    };
-
     public static string GetLabel(RelayChatType channel) => channel switch
     {
+        RelayChatType.IncomingTell => "Incoming Tell",
+        RelayChatType.OutgoingTell => "Outgoing Tell",
+        RelayChatType.CrossWorldParty => "Cross-world Party",
         RelayChatType.FreeCompany => "Free Company",
         RelayChatType.PvPTeam => "PvP Team",
         RelayChatType.NoviceNetwork => "Novice Network",
@@ -92,6 +42,9 @@ public static class ChannelPolicy
 
     public static string GetShortLabel(RelayChatType channel) => channel switch
     {
+        RelayChatType.IncomingTell => "TELL IN",
+        RelayChatType.OutgoingTell => "TELL OUT",
+        RelayChatType.CrossWorldParty => "CROSS-PARTY",
         RelayChatType.FreeCompany => "FC",
         RelayChatType.PvPTeam => "PVP",
         RelayChatType.NoviceNetwork => "NN",
@@ -114,5 +67,20 @@ public static class ChannelPolicy
         RelayChatType.Linkshell7 => "LS7",
         RelayChatType.Linkshell8 => "LS8",
         _ => channel.ToString().ToUpperInvariant(),
+    };
+
+    public static int GetDiscordColor(RelayChatType channel) => channel switch
+    {
+        RelayChatType.FreeCompany => 0x4CAF50,
+        RelayChatType.Party or RelayChatType.CrossWorldParty => 0x4FC3F7,
+        RelayChatType.Alliance => 0xF06292,
+        RelayChatType.IncomingTell or RelayChatType.OutgoingTell => 0xEC407A,
+        RelayChatType.Shout => 0xFF7043,
+        RelayChatType.Yell => 0xFFB74D,
+        RelayChatType.PvPTeam => 0xEF5350,
+        >= RelayChatType.Linkshell1 and <= RelayChatType.CrossWorldLinkshell8 => 0xAB47BC,
+        RelayChatType.NoviceNetwork => 0x43A047,
+        RelayChatType.StandardEmote or RelayChatType.CustomEmote => 0x9E9E9E,
+        _ => 0x5C6BC0,
     };
 }

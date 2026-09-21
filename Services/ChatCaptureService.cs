@@ -57,7 +57,7 @@ public sealed class ChatCaptureService : IDisposable
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "Sentinel Relay ignored a chat message that could not be sanitized.");
+            log.Warning("Sentinel Relay ignored a chat message that could not be sanitized ({ExceptionType}).", ex.GetType().Name);
         }
     }
 }

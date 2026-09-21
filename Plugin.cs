@@ -6,15 +6,17 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using SentinelRelay.Core;
 using SentinelRelay.Models;
-using SentinelRelay.Protocol;
 using SentinelRelay.Services;
 using SentinelRelay.UI;
 
 namespace SentinelRelay;
 
+public sealed record WebhookConfigurationResult(bool Success, string? Error);
+
 public sealed class Plugin : IDalamudPlugin
 {
     private const string CommandName = "/srelay";
+    private static readonly string PluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "unknown";
 
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
@@ -25,14 +27,15 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly WindowSystem windows = new("SentinelRelay");
     private readonly ConcurrentQueue<Action> mainThreadActions = new();
-    private readonly CredentialProtector credentialProtector = new();
+    private readonly WebhookSecretProtector secretProtector = new();
     private readonly CharacterContextService characterContext;
-    private readonly RelayClient relayClient;
-    private readonly OutboundCoordinator outboundCoordinator;
+    private readonly WebhookRelayClient webhookRelay;
+    private readonly DuplicateMessageFilter duplicateFilter = new();
     private readonly ChatCaptureService chatCapture;
     private readonly MainWindow mainWindow;
     private CharacterIdentity? activeIdentity;
     private CharacterProfile? activeProfile;
+    private Uri? activeWebhookEndpoint;
     private DateTime nextCharacterCheckUtc = DateTime.MinValue;
     private bool disposed;
 
@@ -40,39 +43,31 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         characterContext = new CharacterContextService(PlayerState);
-        relayClient = new RelayClient(Log);
-        outboundCoordinator = new OutboundCoordinator(new GameChatSender(), AcknowledgeOutbound);
+        webhookRelay = new WebhookRelayClient(Log);
+        webhookRelay.DeliveryCompleted += result => mainThreadActions.Enqueue(() => OnDeliveryCompleted(result));
         chatCapture = new ChatCaptureService(ChatGui, Log, OnChatCaptured);
         mainWindow = new MainWindow(
-            Configuration,
             () => activeIdentity,
             () => activeProfile,
-            relayClient,
-            SaveConfiguration,
-            ReconnectActiveProfile,
-            RequestPairing,
+            () => activeWebhookEndpoint,
+            webhookRelay,
+            SaveWebhook,
+            RemoveWebhook,
+            TestWebhook,
             SetPaused,
-            RequestUnlink,
-            () => outboundCoordinator.QueueLength,
-            () => outboundCoordinator.PendingEventId);
-
-        relayClient.OutboundReceived += payload => mainThreadActions.Enqueue(
-            () => outboundCoordinator.Enqueue(payload, DateTime.UtcNow));
-        relayClient.PairCompleted += (token, _, _) => mainThreadActions.Enqueue(() => PersistClientToken(token));
-        relayClient.LinkRevoked += () => mainThreadActions.Enqueue(ClearClientToken);
+            SaveConfiguration);
 
         windows.AddWindow(mainWindow);
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open Sentinel Relay. Options: status, link, pause, resume, unlink, debug",
+            HelpMessage = "Open Sentinel Relay. Options: status, pause, resume, debug",
         });
         PluginInterface.UiBuilder.Draw += windows.Draw;
         PluginInterface.UiBuilder.OpenMainUi += OpenMainWindow;
         PluginInterface.UiBuilder.OpenConfigUi += OpenMainWindow;
         Framework.Update += OnFrameworkUpdate;
         RefreshCharacter(force: true);
-        Log.Information("Sentinel Relay {Version} loaded with privacy-first chat filters.",
-            GetType().Assembly.GetName().Version?.ToString() ?? "unknown");
+        Log.Information("Sentinel Relay {Version} loaded in direct Discord webhook mode.", PluginVersion);
     }
 
     public Configuration Configuration { get; }
@@ -88,8 +83,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OpenMainWindow;
         CommandManager.RemoveHandler(CommandName);
         chatCapture.Dispose();
-        outboundCoordinator.Clear("Sentinel Relay is unloading.");
-        relayClient.Dispose();
+        webhookRelay.Dispose();
         windows.RemoveAllWindows();
     }
 
@@ -105,17 +99,16 @@ public sealed class Plugin : IDalamudPlugin
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Sentinel Relay main-thread action failed.");
+                Log.Warning("Sentinel Relay main-thread action failed ({ExceptionType}).", ex.GetType().Name);
             }
         }
 
         var now = DateTime.UtcNow;
         if (now >= nextCharacterCheckUtc)
         {
-            nextCharacterCheckUtc = now.AddSeconds(2);
+            nextCharacterCheckUtc = now.AddMilliseconds(250);
             RefreshCharacter(force: false);
         }
-        outboundCoordinator.Update(now);
     }
 
     private void RefreshCharacter(bool force)
@@ -124,93 +117,128 @@ public sealed class Plugin : IDalamudPlugin
         if (!force && identity?.CharacterKey == activeIdentity?.CharacterKey)
             return;
 
-        outboundCoordinator.Clear("The active FFXIV character changed.");
+        webhookRelay.ClearQueue();
+        duplicateFilter.Clear();
         activeIdentity = identity;
         activeProfile = null;
-        relayClient.Disconnect();
+        activeWebhookEndpoint = null;
         if (identity is null)
+        {
+            webhookRelay.SetConfigured(false);
             return;
+        }
 
         activeProfile = Configuration.GetOrCreateProfile(
             identity.CharacterKey,
             identity.CharacterName,
             identity.HomeWorld);
+        LoadActiveWebhook();
         SaveConfiguration();
-        ReconnectActiveProfile();
     }
 
-    private void ReconnectActiveProfile()
+    private void LoadActiveWebhook()
     {
-        if (activeIdentity is null || activeProfile is null)
+        activeWebhookEndpoint = null;
+        if (activeProfile is null)
         {
-            relayClient.Disconnect();
+            webhookRelay.SetConfigured(false);
             return;
         }
 
-        var token = credentialProtector.Unprotect(activeProfile.ProtectedClientToken);
-        relayClient.Activate(Configuration.ServiceWebSocketUrl, activeProfile, activeIdentity, token);
+        var value = secretProtector.Unprotect(activeProfile.ProtectedWebhookUrl);
+        if (WebhookEndpoint.TryCreate(value, out var endpoint, out _))
+            activeWebhookEndpoint = endpoint;
+        webhookRelay.SetConfigured(activeWebhookEndpoint is not null);
+    }
+
+    private WebhookConfigurationResult SaveWebhook(string value)
+    {
+        if (activeProfile is null)
+            return new WebhookConfigurationResult(false, "Log into a character before configuring its webhook.");
+        if (!WebhookEndpoint.TryCreate(value, out var endpoint, out var error))
+            return new WebhookConfigurationResult(false, error);
+
+        try
+        {
+            activeProfile.ProtectedWebhookUrl = secretProtector.Protect(value.Trim());
+            activeProfile.LastWebhookSuccessUtc = null;
+            activeWebhookEndpoint = endpoint;
+            webhookRelay.ClearQueue();
+            webhookRelay.SetConfigured(true);
+            SaveConfiguration();
+            return new WebhookConfigurationResult(true, null);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Sentinel Relay could not protect the Discord webhook URL ({ExceptionType}).", ex.GetType().Name);
+            return new WebhookConfigurationResult(false, "Windows could not securely protect the webhook URL.");
+        }
+    }
+
+    private void RemoveWebhook()
+    {
+        if (activeProfile is null)
+            return;
+        activeProfile.ProtectedWebhookUrl = string.Empty;
+        activeProfile.LastWebhookSuccessUtc = null;
+        activeWebhookEndpoint = null;
+        webhookRelay.ClearQueue();
+        webhookRelay.SetConfigured(false);
+        SaveConfiguration();
+    }
+
+    private bool TestWebhook()
+    {
+        if (activeIdentity is null || activeWebhookEndpoint is null)
+            return false;
+        return webhookRelay.TryEnqueue(
+            activeIdentity.CharacterKey,
+            activeWebhookEndpoint,
+            [WebhookMessageFormatter.TestMessage(activeIdentity.CharacterName)],
+            isTest: true);
     }
 
     private void OnChatCaptured(CapturedChat chat)
     {
-        if (outboundCoordinator.TryConfirmAndSuppress(chat, activeIdentity))
-            return;
-        if (activeProfile is null || activeProfile.Paused)
-            return;
-        if (!activeProfile.EnabledInboundChannels.Contains(chat.ChatType))
+        // Drop rather than risk routing through a stale profile if the active
+        // content ID changes between framework refreshes. The next 250 ms
+        // framework check loads the new profile; the chat callback stays free
+        // of secret decryption and configuration I/O.
+        if (characterContext.Current?.CharacterKey != activeIdentity?.CharacterKey)
             return;
 
-        var matches = KeywordMatcher.FindMatches(activeProfile.Keywords, chat.ChatType, chat.Message)
-            .Select(rule => new KeywordMatchPayload(rule.Keyword, rule.AlertMethod.ToString()))
-            .ToArray();
-        var payload = new InboundChatPayload(
-            Guid.NewGuid().ToString("N"),
-            chat.ChatType.ToString(),
-            ChannelPolicy.GetShortLabel(chat.ChatType),
-            chat.Sender,
-            chat.SenderWorld,
-            chat.Message,
-            chat.TimestampUtc,
-            matches);
-        relayClient.SendInbound(payload);
+        if (!RelayFilter.ShouldForward(activeProfile, chat.ChatType) || activeWebhookEndpoint is null || activeIdentity is null)
+            return;
+        if (duplicateFilter.IsDuplicate(chat, DateTime.UtcNow))
+            return;
+
+        var keywordMatches = KeywordMatcher.FindMatches(
+            activeProfile!.Keywords,
+            chat.ChatType,
+            chat.Message);
+        var payloads = WebhookMessageFormatter.Format(
+            chat,
+            activeProfile.IncludeSenderWorld,
+            activeProfile.UseDiscordEmbeds,
+            keywordMatches,
+            activeProfile.DiscordMentionUserId);
+        webhookRelay.TryEnqueue(activeIdentity.CharacterKey, activeWebhookEndpoint, payloads);
     }
 
-    private void AcknowledgeOutbound(string eventId, bool delivered, string? error)
+    private void OnDeliveryCompleted(WebhookDeliveryResult result)
     {
-        relayClient.SendOutboundAck(eventId, delivered, error);
-        if (!delivered && !string.IsNullOrWhiteSpace(error))
-            ChatGui.PrintError($"[Sentinel Relay] Discord message was not sent: {error}");
-    }
-
-    private void PersistClientToken(string token)
-    {
-        if (activeProfile is null)
-            return;
-        try
+        if (Configuration.CharacterProfiles.TryGetValue(result.CharacterKey, out var profile) && result.Success)
         {
-            activeProfile.ProtectedClientToken = credentialProtector.Protect(token);
+            profile.LastWebhookSuccessUtc = result.CompletedAtUtc;
             SaveConfiguration();
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Sentinel Relay could not protect the new client credential.");
-            ChatGui.PrintError("[Sentinel Relay] Linking succeeded, but the local credential could not be protected. Relink after restarting.");
-        }
-    }
 
-    private void ClearClientToken()
-    {
-        if (activeProfile is null)
+        if (!result.IsTest || result.CharacterKey != activeIdentity?.CharacterKey)
             return;
-        activeProfile.ProtectedClientToken = string.Empty;
-        SaveConfiguration();
-    }
-
-    private bool RequestPairing()
-    {
-        if (activeProfile is null)
-            return false;
-        return relayClient.RequestPairing();
+        if (result.Success)
+            ChatGui.Print("[Sentinel Relay] Discord webhook test succeeded.");
+        else
+            ChatGui.PrintError($"[Sentinel Relay] Discord webhook test failed: {result.Error ?? "unknown error"}");
     }
 
     private void SetPaused(bool paused)
@@ -218,16 +246,9 @@ public sealed class Plugin : IDalamudPlugin
         if (activeProfile is null)
             return;
         activeProfile.Paused = paused;
-        SaveConfiguration();
-        relayClient.SetPaused(paused);
         if (paused)
-            outboundCoordinator.Clear("Relay was paused locally.");
-    }
-
-    private void RequestUnlink()
-    {
-        if (!relayClient.Unlink())
-            ChatGui.PrintError("[Sentinel Relay] Unlink could not be sent while the relay is offline.");
+            webhookRelay.ClearQueue();
+        SaveConfiguration();
     }
 
     private void OnCommand(string _, string arguments)
@@ -241,42 +262,52 @@ public sealed class Plugin : IDalamudPlugin
             case "status":
                 PrintStatus();
                 break;
-            case "link":
-                if (!RequestPairing())
-                    ChatGui.PrintError("[Sentinel Relay] Connect to the service first, then try /srelay link again.");
-                else
-                    ChatGui.Print("[Sentinel Relay] Pairing code requested. Open /srelay to view it.");
-                mainWindow.IsOpen = true;
-                break;
             case "pause":
+                if (activeProfile is null)
+                {
+                    ChatGui.PrintError("[Sentinel Relay] Log into a character before changing relay state.");
+                    break;
+                }
                 SetPaused(true);
-                ChatGui.Print("[Sentinel Relay] Relay paused. No chat will enter or leave FFXIV.");
+                ChatGui.Print("[Sentinel Relay] Relay paused. No enabled FFXIV chat will be sent to Discord.");
                 break;
             case "resume":
+                if (activeProfile is null)
+                {
+                    ChatGui.PrintError("[Sentinel Relay] Log into a character before changing relay state.");
+                    break;
+                }
                 SetPaused(false);
                 ChatGui.Print("[Sentinel Relay] Relay resumed.");
                 break;
-            case "unlink":
-                RequestUnlink();
-                break;
             case "debug":
-                ChatGui.Print($"[Sentinel Relay] state={relayClient.State}, reconnects={relayClient.ReconnectCount}, "
-                    + $"queue={outboundCoordinator.QueueLength}, character={activeIdentity?.CharacterName ?? "none"}, "
-                    + $"backend={relayClient.BackendVersion ?? "unknown"}");
+                ChatGui.Print($"[Sentinel Relay] version={PluginVersion}, state={webhookRelay.State}, queue={webhookRelay.QueueLength}, "
+                    + $"dropped={webhookRelay.DroppedCount}, character={activeIdentity?.CharacterName ?? "none"}, "
+                    + $"webhook={(activeWebhookEndpoint is null ? "not configured" : "configured")}, "
+                    + $"lastSuccess={webhookRelay.LastSuccessUtc?.ToLocalTime().ToString("G") ?? "never"}, "
+                    + $"lastError={webhookRelay.LastError ?? "none"}");
                 break;
             default:
-                ChatGui.PrintError("[Sentinel Relay] Use /srelay, status, link, pause, resume, unlink, or debug.");
+                ChatGui.PrintError("[Sentinel Relay] Use /srelay, status, pause, resume, or debug.");
                 break;
         }
     }
 
     private void PrintStatus()
     {
+        var enabled = activeProfile is null
+            ? "none"
+            : string.Join(", ", activeProfile.EnabledInboundChannels.Select(ChannelPolicy.GetShortLabel));
+        var relayState = activeProfile is null
+            ? "inactive"
+            : activeProfile.Paused
+                ? "paused"
+                : activeWebhookEndpoint is null ? "not configured" : "active";
         ChatGui.Print($"[Sentinel Relay] Character: {activeIdentity?.CharacterName ?? "not logged in"}; "
-            + $"service: {relayClient.State}; relay: {(activeProfile?.Paused == true ? "paused" : "running")}; "
-            + $"Discord: {relayClient.DiscordUsername ?? "not linked"}; destination: {relayClient.RelayChannelName ?? "not configured"}.");
+            + $"Discord webhook: {(activeWebhookEndpoint is null ? "not configured" : "configured")}; "
+            + $"relay: {relayState}; "
+            + $"enabled chats: {(enabled.Length == 0 ? "none" : enabled)}; queue: {webhookRelay.QueueLength}.");
     }
 
     private void OpenMainWindow() => mainWindow.IsOpen = true;
 }
-

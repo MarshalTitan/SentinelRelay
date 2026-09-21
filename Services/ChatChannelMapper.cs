@@ -12,8 +12,10 @@ public static class ChatChannelMapper
             XivChatType.Say => RelayChatType.Say,
             XivChatType.Yell => RelayChatType.Yell,
             XivChatType.Shout => RelayChatType.Shout,
-            XivChatType.TellIncoming or XivChatType.TellOutgoing => RelayChatType.Tell,
-            XivChatType.Party or XivChatType.CrossParty => RelayChatType.Party,
+            XivChatType.TellIncoming => RelayChatType.IncomingTell,
+            XivChatType.TellOutgoing => RelayChatType.OutgoingTell,
+            XivChatType.Party => RelayChatType.Party,
+            XivChatType.CrossParty => RelayChatType.CrossWorldParty,
             XivChatType.Alliance => RelayChatType.Alliance,
             XivChatType.FreeCompany => RelayChatType.FreeCompany,
             XivChatType.PvPTeam => RelayChatType.PvPTeam,
@@ -49,4 +51,3 @@ public static class ChatChannelMapper
             or XivChatType.StandardEmote or XivChatType.CustomEmote;
     }
 }
-

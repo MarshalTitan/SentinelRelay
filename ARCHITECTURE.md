@@ -1,129 +1,85 @@
-# Architecture
+# Sentinel Relay architecture
 
 ## Scope
 
-Sentinel Relay is deliberately one system with two deployable components:
+Sentinel Relay is a one-way, direct-webhook Dalamud plugin:
 
-1. `SentinelRelay.dll`, loaded by Dalamud on each FFXIV PC.
-2. `sentinel-relay-service`, a Node.js process that owns the Discord bot, WebSocket hub, and minimal SQLite link database.
-
-Dreamforge is not involved. Wrothy and Elektra each use an independent character profile, credential, WebSocket session, Discord user, and relay channel.
-
-```mermaid
-flowchart LR
-    F1["Wrothy FFXIV client"] -->|"outbound WSS"| R["Sentinel Relay service"]
-    F2["Elektra FFXIV client"] -->|"outbound WSS"| R
-    R -->|"Discord Gateway / REST"| D["Sentinel Relay bot"]
-    R --> M[("SQLite link metadata")]
-    D --> C1["#relay-wrothy"]
-    D --> C2["#relay-elektra"]
+```text
+FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-No port is opened on either game PC. Both clients initiate ordinary TLS WebSocket connections to the hosted service.
+Discord cannot connect back to the plugin. There is no generic or whitelisted game-command path because there is no inbound Discord path at all.
 
-## Component responsibilities
+## Runtime flow
 
-| Concern | Dalamud plugin | Relay service |
-|---|---|---|
-| Identify active character | `IPlayerState` character name, Content ID, home world | Verify saved character key against the credential-bound link |
-| Receive FFXIV chat | `IChatGui.ChatMessage` and `XivChatType` | Never receives disabled channel data |
-| Filter channels/keywords | Local per-character configuration | Deliver prefiltered event and alert instructions |
-| Sanitize FFXIV data | Convert `SeString.TextValue` and player payload to plain text | Validate structured payload/size/freshness again |
-| Discord routing | None | Exact link → guild → channel mapping |
-| Discord authorization | Credential-bound WebSocket | Exact linked Discord user and configured channel |
-| Send real FFXIV chat | Main-thread fixed channel mapping | Send enum + text only; await acknowledgement |
-| Secrets | DPAPI-protected client token only | Bot token from environment; client-token hashes in SQLite |
-| Persistence | Dalamud config, per character | Link/routing metadata only; no chat history |
+1. Dalamud publishes a structured `IChatGui.ChatMessage` event.
+2. `ChatChannelMapper` maps the supported `XivChatType` to a stable `RelayChatType`.
+3. `ChatCaptureService` extracts player/world information where available and converts `SeString.TextValue` into normalized plain text.
+4. `Plugin.OnChatCaptured` verifies the live content ID still matches the loaded character profile; a transition mismatch is dropped rather than risk cross-character routing.
+5. Paused, disabled, unconfigured, empty, unsupported, or immediate duplicate messages stop locally.
+6. `KeywordMatcher` evaluates configured rules locally for enabled chat only.
+7. `WebhookMessageFormatter` creates compact text or embed payloads, splits oversized content, and disables all untrusted mentions.
+8. `WebhookRelayClient` adds the immutable payload and that profile's already validated webhook endpoint to a bounded FIFO queue.
+9. One background worker posts messages to Discord through `WebhookHttpSender` in order.
+10. Successful delivery timestamps and sanitized errors are returned to the game thread through a small action queue.
 
-## Current Dalamud API choices
+No HTTP, cryptography, disk, or retry delay runs inside the FFXIV chat callback.
 
-- **Lifecycle/configuration:** `IDalamudPlugin`, `IDalamudPluginInterface.GetPluginConfig`, and `SavePluginConfig`.
-- **Incoming chat:** `IChatGui.ChatMessage`, with structured `XivChatType`, sender `SeString`, message `SeString`, and `PlayerPayload` world where available. The visible chat window is not scraped.
-- **Character identity:** `IPlayerState.CharacterName`, `ContentId`, and `HomeWorld`. Character profiles are keyed by the player's own Content ID, not by a typed display name; home world remains part of the displayed and authenticated profile metadata.
-- **Commands:** `ICommandManager` for `/srelay`.
-- **UI:** Dalamud `WindowSystem` and ImGui bindings.
-- **Threading:** network and JSON I/O run on background tasks; `IFramework.Update` executes only the final game-chat send and small queued state transitions on the game thread.
-- **Outbound chat:** `FFXIVClientStructs` `RaptureShellModule.ExecuteCommandInner` with a plugin-owned fixed prefix mapping. `IChatGui.Print` is intentionally not used as a substitute because it prints locally and does not transmit a chat message.
+## Per-character routing
 
-The outbound function is an unsafe game-client structure call, not a stable high-level Dalamud chat-send service. API 15 compilation proves current symbol compatibility, but only a live multi-client FFXIV test can prove the function still produces server-visible chat. Game updates can break it; failure is reported rather than falling back to a fake local print.
+Dalamud's `IPlayerState.ContentId` becomes a key such as `cid:0011223344556677`. Each key owns a `CharacterProfile` containing:
 
-## Channel mapping
+- display name and home world;
+- DPAPI-protected webhook URL;
+- enabled chat types;
+- pause state;
+- compact-text/embed and world-display preferences;
+- local keyword rules and optional Discord mention user ID; and
+- last successful webhook test/delivery timestamp.
 
-Incoming mappings use current `XivChatType` values for Say, Yell, Shout, Tell incoming/outgoing, Party/CrossParty, Alliance, Free Company, PvP Team, LS 1–8, CWLS 1–8, Novice Network, and standard/custom emotes.
+The framework checks for a content-ID change every 250 ms. When it changes, Sentinel Relay cancels/clears pending delivery, clears the duplicate cache, loads only the new profile, decrypts only its webhook into memory, and updates the UI. A queued item also carries the endpoint selected at capture time; it is never rerouted through another profile. A chat event that lands inside the transition window is discarded, never sent through the previous route.
 
-Outbound Discord payloads contain only these enums:
+## Webhook validation
 
-`Say`, `Yell`, `Shout`, `Party`, `Alliance`, `FreeCompany`, `PvPTeam`, `Linkshell1..8`, and `CrossWorldLinkshell1..8`.
+The plugin accepts only absolute HTTPS URLs whose host is a recognized Discord host and whose path matches Discord's incoming-webhook structure:
 
-The plugin maps those internally to the canonical full FFXIV commands `/say`, `/yell`, `/shout`, `/party`, `/alliance`, `/freecompany`, `/pvpteam`, `/linkshell1..8`, and `/cwlinkshell1..8`. Tell, Novice Network, emotes, and arbitrary command strings have no outbound mapping.
-
-## Inbound path: FFXIV → Discord
-
-1. Dalamud raises a structured chat event.
-2. The plugin maps `XivChatType` to a Sentinel enum.
-3. Outbound-echo correlation gets first refusal; a matching Discord-originated echo is acknowledged and suppressed.
-4. The active character profile is checked for pause state and explicit channel enablement.
-5. Sender/message are converted to safe plain text and keyword rules run locally.
-6. A bounded, 15-second in-memory queue hands a structured event to the WebSocket task.
-7. The server authenticates installation + token, rejects stale/replayed events, resolves only that installation's link, and posts a compact embed to only that configured channel.
-8. One bundled keyword notification is optionally delivered by DM and/or mention.
-9. Neither component writes the chat body to persistent storage.
-
-## Outbound path: Discord → FFXIV
-
-```mermaid
-sequenceDiagram
-    participant U as Linked Discord user
-    participant B as Sentinel Relay bot
-    participant P as Character plugin
-    participant G as FFXIV chat
-    U->>B: /fc message: text
-    B->>B: Check user, guild, channel, allowlist, limits
-    B->>P: FreeCompany + text + event/expiry
-    P->>P: Check auth, freshness, replay, limits
-    P->>G: Map to fixed /fc prefix on game thread
-    G-->>P: Structured outgoing chat echo
-    P-->>B: Confirm event delivered
-    B-->>U: Ephemeral success + one relay embed
+```text
+/api/webhooks/{numeric webhook id}/{webhook token}
 ```
 
-If the plugin does not observe the real matching FFXIV echo within six seconds, it reports failure. The backend times out after nine seconds. A stale packet expires at twenty seconds, queues are capped, and offline clients receive no backlog dump.
+The request adds `wait=true` so Discord confirms creation rather than returning before the message is saved.
 
-## Pairing protocol
+## Queue and failure policy
 
-1. The connected unlinked client requests a code.
-2. The service creates an eight-character, 40-bit cryptographically random code and retains it only in process memory, indexed by a hash and bound to that session, for ten minutes.
-3. `/relay link` must present that code while the generating socket is still open.
-4. The service binds installation ID, character key, Discord user, and a fresh 256-bit bearer token.
-5. The plaintext token is shown to the plugin exactly once. The server stores its SHA-256 hash; the plugin stores a DPAPI-protected blob.
-6. Future `hello` packets must present installation ID, the token, and the same character key.
-7. Unlink deletes the database row and revokes the live session.
+- FIFO capacity: 100 deliveries
+- Stale cutoff: two minutes
+- Worker count: one, preserving order
+- HTTP timeout: 30 seconds
+- `429`: honor Discord retry timing, bounded to 60 seconds per wait
+- transient network/5xx responses: bounded exponential retry
+- permanent 4xx response: fail clearly without an infinite loop
+- full queue: reject the newest item and increment the non-secret drop counter
+- redirects: disabled so the webhook credential remains on the validated Discord origin
+- pause or character switch: cancel active delivery and clear pending work
 
-One Discord user can have one V1 link. That deliberate database constraint prevents a single account from accidentally controlling both initial characters.
+## Message presentation
 
-## Resilience
+Compact mode:
 
-- Client reconnect delay grows exponentially from about 1 to 60 seconds with jitter.
-- WebSocket keepalive is 20 seconds.
-- Network work never blocks the game/framework thread.
-- Inbound client events expire after 15 seconds and the bounded queue does not accumulate an hours-old replay dump.
-- Discord-originated messages expire after 20 seconds and local outbound queue depth is five.
-- A new session for the same installation replaces the old socket.
-- Discord offline status uses a 30-second grace period to avoid reconnect noise.
-- The service handles `SIGINT`/`SIGTERM`, closes sockets, stops Discord, closes SQLite, and lets the host restart it.
+```text
+【FC】 Player Name @ World: Anyone want roulettes?
+```
 
-## Persistence schema
+Embed mode uses a small channel-specific color, sender/channel title, message description, and UTC timestamp. Long content is split on Unicode rune boundaries so surrogate pairs are not broken.
 
-The single `links` table stores:
+Every payload has an empty `allowed_mentions.parse` array. Raw FFXIV text also has mention-like syntax neutralized. A keyword rule may separately authorize exactly one validated Discord user ID; that ID is the only entry in `allowed_mentions.users` for that alert.
 
-- installation ID and token hash
-- character key, name, and home world
-- linked Discord user ID/name
-- guild/channel ID/name
-- pause flag and creation/update/last-seen timestamps
+## Discord commands decision
 
-It stores no FFXIV chat messages, Discord command messages, keyword lists, or plaintext credentials. Keyword rules stay only in Dalamud's per-character local configuration.
+Discord slash commands are intentionally absent. Webhooks are write-only and cannot receive interactions. Adding a Gateway bot inside the plugin would require placing a shared bot token on both PCs, and two simultaneous clients could process the same interaction. That would add risk and unreliable routing without improving the core relay.
 
-## Scaling boundary
+All configuration lives in the `/srelay` UI. The unrelated pre-existing Discord bot is neither required nor contacted.
 
-The current single process is intentionally sized for two clients. More modest users can be added vertically. Horizontal replicas would require shared live-session coordination, a shared rate-limit/replay store, and a network database; running two current replicas would misroute acknowledgements and is unsupported.
+## Reference and licensing
+
+`reiichi001/Dalamud.DiscordBridge` was reviewed as behavioral proof for structured chat capture, mapping, queueing, duplicate suppression, and Discord delivery. That project is AGPL-3.0. Sentinel Relay remains MIT and uses an independently written implementation; no substantial source was copied.

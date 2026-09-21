@@ -3,12 +3,3 @@ obj/
 .vs/
 .idea/
 *.user
-service/node_modules/
-service/dist/
-service/coverage/
-service/data/
-service/.env
-*.db
-*.db-shm
-*.db-wal
-
