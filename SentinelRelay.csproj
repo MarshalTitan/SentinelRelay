@@ -1,0 +1,21 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Author>MTitan</Author>
+    <Name>Sentinel Relay</Name>
+    <Punchline>Private, two-way FFXIV and Discord chat relay.</Punchline>
+    <Description>Relays explicitly selected FFXIV chat channels to Discord and allows a linked Discord user to send strictly whitelisted chat messages through their own logged-in character.</Description>
+    <RepoUrl>https://github.com/MarshalTitan/SentinelRelay</RepoUrl>
+    <IconUrl>https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png</IconUrl>
+    <Tags>chat;discord;relay;utility;sentinel</Tags>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <None Include="assets/icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
+

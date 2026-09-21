@@ -1,0 +1,97 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download current Dalamud development assemblies
+        shell: pwsh
+        run: |
+          $dalamudDir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Path $dalamudDir -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-latest.zip'
+          Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
+
+      - name: Restore locked dependencies
+        run: dotnet restore SentinelRelay.csproj --locked-mode
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content -LiteralPath 'SentinelRelay.csproj' -Raw
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Invalid version: $version" }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Run plugin core tests
+        run: dotnet run --project tests/SentinelRelay.Core.Tests/SentinelRelay.Core.Tests.csproj -c Release
+
+      - name: Build release package
+        run: dotnet build SentinelRelay.csproj -c Release --no-restore
+
+      - name: Validate installable package
+        shell: pwsh
+        run: >-
+          ./.github/scripts/Validate-Package.ps1
+          -PackagePath 'bin/Release/SentinelRelay/latest.zip'
+          -ExpectedVersion '${{ steps.version.outputs.value }}'
+
+      - name: Upload installable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: SentinelRelay-${{ steps.version.outputs.value }}
+          path: bin/Release/SentinelRelay/latest.zip
+          if-no-files-found: error
+
+  service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: service/package-lock.json
+
+      - name: Install locked dependencies
+        working-directory: service
+        run: npm ci
+
+      - name: Type-check service
+        working-directory: service
+        run: npm run check
+
+      - name: Run service tests
+        working-directory: service
+        run: npm test
+
+      - name: Build service
+        working-directory: service
+        run: npm run build
+
+      - name: Build production container
+        run: docker build --tag sentinel-relay-service:test .

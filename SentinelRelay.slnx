@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SentinelRelay.csproj" />
+  <Project Path="tests/SentinelRelay.Core.Tests/SentinelRelay.Core.Tests.csproj" />
+</Solution>
+

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="shield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#173762"/>
+      <stop offset="0.52" stop-color="#07172d"/>
+      <stop offset="1" stop-color="#020811"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff8dc"/>
+      <stop offset="0.22" stop-color="#718295"/>
+      <stop offset="0.48" stop-color="#f7fbff"/>
+      <stop offset="0.72" stop-color="#9a671b"/>
+      <stop offset="1" stop-color="#fff0a0"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c8f8ff"/>
+      <stop offset="0.45" stop-color="#2ad8ff"/>
+      <stop offset="1" stop-color="#0875d5"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff4a6"/>
+      <stop offset="0.5" stop-color="#ffc53e"/>
+      <stop offset="1" stop-color="#9d6414"/>
+    </linearGradient>
+    <radialGradient id="core">
+      <stop offset="0" stop-color="#7df2ff" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#148ee0" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#001324" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="smallGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <path d="M256 18 451 91l-18 232c-11 80-78 143-177 177C157 466 90 403 79 323L61 91Z"
+        fill="none" stroke="#00c8ff" stroke-width="20" opacity="0.28" filter="url(#glow)"/>
+  <path d="M256 19 449 92l-17 229c-11 78-76 139-176 174C156 460 91 399 80 321L63 92Z"
+        fill="url(#shield)" stroke="url(#metal)" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M256 49 416 108l-15 202c-9 62-61 113-145 146-84-33-136-84-145-146L96 108Z"
+        fill="none" stroke="#1bcfff" stroke-width="5" opacity="0.88"/>
+  <ellipse cx="256" cy="252" rx="176" ry="177" fill="url(#core)"/>
+
+  <g fill="none" stroke-linecap="round" filter="url(#smallGlow)">
+    <path d="M190 171c-28 15-47 43-47 76" stroke="#33d9ff" stroke-width="12"/>
+    <path d="M170 139c-46 23-77 69-77 121" stroke="#0e8fd7" stroke-width="9" opacity="0.9"/>
+    <path d="M322 171c28 15 47 43 47 76" stroke="#ffd45c" stroke-width="12"/>
+    <path d="M342 139c46 23 77 69 77 121" stroke="#c58a23" stroke-width="9" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(92 230)">
+    <path d="M16 0h104c12 0 22 10 22 22v66c0 12-10 22-22 22H68l-30 25 5-25H16C4 110-6 100-6 88V22C-6 10 4 0 16 0Z"
+          fill="#0b2444" stroke="url(#cyan)" stroke-width="8"/>
+    <path d="M25 35h83M25 60h62M25 84h75" stroke="#9cefff" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(278 230)">
+    <path d="M16 0h104c12 0 22 10 22 22v66c0 12-10 22-22 22H93l5 25-30-25H16C4 110-6 100-6 88V22C-6 10 4 0 16 0Z"
+          fill="#251a0a" stroke="url(#gold)" stroke-width="8"/>
+    <path d="M25 35h83M25 60h62M25 84h75" stroke="#ffe69a" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <path d="M256 167 301 256 256 348 211 256Z" fill="#0d75c8" stroke="#d8fbff" stroke-width="9"/>
+    <path d="M256 184 277 256 256 329 235 256Z" fill="url(#cyan)"/>
+    <path d="M256 184 256 329 235 256Z" fill="#76eaff" opacity="0.72"/>
+    <circle cx="256" cy="256" r="15" fill="#fff7b5" stroke="#ffc73c" stroke-width="6"/>
+  </g>
+
+  <path d="M184 380c37 37 107 41 151 8" fill="none" stroke="#35dfff" stroke-width="10" stroke-linecap="round"/>
+  <path d="m327 369 20 12-17 17" fill="none" stroke="#ffe171" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M256 11 272 35 256 60 240 35Z" fill="#fff3a1" stroke="#9d6b19" stroke-width="4"/>
+  <path d="M256 451 270 473 256 497 242 473Z" fill="#31d7ff" stroke="#eafcff" stroke-width="4" filter="url(#smallGlow)"/>
+</svg>
+

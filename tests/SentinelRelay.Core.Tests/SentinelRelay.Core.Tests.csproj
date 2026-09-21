@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Core/ChannelPolicy.cs" Link="Core/ChannelPolicy.cs" />
+    <Compile Include="../../Core/KeywordMatcher.cs" Link="Core/KeywordMatcher.cs" />
+    <Compile Include="../../Core/MessageSanitizer.cs" Link="Core/MessageSanitizer.cs" />
+    <Compile Include="../../Core/ReplayGuard.cs" Link="Core/ReplayGuard.cs" />
+    <Compile Include="../../Core/SlidingWindowRateLimiter.cs" Link="Core/SlidingWindowRateLimiter.cs" />
+    <Compile Include="../../Models/AlertMethod.cs" Link="Models/AlertMethod.cs" />
+    <Compile Include="../../Models/CharacterProfile.cs" Link="Models/CharacterProfile.cs" />
+    <Compile Include="../../Models/KeywordRule.cs" Link="Models/KeywordRule.cs" />
+    <Compile Include="../../Models/RelayChatType.cs" Link="Models/RelayChatType.cs" />
+  </ItemGroup>
+</Project>

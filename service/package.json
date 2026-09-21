@@ -1,0 +1,33 @@
+{
+  "name": "sentinel-relay-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Secure Discord bot and WebSocket relay for Sentinel Relay.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/app.ts",
+    "start": "node dist/app.js",
+    "test": "vitest run --coverage.enabled=false"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.27.0",
+    "pino": "^10.3.1",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.10.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
+
