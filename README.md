@@ -48,13 +48,16 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-1. Create private Discord channels such as `#relay-wrothy` and `#relay-elektra`.
-2. Create a separate incoming webhook in each channel by following [DISCORD_SETUP.md](DISCORD_SETUP.md).
-3. Install Sentinel Relay from the Sentinel custom Dalamud repository.
-4. Log in as the intended character and run `/srelay`.
-5. Open **Discord Webhook**, paste that character's webhook URL, select **Save Webhook**, and then **Test Webhook**.
-6. Open **Chat Filters** and enable only the desired chat types.
-7. Repeat on the other character/client with its own webhook.
+The current `0.1.0.0` release is an explicitly testing-only beta. It is hosted online; testers do not need a compiler, development-plugin folder, backend, or always-on service.
+
+1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
+2. Open `/xlplugins`, find **Sentinel Relay** in the available/testing section, and choose **Install**.
+3. Create private Discord channels such as `#relay-wrothy` and `#relay-elektra`.
+4. Create a separate incoming webhook in each channel by following [DISCORD_SETUP.md](DISCORD_SETUP.md).
+5. Log in as the intended character and run `/srelay`.
+6. Open **Discord Webhook**, paste that character's webhook URL, select **Save Webhook**, and then **Test Webhook**.
+7. Open **Chat Filters** and enable only the desired chat types.
+8. Repeat on the other character/client with its own webhook.
 
 The successful test message is:
 

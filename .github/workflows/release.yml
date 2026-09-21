@@ -1,30 +1,53 @@
-name: Publish Beta
+name: Publish Online Beta
 
 on:
   workflow_dispatch:
     inputs:
-      live_tested:
-        description: 'I completed LIVE_TEST_CHECKLIST.md for both character webhooks and filter isolation.'
+      publication_mode:
+        description: 'Publish for testing, or promote the existing tested release.'
         required: true
+        default: testing
+        type: choice
+        options:
+          - testing
+          - live
+      live_tested:
+        description: 'Required only for live promotion: both character routes passed LIVE_TEST_CHECKLIST.md.'
+        required: false
         default: false
         type: boolean
+  push:
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: publish-beta
+  group: publish-online-beta
   cancel-in-progress: false
 
 jobs:
   publish:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-testing]')
     runs-on: windows-latest
 
     steps:
-      - name: Require live-test attestation
-        if: inputs.live_tested != true
+      - name: Select publication mode
+        id: publication
         shell: pwsh
-        run: throw 'Complete LIVE_TEST_CHECKLIST.md before publishing.'
+        run: |
+          $mode = if ('${{ github.event_name }}' -eq 'push') { 'testing' } else { '${{ inputs.publication_mode }}' }
+          $liveTested = '${{ inputs.live_tested }}' -eq 'true'
+          if ($mode -notin @('testing', 'live')) {
+            throw "Unknown publication mode '$mode'."
+          }
+          if ($mode -eq 'live' -and -not $liveTested) {
+            throw 'Live promotion requires completion of LIVE_TEST_CHECKLIST.md for both characters.'
+          }
+          $testingOnly = $mode -eq 'testing'
+          "mode=$mode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "testing_only=$($testingOnly.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Publication mode: $mode"
 
       - name: Check out release source
         uses: actions/checkout@v7
@@ -43,7 +66,7 @@ jobs:
           Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
 
-      - name: Validate version and immutable release
+      - name: Validate version and release state
         id: version
         shell: pwsh
         env:
@@ -66,11 +89,16 @@ jobs:
           gh release view $tag --repo '${{ github.repository }}' *> $null
           $releaseExists = $LASTEXITCODE -eq 0
           $global:LASTEXITCODE = 0
-          if ($releaseExists) {
-            throw "Release '$tag' already exists. Increment the version; existing releases are immutable."
+          if ('${{ steps.publication.outputs.mode }}' -eq 'testing' -and $releaseExists) {
+            $releaseTarget = gh release view $tag --repo '${{ github.repository }}' --json targetCommitish --jq '.targetCommitish'
+            if ($releaseTarget -ne '${{ github.sha }}') {
+              throw "Testing release '$tag' already belongs to commit '$releaseTarget' and is immutable. Increment the version for another build."
+            }
+            Write-Host "Reusing testing release '$tag' for this same commit."
           }
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "release_exists=$($releaseExists.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Restore locked dependencies
         run: dotnet restore SentinelRelay.csproj --locked-mode
@@ -89,19 +117,27 @@ jobs:
           -ExpectedVersion '${{ steps.version.outputs.value }}'
 
       - name: Prepare named release asset
+        if: steps.version.outputs.release_exists != 'true'
         shell: pwsh
         run: Copy-Item -LiteralPath 'bin/Release/SentinelRelay/latest.zip' -Destination "$env:RUNNER_TEMP\SentinelRelay.zip" -Force
 
       - name: Publish immutable GitHub prerelease
+        if: steps.version.outputs.release_exists != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $notes = if ('${{ steps.publication.outputs.testing_only }}' -eq 'true') {
+            'Online testing build for Wrothy and Elektra. Direct per-character FFXIV-to-Discord webhook relay with no hosted backend. In-game validation is still in progress; see LIVE_TEST_CHECKLIST.md.'
+          }
+          else {
+            'Live-tested Sentinel Relay beta. Direct per-character FFXIV-to-Discord webhook relay with no hosted backend. Both character routes completed LIVE_TEST_CHECKLIST.md.'
+          }
           gh release create '${{ steps.version.outputs.tag }}' "$env:RUNNER_TEMP\SentinelRelay.zip" `
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }} beta" `
-            --notes "First Sentinel Relay beta: direct per-character FFXIV-to-Discord webhook relay with no hosted backend. Live-test attestation was required before publication. See SECURITY.md and LIVE_TEST_CHECKLIST.md." `
+            --notes $notes `
             --prerelease
 
       - name: Verify public release asset
@@ -129,7 +165,7 @@ jobs:
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CATALOG_TOKEN)) {
             "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            Write-Host "::notice::DALAMUD_CATALOG_TOKEN is not configured. Add SentinelRelay to MarshalTitan/Sentinel only after the asset is public."
+            Write-Host '::notice::DALAMUD_CATALOG_TOKEN is not configured. The release is online, but the central catalog requires a separate update.'
           }
           else {
             "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -147,11 +183,13 @@ jobs:
       - name: Add or update only SentinelRelay in central catalog
         if: steps.catalog-auth.outputs.enabled == 'true'
         shell: pwsh
-        run: >-
-          ./.github/scripts/Upsert-CentralCatalogEntry.ps1
-          -ManifestPath 'central-catalog/repo.json'
-          -Version '${{ steps.version.outputs.value }}'
-          -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip'
+        run: |
+          $testingOnly = '${{ steps.publication.outputs.testing_only }}' -eq 'true'
+          ./.github/scripts/Upsert-CentralCatalogEntry.ps1 `
+            -ManifestPath 'central-catalog/repo.json' `
+            -Version '${{ steps.version.outputs.value }}' `
+            -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip' `
+            -TestingOnly:$testingOnly
 
       - name: Validate and publish central catalog update
         if: steps.catalog-auth.outputs.enabled == 'true'
@@ -168,6 +206,31 @@ jobs:
           git add -- repo.json
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
-            git commit -m "Add SentinelRelay ${{ steps.version.outputs.value }}"
+            $suffix = if ('${{ steps.publication.outputs.testing_only }}' -eq 'true') { 'testing beta' } else { 'live beta' }
+            git commit -m "Publish SentinelRelay ${{ steps.version.outputs.value }} $suffix"
             git push origin HEAD:main
           }
+
+      - name: Verify public central catalog
+        if: steps.catalog-auth.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $expectedTestingOnly = '${{ steps.publication.outputs.testing_only }}' -eq 'true'
+          $catalogUrl = 'https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json'
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              $catalog = @(Invoke-RestMethod -Uri "$catalogUrl`?release=${{ github.run_id }}-$attempt")
+              $entry = @($catalog | Where-Object InternalName -eq 'SentinelRelay')
+              if ($entry.Count -eq 1 `
+                  -and $entry[0].AssemblyVersion -eq '${{ steps.version.outputs.value }}' `
+                  -and [bool]$entry[0].IsTestingExclusive -eq $expectedTestingOnly) {
+                Write-Host "Verified public SentinelRelay catalog entry (testing-only: $expectedTestingOnly)."
+                exit 0
+              }
+            }
+            catch {
+              if ($attempt -eq 12) { throw }
+            }
+            Start-Sleep -Seconds 5
+          }
+          throw 'The public SentinelRelay catalog entry did not reach the expected state.'

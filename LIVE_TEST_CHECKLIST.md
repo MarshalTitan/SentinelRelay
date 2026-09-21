@@ -3,22 +3,24 @@
 Target release: `0.1.0.0`  
 Required testers: Wrothy Minioa and Elektra Minoa
 
-Do not publish the catalog entry until every release-blocking item passes. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
+The catalog entry is published as **testing-only** so both testers can install it online. Do not promote it to a normal live entry until every release-blocking item passes. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
-## Install the pre-release build
+## Install the online testing build
 
-The catalog is intentionally not updated until this checklist passes:
+The testing build is published online. Neither tester needs a compiler, development-plugin folder, backend, or locally hosted service:
 
-1. Open the successful **Build** workflow run for the candidate commit.
-2. Download the `SentinelRelay-0.1.0.0` artifact.
-3. Extract the downloaded artifact; it contains `latest.zip`.
-4. Extract `latest.zip` into a stable folder such as `C:\DalamudDevPlugins\SentinelRelay`.
-5. Confirm the folder contains `SentinelRelay.dll`, `SentinelRelay.json`, `SentinelRelay.deps.json`, and `assets\icon.png`.
-6. In FFXIV, run `/xlsettings` → **Experimental** → **Dev Plugin Locations** and select `SentinelRelay.dll`.
-7. Save, run `/xlplugins`, open **Dev Tools** → **Installed Dev Plugins**, and enable **Sentinel Relay**.
-8. Run `/srelay` and confirm version `0.1.0.0`.
+1. In FFXIV, run `/xlsettings` and open **Experimental**.
+2. Add this URL under **Custom Plugin Repositories**:
 
-Remove this development-plugin entry before installing the eventual catalog copy.
+   ```text
+   https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json
+   ```
+
+3. Save and close settings.
+4. Run `/xlplugins`, find **Sentinel Relay** in the available/testing section, and choose **Install**.
+5. Run `/srelay`, confirm version `0.1.0.0`, and verify the active character shown in the header.
+
+The plugin still runs locally inside each active FFXIV client because that is where game chat exists. It sends directly to Discord; there is no separate PC-hosted relay process.
 
 ## Preconditions
 
