@@ -19,6 +19,28 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
+## Install the experimental artifact
+
+Use this only for the `/fc` proof. It does not replace the live catalog release.
+
+1. Open the [experimental branch Build runs](https://github.com/MarshalTitan/SentinelRelay/actions/workflows/build.yml?query=branch%3Aexperimental-discord-replies).
+2. Open the newest successful run and download the `SentinelRelay-0.2.0.0` artifact.
+3. Extract the downloaded outer artifact ZIP. It contains the validated plugin package `latest.zip`.
+4. Extract `latest.zip` into a permanent test folder. Do not run the DLL directly.
+5. In `/xlplugins`, disable or uninstall the catalog copy of Sentinel Relay without deleting its configuration.
+6. Run `/xlsettings`, open **Experimental**, and add either the extracted folder or its full `SentinelRelay.dll` path under **Dev Plugin Locations**.
+7. Save, then run `/xlplugins`. Under **Installed Dev Plugins**, load Sentinel Relay.
+8. Run `/srelay` and confirm version `0.2.0.0` before configuring replies.
+
+Rollback after the experiment:
+
+1. Unload the dev plugin.
+2. Remove its Dev Plugin Location and extracted test folder.
+3. Reinstall or re-enable the live catalog copy.
+4. Confirm `/srelay` reports `0.1.0.1`.
+
+Do not run the catalog and dev copies simultaneously because they share the same internal plugin name and configuration.
+
 ## Preconditions
 
 - [ ] Two private Discord relay channels exist.
