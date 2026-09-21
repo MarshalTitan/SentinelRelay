@@ -1,10 +1,10 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.0.0</Version>
+    <Version>0.1.0.1</Version>
     <Author>MTitan</Author>
     <Name>Sentinel Relay</Name>
     <Punchline>Private FFXIV-to-Discord chat relay with no hosted backend.</Punchline>
-    <Description>Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off; no bot, paid hosting, or Discord-to-FFXIV control is required.</Description>
+    <Description>Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off.</Description>
     <RepoUrl>https://github.com/MarshalTitan/SentinelRelay</RepoUrl>
     <IconUrl>https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png</IconUrl>
     <Tags>chat;discord;relay;utility;sentinel</Tags>

@@ -89,34 +89,34 @@ static void CharacterProfilesAreIsolated()
 {
     var profiles = new Dictionary<string, CharacterProfile>
     {
-        ["cid:wrothy"] = new() { CharacterKey = "cid:wrothy", ProtectedWebhookUrl = "protected-wrothy" },
-        ["cid:elektra"] = new() { CharacterKey = "cid:elektra", ProtectedWebhookUrl = "protected-elektra" },
+        ["cid:one"] = new() { CharacterKey = "cid:one", ProtectedWebhookUrl = "protected-one" },
+        ["cid:two"] = new() { CharacterKey = "cid:two", ProtectedWebhookUrl = "protected-two" },
     };
-    profiles["cid:wrothy"].EnabledInboundChannels.Add(RelayChatType.FreeCompany);
-    profiles["cid:elektra"].EnabledInboundChannels.Add(RelayChatType.Party);
+    profiles["cid:one"].EnabledInboundChannels.Add(RelayChatType.FreeCompany);
+    profiles["cid:two"].EnabledInboundChannels.Add(RelayChatType.Party);
 
-    Assert(profiles["cid:wrothy"].ProtectedWebhookUrl == "protected-wrothy", "Wrothy route changed");
-    Assert(profiles["cid:elektra"].ProtectedWebhookUrl == "protected-elektra", "Elektra route changed");
-    Assert(!profiles["cid:elektra"].EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "filters leaked across profiles");
+    Assert(profiles["cid:one"].ProtectedWebhookUrl == "protected-one", "first route changed");
+    Assert(profiles["cid:two"].ProtectedWebhookUrl == "protected-two", "second route changed");
+    Assert(!profiles["cid:two"].EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "filters leaked across profiles");
 }
 
 static void ConfigurationSelectsCharacterProfile()
 {
     var configuration = new Configuration();
-    var wrothy = configuration.GetOrCreateProfile("cid:wrothy", "Wrothy Minioa", "Example World");
-    var elektra = configuration.GetOrCreateProfile("cid:elektra", "Elektra Minoa", "Example World");
-    wrothy.ProtectedWebhookUrl = "protected-wrothy";
-    elektra.ProtectedWebhookUrl = "protected-elektra";
-    wrothy.EnabledInboundChannels.Add(RelayChatType.FreeCompany);
-    elektra.EnabledInboundChannels.Add(RelayChatType.Party);
+    var first = configuration.GetOrCreateProfile("cid:one", "First Character", "Example World");
+    var second = configuration.GetOrCreateProfile("cid:two", "Second Character", "Example World");
+    first.ProtectedWebhookUrl = "protected-one";
+    second.ProtectedWebhookUrl = "protected-two";
+    first.EnabledInboundChannels.Add(RelayChatType.FreeCompany);
+    second.EnabledInboundChannels.Add(RelayChatType.Party);
 
-    var selectedWrothy = configuration.GetOrCreateProfile("cid:wrothy", "Wrothy Minioa", "Example World");
-    var selectedElektra = configuration.GetOrCreateProfile("cid:elektra", "Elektra Minoa", "Example World");
-    Assert(ReferenceEquals(wrothy, selectedWrothy), "Wrothy profile was not selected by content ID");
-    Assert(ReferenceEquals(elektra, selectedElektra), "Elektra profile was not selected by content ID");
-    Assert(selectedWrothy.ProtectedWebhookUrl == "protected-wrothy", "Wrothy webhook route changed");
-    Assert(selectedElektra.ProtectedWebhookUrl == "protected-elektra", "Elektra webhook route changed");
-    Assert(!selectedElektra.EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "Wrothy filter leaked to Elektra");
+    var selectedFirst = configuration.GetOrCreateProfile("cid:one", "First Character", "Example World");
+    var selectedSecond = configuration.GetOrCreateProfile("cid:two", "Second Character", "Example World");
+    Assert(ReferenceEquals(first, selectedFirst), "first profile was not selected by content ID");
+    Assert(ReferenceEquals(second, selectedSecond), "second profile was not selected by content ID");
+    Assert(selectedFirst.ProtectedWebhookUrl == "protected-one", "first webhook route changed");
+    Assert(selectedSecond.ProtectedWebhookUrl == "protected-two", "second webhook route changed");
+    Assert(!selectedSecond.EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "first filter leaked to second profile");
 }
 
 static void ChatLabelsAreExplicit()
@@ -149,7 +149,7 @@ static void KeywordMatchingWorks()
     {
         new KeywordRule
         {
-            Keyword = "Wrothy",
+            Keyword = "ready",
             Channels = [RelayChatType.FreeCompany],
         },
         new KeywordRule
@@ -159,9 +159,9 @@ static void KeywordMatchingWorks()
             Channels = [RelayChatType.Party],
         },
     };
-    Assert(KeywordMatcher.FindMatches(rules, RelayChatType.FreeCompany, "Has anyone seen WROTHY?").Count == 1,
+    Assert(KeywordMatcher.FindMatches(rules, RelayChatType.FreeCompany, "Is everyone READY?").Count == 1,
         "case-insensitive keyword did not match");
-    Assert(KeywordMatcher.FindMatches(rules, RelayChatType.Shout, "Wrothy").Count == 0,
+    Assert(KeywordMatcher.FindMatches(rules, RelayChatType.Shout, "ready").Count == 0,
         "keyword ignored channel scope");
     Assert(!KeywordMatcher.IsMatch(rules[1], "raider"), "whole-word rule matched a partial word");
 }
@@ -170,12 +170,12 @@ static void KeywordPingIsExplicit()
 {
     var rule = new KeywordRule
     {
-        Keyword = "Wrothy",
+        Keyword = "ready",
         PingDiscordUser = true,
         Channels = [RelayChatType.FreeCompany],
     };
     var payload = WebhookMessageFormatter.Format(
-        SampleChat("Wrothy are you coming?"),
+        SampleChat("Are you ready?"),
         includeWorld: true,
         useEmbeds: false,
         [rule],
@@ -272,7 +272,7 @@ static async Task RateLimitIsRetried()
         return Task.CompletedTask;
     });
     WebhookEndpoint.TryCreate(FakeWebhook(), out var endpoint, out _);
-    var result = await sender.SendAsync(endpoint, [WebhookMessageFormatter.TestMessage("Wrothy Minioa")], CancellationToken.None);
+    var result = await sender.SendAsync(endpoint, [WebhookMessageFormatter.TestMessage("Example Character")], CancellationToken.None);
 
     Assert(result.Success, result.Error ?? "retry failed");
     Assert(result.Attempts == 2, "unexpected retry count");
@@ -286,38 +286,38 @@ static async Task WebhookTestSucceeds()
     using var client = new HttpClient(handler);
     var sender = new WebhookHttpSender(client, (_, _) => Task.CompletedTask);
     WebhookEndpoint.TryCreate(FakeWebhook(), out var endpoint, out _);
-    var result = await sender.SendAsync(endpoint, [WebhookMessageFormatter.TestMessage("Wrothy Minioa")], CancellationToken.None);
+    var result = await sender.SendAsync(endpoint, [WebhookMessageFormatter.TestMessage("Example Character")], CancellationToken.None);
 
     Assert(result.Success, result.Error ?? "test failed");
-    Assert(handler.Bodies.Single().Contains("connected successfully for Wrothy Minioa", StringComparison.Ordinal), "test content missing");
+    Assert(handler.Bodies.Single().Contains("connected successfully for Example Character", StringComparison.Ordinal), "test content missing");
 }
 
 static void ConfigurationModelPersists()
 {
     var original = new Configuration();
-    var wrothy = original.GetOrCreateProfile("cid:ABC", "Wrothy Minioa", "Example World");
-    wrothy.ProtectedWebhookUrl = "dpapi-ciphertext-wrothy";
-    wrothy.IncludeSenderWorld = false;
-    wrothy.UseDiscordEmbeds = true;
-    wrothy.Paused = true;
-    wrothy.EnabledInboundChannels = [RelayChatType.FreeCompany, RelayChatType.Shout];
-    wrothy.DiscordMentionUserId = "123456789012345678";
-    wrothy.Keywords = [new KeywordRule { Keyword = "Wrothy", Channels = [RelayChatType.FreeCompany] }];
-    var elektra = original.GetOrCreateProfile("cid:DEF", "Elektra Minoa", "Example World");
-    elektra.ProtectedWebhookUrl = "dpapi-ciphertext-elektra";
-    elektra.EnabledInboundChannels = [RelayChatType.Party];
+    var first = original.GetOrCreateProfile("cid:ABC", "First Character", "Example World");
+    first.ProtectedWebhookUrl = "dpapi-ciphertext-one";
+    first.IncludeSenderWorld = false;
+    first.UseDiscordEmbeds = true;
+    first.Paused = true;
+    first.EnabledInboundChannels = [RelayChatType.FreeCompany, RelayChatType.Shout];
+    first.DiscordMentionUserId = "123456789012345678";
+    first.Keywords = [new KeywordRule { Keyword = "ready", Channels = [RelayChatType.FreeCompany] }];
+    var second = original.GetOrCreateProfile("cid:DEF", "Second Character", "Example World");
+    second.ProtectedWebhookUrl = "dpapi-ciphertext-two";
+    second.EnabledInboundChannels = [RelayChatType.Party];
 
     var json = JsonSerializer.Serialize(original);
     var restored = JsonSerializer.Deserialize<Configuration>(json)
         ?? throw new InvalidOperationException("deserialization failed");
-    var restoredWrothy = restored.CharacterProfiles["cid:ABC"];
-    var restoredElektra = restored.CharacterProfiles["cid:DEF"];
-    Assert(restoredWrothy.ProtectedWebhookUrl == wrothy.ProtectedWebhookUrl, "Wrothy protected webhook was lost");
-    Assert(restoredElektra.ProtectedWebhookUrl == elektra.ProtectedWebhookUrl, "Elektra protected webhook was lost");
-    Assert(restoredWrothy.EnabledInboundChannels.SetEquals(wrothy.EnabledInboundChannels), "Wrothy filters were lost");
-    Assert(restoredElektra.EnabledInboundChannels.SetEquals(elektra.EnabledInboundChannels), "Elektra filters were lost");
-    Assert(restoredWrothy.Paused && restoredWrothy.UseDiscordEmbeds && !restoredWrothy.IncludeSenderWorld, "preferences were lost");
-    Assert(restoredWrothy.Keywords.Single().Keyword == "Wrothy", "keyword was lost");
+    var restoredFirst = restored.CharacterProfiles["cid:ABC"];
+    var restoredSecond = restored.CharacterProfiles["cid:DEF"];
+    Assert(restoredFirst.ProtectedWebhookUrl == first.ProtectedWebhookUrl, "first protected webhook was lost");
+    Assert(restoredSecond.ProtectedWebhookUrl == second.ProtectedWebhookUrl, "second protected webhook was lost");
+    Assert(restoredFirst.EnabledInboundChannels.SetEquals(first.EnabledInboundChannels), "first filters were lost");
+    Assert(restoredSecond.EnabledInboundChannels.SetEquals(second.EnabledInboundChannels), "second filters were lost");
+    Assert(restoredFirst.Paused && restoredFirst.UseDiscordEmbeds && !restoredFirst.IncludeSenderWorld, "preferences were lost");
+    Assert(restoredFirst.Keywords.Single().Keyword == "ready", "keyword was lost");
 }
 
 static CharacterProfile ConfiguredProfile(params RelayChatType[] channels) => new()

@@ -2,7 +2,7 @@
 
 Sentinel Relay is a privacy-first **FFXIV → Discord** chat relay for Dalamud. It sends only the chat types a player explicitly enables, directly from the game client to that character's private Discord webhook.
 
-**No hosted backend is required.** There is no Railway service, monthly fee, Docker container, Node process, port forwarding, Discord bot token, pairing code, or Discord-to-FFXIV control path.
+Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -17,7 +17,7 @@ Dalamud structured chat event
   → private relay channel
 ```
 
-Wrothy Minioa and Elektra Minoa are not hard-coded. Dalamud identifies the active character by content ID, and each character profile independently retains its protected webhook, filters, formatting, keywords, and pause state.
+Dalamud identifies the active character by content ID. Each character profile independently retains its protected webhook, filters, formatting, keywords, and pause state.
 
 ## Supported chat types
 
@@ -48,11 +48,11 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-The current `0.1.0.0` release is an explicitly testing-only beta. It is hosted online; testers do not need a compiler, development-plugin folder, backend, or always-on service.
+The current `0.1.0.1` release is available from the live Sentinel catalog. Users do not need a compiler, development-plugin folder, or separately hosted relay service.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
-2. Open `/xlplugins`, find **Sentinel Relay** in the available/testing section, and choose **Install**.
-3. Create private Discord channels such as `#relay-wrothy` and `#relay-elektra`.
+2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
+3. Create one private Discord relay channel per FFXIV character.
 4. Create a separate incoming webhook in each channel by following [DISCORD_SETUP.md](DISCORD_SETUP.md).
 5. Log in as the intended character and run `/srelay`.
 6. Open **Discord Webhook**, paste that character's webhook URL, select **Save Webhook**, and then **Test Webhook**.
@@ -62,7 +62,7 @@ The current `0.1.0.0` release is an explicitly testing-only beta. It is hosted o
 The successful test message is:
 
 ```text
-Sentinel Relay connected successfully for Wrothy Minioa.
+Sentinel Relay connected successfully for Example Character.
 ```
 
 ## Keyword alerts
@@ -103,6 +103,6 @@ The installable package is written to `bin/Release/SentinelRelay/latest.zip`. Gi
 - [Architecture](ARCHITECTURE.md)
 - [Security and privacy](SECURITY.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
-- [Wrothy/Elektra live-test checklist](LIVE_TEST_CHECKLIST.md)
+- [Live-test checklist](LIVE_TEST_CHECKLIST.md)
 
 Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamud catalog. It is not affiliated with or endorsed by Square Enix, Discord, Dalamud, or XIVLauncher.

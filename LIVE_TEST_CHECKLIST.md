@@ -1,13 +1,9 @@
 # Sentinel Relay live-test checklist
 
-Target release: `0.1.0.0`  
-Required testers: Wrothy Minioa and Elektra Minoa
+Target release: `0.1.0.1`
+Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
-The catalog entry is published as **testing-only** so both testers can install it online. Do not promote it to a normal live entry until every release-blocking item passes. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
-
-## Install the online testing build
-
-The testing build is published online. Neither tester needs a compiler, development-plugin folder, backend, or locally hosted service:
+## Install the live build
 
 1. In FFXIV, run `/xlsettings` and open **Experimental**.
 2. Add this URL under **Custom Plugin Repositories**:
@@ -17,70 +13,58 @@ The testing build is published online. Neither tester needs a compiler, developm
    ```
 
 3. Save and close settings.
-4. Run `/xlplugins`, find **Sentinel Relay** in the available/testing section, and choose **Install**.
-5. Run `/srelay`, confirm version `0.1.0.0`, and verify the active character shown in the header.
+4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
+5. Run `/srelay`, confirm version `0.1.0.1`, and verify the active character shown in the header.
 
-The plugin still runs locally inside each active FFXIV client because that is where game chat exists. It sends directly to Discord; there is no separate PC-hosted relay process.
+The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
 ## Preconditions
 
-- [ ] `#relay-wrothy` and `#relay-elektra` are private channels.
-- [ ] Each channel has its own webhook; the two URLs are not the same.
+- [ ] Two private Discord relay channels exist.
+- [ ] Each channel has its own webhook; the two URLs are different.
 - [ ] No webhook URL is committed, posted, logged, or visible in screenshots.
-- [ ] No Railway/Docker/Node/WebSocket service is running or required.
-- [ ] The Discord bot may be offline; webhook tests still work.
 - [ ] All chat filters begin off for a fresh character profile.
 
-## A — Wrothy webhook and routing
+## A — First character webhook and routing
 
-1. Log in as **Wrothy Minioa**.
-2. Run `/srelay` and verify Wrothy appears in the header.
-3. Paste only the `#relay-wrothy` webhook, save, and test.
-4. Confirm this appears in `#relay-wrothy`:
-
-   ```text
-   Sentinel Relay connected successfully for Wrothy Minioa.
-   ```
-
-5. Confirm nothing appears in `#relay-elektra`.
+1. Log into the first character.
+2. Run `/srelay` and verify the correct character appears in the header.
+3. Paste only that character's webhook, save it, and run **Test Webhook**.
+4. Confirm the success message appears only in the first relay channel.
+5. Confirm nothing appears in the second relay channel.
 
 - [ ] PASS
 
-## B — Wrothy chat relay
+## B — First character chat relay
 
 1. Enable Say, Free Company, and Shout only.
 2. Send unique messages in this order:
 
    ```text
-   Say: Sentinel Relay Wrothy Say B1
-   FC: Sentinel Relay Wrothy FC B2
-   Shout: Sentinel Relay Wrothy Shout B3
+   Sentinel Relay Say B1
+   Sentinel Relay FC B2
+   Sentinel Relay Shout B3
    ```
 
-3. Confirm three ordered messages in `#relay-wrothy` with correct labels, sender, readable text, and optional world.
-4. Confirm none appears in `#relay-elektra`.
+3. Confirm three ordered messages in the first relay channel with correct labels, sender, readable text, and optional world.
+4. Confirm none appears in the second relay channel.
 
 - [ ] PASS
 
-## C — Elektra webhook and routing
+## C — Second character isolation
 
-1. Log in as **Elektra Minoa** and wait for the header to change.
-2. Confirm Elektra initially shows her own webhook state and filters—not Wrothy's values.
-3. Paste only the `#relay-elektra` webhook, save, and test.
-4. Confirm the Elektra success message appears only in `#relay-elektra`.
-
-- [ ] PASS
-
-## D — Elektra independent filters
-
-1. Enable Party and Yell for Elektra, leaving FC and Shout disabled.
-2. Send a Party message and a Yell; confirm both reach `#relay-elektra`.
-3. Send an FC message and a Shout; confirm neither reaches Discord.
-4. Switch back to Wrothy and confirm Wrothy still has Say/FC/Shout enabled and her own webhook.
+1. Log into the second character and wait for the `/srelay` header to change.
+2. Confirm the profile initially shows its own webhook state and filters, not the first profile's values.
+3. Paste only the second webhook, save it, and test it.
+4. Confirm the success message appears only in the second relay channel.
+5. Enable Party and Yell, leaving Free Company and Shout disabled.
+6. Confirm Party and Yell reach only the second relay channel.
+7. Confirm Free Company and Shout do not leave the PC.
+8. Switch back to the first character and verify its original webhook and filters remain intact.
 
 - [ ] PASS
 
-## E — Sensitive channel opt-in
+## D — Sensitive channel opt-in
 
 For a character that can access each chat type:
 
@@ -93,17 +77,17 @@ For a character that can access each chat type:
 - [ ] Novice Network remains off unless explicitly enabled.
 - [ ] Standard and Custom Emotes are independently selectable.
 
-## F — Local filtering proof
+## E — Local filtering proof
 
-1. On Wrothy, disable Shout and keep Say enabled.
-2. Send `Sentinel Relay disabled Shout F1` in Shout.
-3. Send `Sentinel Relay enabled Say F2` in Say.
-4. Confirm only F2 reaches Discord.
-5. Check `/srelay debug`; no queue activity should result from F1.
+1. Disable Shout and keep Say enabled.
+2. Send `Sentinel Relay disabled Shout E1` in Shout.
+3. Send `Sentinel Relay enabled Say E2` in Say.
+4. Confirm only E2 reaches Discord.
+5. Check `/srelay debug`; no queue activity should result from E1.
 
 - [ ] PASS
 
-## G — Pause/resume
+## F — Pause and resume
 
 1. Run `/srelay pause`.
 2. Send an otherwise enabled message; confirm Discord receives nothing.
@@ -112,30 +96,30 @@ For a character that can access each chat type:
 
 - [ ] PASS
 
-## H — Keyword highlight and optional ping
+## G — Keyword highlight and optional ping
 
-1. In Wrothy's **Keywords** tab, save Wrothy's numeric Discord User ID.
-2. Add keyword `Wrothy`, contains mode, Free Company, **Ping configured user** enabled.
-3. From another character, send `Wrothy are you coming?` in FC.
-4. Confirm one relayed chat item includes a keyword alert and pings only Wrothy.
-5. Add a second matching keyword and repeat; confirm one bundled alert, not one ping per rule.
+1. In **Keywords**, save the intended numeric Discord User ID.
+2. Add keyword `ready`, contains mode, Free Company, and enable **Ping configured user**.
+3. From another character, send `Are you ready?` in Free Company chat.
+4. Confirm one relayed chat item includes a keyword alert and pings only the configured user.
+5. Add a second matching keyword and repeat; confirm one bundled alert rather than one ping per rule.
 6. Test literal `@everyone`, `@here`, `<@user>`, `<@&role>`, and `<#channel>` text; confirm none creates an unintended mention.
 
 - [ ] PASS
 
-## I — Formatting, sanitization, and duplicates
+## H — Formatting, sanitization, and duplicates
 
 - [ ] Compact text mode displays a clean `【CHANNEL】 Sender: message` form.
-- [ ] Embed mode displays channel/sender, message, color, and timestamp cleanly on desktop/mobile.
+- [ ] Embed mode displays channel/sender, message, color, and timestamp cleanly on desktop and mobile.
 - [ ] Unicode survives in readable form.
 - [ ] Item, map, and player links become harmless readable plain text.
 - [ ] Control characters do not create malformed Discord output.
 - [ ] One duplicated chat event is not posted twice.
 - [ ] Distinct messages remain in original order.
 
-## J — Outage and rate behavior
+## I — Outage and rate behavior
 
-1. Temporarily block/disconnect Internet access or wait for a safe Discord maintenance test window.
+1. Temporarily disconnect Internet access.
 2. Confirm FFXIV remains responsive and Sentinel Relay reports an error without freezing.
 3. Restore connectivity and use **Test Webhook**.
 4. Confirm the queue does not dump messages older than two minutes.
@@ -143,31 +127,21 @@ For a character that can access each chat type:
 
 - [ ] PASS
 
-## K — Restart and persistence
+## J — Restart and persistence
 
-1. Record both characters' webhook state, filters, formatting, keyword rules, and pause state.
-2. Restart/reload Dalamud and, if practical, restart FFXIV.
-3. Log into Wrothy and verify her settings and webhook test.
-4. Log into Elektra and verify her independent settings and webhook test.
-5. Confirm neither saved webhook URL is visible in UI, status, debug, or logs.
+1. Record both character profiles' webhook state, filters, formatting, keyword rules, and pause state.
+2. Restart or reload Dalamud and, if practical, restart FFXIV.
+3. Verify each character reloads only its own saved configuration.
+4. Confirm neither saved webhook URL is visible in UI, status, debug, or logs.
 
 - [ ] PASS
 
-## L — Scope-removal checks
-
-- [ ] No Discord → FFXIV command exists.
-- [ ] No `/srelay link` or `/srelay unlink` exists.
-- [ ] No pairing code appears.
-- [ ] No bot token is requested.
-- [ ] No Railway, Docker, Node, SQLite, Tailscale, port-forwarding, or local service instruction remains.
-- [ ] Normal delivery works while the old Sentinel Relay bot is offline.
-
 ## Final sign-off
 
-- [ ] Wrothy tester: ____________________ Date: __________
-- [ ] Elektra tester: ___________________ Date: __________
-- [ ] Candidate commit: __________________________________
-- [ ] Release workflow run: _______________________________
+- [ ] First tester: ____________________ Date: __________
+- [ ] Second tester: ___________________ Date: __________
+- [ ] Release commit: ___________________________________
+- [ ] Release workflow run: ______________________________
 - [ ] Catalog URL/version verified from a clean Dalamud install
 
-Failures in routing isolation, disabled-filter privacy, pause behavior, webhook masking, mention safety, or no-backend operation block release.
+Failures in routing isolation, disabled-filter privacy, pause behavior, webhook masking, mention safety, or direct delivery require a follow-up fix.

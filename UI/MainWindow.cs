@@ -200,7 +200,7 @@ public sealed class MainWindow : Window
         }
 
         ImGui.Spacing();
-        ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook. There is no bot, hosted backend, or Discord-to-FFXIV control path.");
+        ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
     }
 
     private void DrawFilters(CharacterProfile? profile)

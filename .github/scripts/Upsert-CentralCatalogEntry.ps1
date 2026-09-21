@@ -6,9 +6,7 @@ param(
     [string]$Version,
 
     [Parameter(Mandatory = $true)]
-    [string]$ReleaseAssetUrl,
-
-    [switch]$TestingOnly
+    [string]$ReleaseAssetUrl
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,8 +29,8 @@ if ($matches.Count -gt 1) {
 $values = [ordered]@{
     Author = 'MTitan'
     Name = 'Sentinel Relay'
-    Punchline = if ($TestingOnly) { 'Testing beta: private FFXIV-to-Discord relay with no hosted backend.' } else { 'Private FFXIV-to-Discord chat relay with no hosted backend.' }
-    Description = if ($TestingOnly) { 'Testing beta for Wrothy and Elektra. Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off; no bot, paid hosting, or Discord-to-FFXIV control is required.' } else { 'Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off; no bot, paid hosting, or Discord-to-FFXIV control is required.' }
+    Punchline = 'Private FFXIV-to-Discord chat relay using per-character webhooks.'
+    Description = 'Sends explicitly selected FFXIV chat channels directly to a per-character Discord webhook. All filters default off.'
     InternalName = 'SentinelRelay'
     AssemblyVersion = $Version
     TestingAssemblyVersion = $Version
@@ -42,7 +40,7 @@ $values = [ordered]@{
     DalamudApiLevel = 15
     TestingDalamudApiLevel = 15
     IsHide = $false
-    IsTestingExclusive = [bool]$TestingOnly
+    IsTestingExclusive = $false
     DownloadCount = 0
     LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     LoadPriority = 0
@@ -75,4 +73,4 @@ if ($relayEntries.Count -ne 1) {
 $json = ConvertTo-Json -InputObject @($entries) -Depth 30
 $resolvedPath = (Resolve-Path -LiteralPath $ManifestPath).Path
 [System.IO.File]::WriteAllText($resolvedPath, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
-Write-Host "Upserted only SentinelRelay $Version (testing-only: $([bool]$TestingOnly))."
+Write-Host "Upserted only live SentinelRelay $Version."

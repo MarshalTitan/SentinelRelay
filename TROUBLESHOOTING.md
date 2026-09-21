@@ -46,7 +46,7 @@ Confirm the PC can reach Discord over HTTPS. VPN, firewall, DNS, security softwa
 5. Save and test it.
 6. Resume.
 
-Wrothy and Elektra require separate webhooks. Their URLs must not be swapped or reused.
+Each character requires a separate webhook. Webhook URLs must not be swapped or reused between profiles.
 
 ## Queue full or dropped messages increase
 
@@ -70,7 +70,7 @@ This is intentional. Arbitrary FFXIV text is sent with all mentions disabled and
 
 ## Character settings appear missing
 
-Settings are per FFXIV content ID. Confirm the intended character is fully logged in and `IPlayerState` has loaded. Wrothy's filters/webhook do not appear while Elektra is active, and vice versa.
+Settings are per FFXIV content ID. Confirm the intended character is fully logged in and `IPlayerState` has loaded. One character's filters and webhook must not appear while another character is active.
 
 If the protected URL becomes unreadable after moving a Dalamud configuration file to another Windows account/PC, paste that character's webhook again. Windows DPAPI intentionally ties protection to the original Windows user.
 
