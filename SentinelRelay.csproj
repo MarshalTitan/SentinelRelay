@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.3.0.0</Version>
+    <Version>0.3.0.1</Version>
     <Author>MTitan</Author>
     <Name>Sentinel Relay</Name>
     <Punchline>Private per-character FFXIV and Discord chat relay.</Punchline>

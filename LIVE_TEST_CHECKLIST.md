@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.3.0.0`
+Live catalog version: `0.3.0.1`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.3.0.0` and verify the active character shown in the header.
+5. Confirm version `0.3.0.1` and verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
@@ -171,13 +171,13 @@ Local plugin output is not proof. The second FFXIV client must see the server-si
 
 Enable and test only destinations available to the active character:
 
-- [ ] `/say message` reaches real Say chat.
-- [ ] `/yell message` reaches real Yell chat.
-- [ ] `/shout message` reaches real Shout chat.
-- [ ] `/party message` reaches Party or Cross-world Party as appropriate.
-- [ ] `/alliance message` reaches Alliance chat while in an alliance.
+- [ ] `/say message` and `/s message` reach real Say chat.
+- [ ] `/yell message` and `/y message` reach real Yell chat.
+- [ ] `/shout message` and `/sh message` reach real Shout chat.
+- [ ] `/party message` and `/p message` reach Party or Cross-world Party as appropriate.
+- [ ] `/alliance message` and `/a message` reach Alliance chat while in an alliance.
 - [ ] `/pvpteam message` reaches PvP Team chat when available.
-- [ ] `/novice message` reaches Novice Network when available.
+- [ ] `/novice message` and `/n message` reach Novice Network when available.
 - [ ] `/ls1`–`/ls8` route only to their matching Linkshell slots.
 - [ ] `/cwls1`–`/cwls8` route only to their matching Cross-world Linkshell slots.
 - [ ] A destination disabled under **Discord Replies** is ignored even when its inbound Chat Filter is enabled.

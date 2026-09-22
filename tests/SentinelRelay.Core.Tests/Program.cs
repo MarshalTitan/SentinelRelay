@@ -266,14 +266,20 @@ static void OutboundCommandsParse()
     var expected = new Dictionary<string, RelayChatType>
     {
         ["/say hello"] = RelayChatType.Say,
+        ["/s hello"] = RelayChatType.Say,
         ["/yell hello"] = RelayChatType.Yell,
+        ["/y hello"] = RelayChatType.Yell,
         ["/shout hello"] = RelayChatType.Shout,
+        ["/sh hello"] = RelayChatType.Shout,
         ["/r hello"] = RelayChatType.IncomingTell,
         ["/party hello"] = RelayChatType.Party,
+        ["/p hello"] = RelayChatType.Party,
         ["/alliance hello"] = RelayChatType.Alliance,
+        ["/a hello"] = RelayChatType.Alliance,
         ["/fc hello"] = RelayChatType.FreeCompany,
         ["/pvpteam hello"] = RelayChatType.PvPTeam,
         ["/novice hello"] = RelayChatType.NoviceNetwork,
+        ["/n hello"] = RelayChatType.NoviceNetwork,
     };
     for (var slot = 1; slot <= 8; slot++)
     {

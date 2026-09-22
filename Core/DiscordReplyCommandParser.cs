@@ -8,11 +8,16 @@ public static class DiscordReplyCommandParser
         new Dictionary<string, RelayChatType>(StringComparer.OrdinalIgnoreCase)
         {
             ["/say"] = RelayChatType.Say,
+            ["/s"] = RelayChatType.Say,
             ["/yell"] = RelayChatType.Yell,
+            ["/y"] = RelayChatType.Yell,
             ["/shout"] = RelayChatType.Shout,
+            ["/sh"] = RelayChatType.Shout,
             ["/r"] = RelayChatType.IncomingTell,
             ["/party"] = RelayChatType.Party,
+            ["/p"] = RelayChatType.Party,
             ["/alliance"] = RelayChatType.Alliance,
+            ["/a"] = RelayChatType.Alliance,
             ["/fc"] = RelayChatType.FreeCompany,
             ["/pvpteam"] = RelayChatType.PvPTeam,
             ["/ls1"] = RelayChatType.Linkshell1,
@@ -32,6 +37,7 @@ public static class DiscordReplyCommandParser
             ["/cwls7"] = RelayChatType.CrossWorldLinkshell7,
             ["/cwls8"] = RelayChatType.CrossWorldLinkshell8,
             ["/novice"] = RelayChatType.NoviceNetwork,
+            ["/n"] = RelayChatType.NoviceNetwork,
         };
 
     public static bool TryParse(string? content, out RelayChatType destination, out string message)

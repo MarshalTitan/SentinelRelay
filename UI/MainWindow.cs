@@ -60,18 +60,18 @@ public sealed class MainWindow : Window
 
     private static readonly (RelayChatType Channel, string Command, string Label)[] CommonReplyChannels =
     [
-        (RelayChatType.Say, "/say", "Say"),
-        (RelayChatType.Yell, "/yell", "Yell"),
-        (RelayChatType.Shout, "/shout", "Shout"),
+        (RelayChatType.Say, "/say or /s", "Say"),
+        (RelayChatType.Yell, "/yell or /y", "Yell"),
+        (RelayChatType.Shout, "/shout or /sh", "Shout"),
         (RelayChatType.FreeCompany, "/fc", "Free Company"),
     ];
 
     private static readonly (RelayChatType Channel, string Command, string Label)[] GroupReplyChannels =
     [
-        (RelayChatType.Party, "/party", "Party / Cross-world Party"),
-        (RelayChatType.Alliance, "/alliance", "Alliance"),
+        (RelayChatType.Party, "/party or /p", "Party / Cross-world Party"),
+        (RelayChatType.Alliance, "/alliance or /a", "Alliance"),
         (RelayChatType.PvPTeam, "/pvpteam", "PvP Team"),
-        (RelayChatType.NoviceNetwork, "/novice", "Novice Network"),
+        (RelayChatType.NoviceNetwork, "/novice or /n", "Novice Network"),
     ];
 
     private static readonly (RelayChatType Channel, string Command, string Label)[] LinkshellReplyChannels =

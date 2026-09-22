@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The live `0.3.0.0` release expands the proven `/fc` reply path to explicit commands for public, group, linkshell, cross-world linkshell, Novice Network, and recent Tell replies. It does not register Discord slash commands and does not change the webhook relay's independent operation.
+The live `0.3.0.1` release expands the proven `/fc` reply path to explicit commands for public, group, linkshell, cross-world linkshell, Novice Network, and recent Tell replies, including familiar short chat aliases. It does not register Discord slash commands and does not change the webhook relay's independent operation.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -55,7 +55,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.3.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
+Version `0.3.0.1` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -103,7 +103,8 @@ Do not enable this until the channel-specific bot permissions and IDs are config
 
 Supported ordinary-message prefixes:
 
-- `/say`, `/yell`, `/shout`, `/fc`, `/party`, `/alliance`, `/pvpteam`, and `/novice`
+- `/say` or `/s`, `/yell` or `/y`, `/shout` or `/sh`, and `/fc`
+- `/party` or `/p`, `/alliance` or `/a`, `/pvpteam`, and `/novice` or `/n`
 - `/ls1` through `/ls8`
 - `/cwls1` through `/cwls8`
 - `/r` to reply to the latest incoming Tell seen during the current session

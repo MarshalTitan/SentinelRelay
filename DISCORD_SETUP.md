@@ -170,14 +170,14 @@ Configure a second character separately with its own channel ID and authorized u
 
 ### G. Supported ordinary-message commands
 
-- `/say message`
-- `/yell message`
-- `/shout message`
+- `/say message` or `/s message`
+- `/yell message` or `/y message`
+- `/shout message` or `/sh message`
 - `/fc message`
-- `/party message` — also uses Cross-world Party when that is the active party type
-- `/alliance message`
+- `/party message` or `/p message` — also uses Cross-world Party when that is the active party type
+- `/alliance message` or `/a message`
 - `/pvpteam message`
-- `/novice message`
+- `/novice message` or `/n message`
 - `/ls1 message` through `/ls8 message`
 - `/cwls1 message` through `/cwls8 message`
 - `/r message` — replies to the latest incoming Tell
