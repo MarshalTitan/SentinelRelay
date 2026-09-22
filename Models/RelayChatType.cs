@@ -31,4 +31,5 @@ public enum RelayChatType
     CustomEmote = 26,
     OutgoingTell = 27,
     CrossWorldParty = 28,
+    RewardsHuntResults = 29,
 }

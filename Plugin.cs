@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly BoundedOrderedQueue<DiscordReplyCommand> outboundQueue = new(5);
     private readonly SlidingWindowRateLimiter outboundRateLimiter = new(5, TimeSpan.FromSeconds(30));
     private readonly DuplicateMessageFilter duplicateFilter = new();
+    private readonly RewardMessageBatcher rewardBatcher = new();
     private readonly ChatCaptureService chatCapture;
     private readonly MainWindow mainWindow;
     private CharacterIdentity? activeIdentity;
@@ -66,12 +67,17 @@ public sealed class Plugin : IDalamudPlugin
             mainThreadActions.Enqueue(() => OnDiscordCheckpointEstablished(characterKey, checkpoint, timestamp));
         discordReplyReader.MessagesReceived += batch =>
             mainThreadActions.Enqueue(() => OnDiscordMessagesReceived(batch));
-        chatCapture = new ChatCaptureService(ChatGui, Log, OnChatCaptured);
+        chatCapture = new ChatCaptureService(
+            ChatGui,
+            Log,
+            OnChatCaptured,
+            () => activeProfile?.CaptureRewardDiagnostics == true);
         mainWindow = new MainWindow(
             () => activeIdentity,
             () => activeProfile,
             () => activeWebhookEndpoint,
             webhookRelay,
+            chatCapture,
             SaveWebhook,
             RemoveWebhook,
             TestWebhook,
@@ -138,6 +144,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         ProcessOutboundQueue(now);
+        QueueCapturedChat(rewardBatcher.FlushIfDue(now));
     }
 
     private void RefreshCharacter(bool force)
@@ -150,6 +157,8 @@ public sealed class Plugin : IDalamudPlugin
         discordReplyReader.Stop();
         outboundQueue.Clear();
         outboundRateLimiter.Clear();
+        rewardBatcher.Clear();
+        chatCapture.RewardDiagnostics.Clear();
         lastOutboundError = null;
         lastIncomingTellUtc = null;
         duplicateFilter.Clear();
@@ -361,6 +370,26 @@ public sealed class Plugin : IDalamudPlugin
         if (duplicateFilter.IsDuplicate(chat, DateTime.UtcNow))
             return;
 
+        if (chat.ChatType == RelayChatType.RewardsHuntResults)
+        {
+            QueueCapturedChat(rewardBatcher.Add(chat, DateTime.UtcNow));
+            return;
+        }
+
+        // Preserve event order when ordinary chat arrives before the short
+        // reward batching window expires.
+        QueueCapturedChat(rewardBatcher.Flush());
+        QueueCapturedChat(chat);
+    }
+
+    private void QueueCapturedChat(CapturedChat? chat)
+    {
+        if (chat is null
+            || !RelayFilter.ShouldForward(activeProfile, chat.ChatType)
+            || activeWebhookEndpoint is null
+            || activeIdentity is null)
+            return;
+
         var keywordMatches = KeywordMatcher.FindMatches(
             activeProfile!.Keywords,
             chat.ChatType,
@@ -368,7 +397,7 @@ public sealed class Plugin : IDalamudPlugin
         var payloads = WebhookMessageFormatter.Format(
             chat,
             activeProfile.IncludeSenderWorld,
-            activeProfile.UseDiscordEmbeds,
+            activeProfile.UseDiscordEmbeds || chat.ChatType == RelayChatType.RewardsHuntResults,
             keywordMatches,
             activeProfile.DiscordMentionUserId);
         webhookRelay.TryEnqueue(activeIdentity.CharacterKey, activeWebhookEndpoint, payloads);
@@ -511,6 +540,7 @@ public sealed class Plugin : IDalamudPlugin
             webhookRelay.ClearQueue();
             discordReplyReader.Stop();
             outboundQueue.Clear();
+            rewardBatcher.Clear();
         }
         SaveConfiguration();
         if (!paused)
@@ -547,11 +577,15 @@ public sealed class Plugin : IDalamudPlugin
                 ChatGui.Print("[Sentinel Relay] Relay resumed.");
                 break;
             case "debug":
+                var rewardDiagnostics = chatCapture.RewardDiagnostics.Snapshot();
+                var latestReward = rewardDiagnostics.LastOrDefault();
                 ChatGui.Print($"[Sentinel Relay] version={PluginVersion}, state={webhookRelay.State}, queue={webhookRelay.QueueLength}, "
                     + $"dropped={webhookRelay.DroppedCount}, character={activeIdentity?.CharacterName ?? "none"}, "
                     + $"webhook={(activeWebhookEndpoint is null ? "not configured" : "configured")}, "
                     + $"replyReader={discordReplyReader.State}, replyQueue={outboundQueue.Count}, replyDropped={droppedOutboundCount}, "
                     + $"recentTellTarget={(DiscordReplyPolicy.HasRecentTellTarget(lastIncomingTellUtc, DateTime.UtcNow) ? "available" : "none")}, "
+                    + $"rewardDiagnostics={(activeProfile?.CaptureRewardDiagnostics == true ? "on" : "off")}, rewardObservations={rewardDiagnostics.Count}, "
+                    + $"lastRewardLogKind={(latestReward is null ? "none" : $"{latestReward.LogKindName}({latestReward.LogKindValue})")}, "
                     + $"lastReplySubmit={lastOutboundSubmitUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"lastSuccess={webhookRelay.LastSuccessUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"lastError={webhookRelay.LastError ?? "none"}, replyError={lastOutboundError ?? discordReplyReader.LastError ?? "none"}");

@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.3.0.1`
+Live catalog version: `0.3.1.0`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.3.0.1` and verify the active character shown in the header.
+5. Confirm version `0.3.1.0` and verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
@@ -218,6 +218,25 @@ Only after section L passes for the first profile:
 2. Test `/fc second profile isolation` from the second authorized account/channel.
 3. Confirm only the second FFXIV character sends it.
 4. Post `/fc wrong route` in each wrong channel/user combination and confirm neither profile sends it.
+
+- [ ] PASS
+
+## Q — Rewards / Hunt Results and API diagnostics
+
+Run this during a real S-rank reward event; ordinary chat cannot simulate the game LogKind.
+
+1. In **Chat Filters**, enable **Rewards / Hunt Results** for only the character under test.
+2. In **Debug**, enable **Record reward XivChatType / LogKind diagnostics** and clear old observations.
+3. Complete one S-rank with credit.
+4. Confirm Discord receives one compact `【REWARD】` embed containing the contribution line and consecutive seal/tomestone lines in their original order.
+5. Confirm `You cannot carry any more ...` remains present when a currency is capped.
+6. Confirm there is no sender header, embed timestamp, or timestamp footer.
+7. In **Debug**, record the exact `XivChatType` name and numeric RowId shown for each observed line, plus the nearby raw `LogMessage` IDs.
+8. Send a player-chat message containing `You obtain 60 Allied Seals.` and confirm it does not bypass that player's own disabled chat filter or appear as `【REWARD】`.
+9. Disable **Rewards / Hunt Results**, complete another hunt if practical, and confirm no reward system line leaves the PC.
+10. Confirm Rewards / Hunt Results does not appear under **Discord Replies** and no `/reward` command is accepted.
+
+Expected API 15 candidate RowIds are `SystemMessage` (57), `SystemError` (58), `ErrorMessage` (60), `LootNotice` (62), and `Progress` (64). Treat the Debug observations from the live client as authoritative and report any matching line marked **diagnostic only**.
 
 - [ ] PASS
 

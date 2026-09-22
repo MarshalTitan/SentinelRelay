@@ -41,7 +41,7 @@ Do this while the intended FFXIV character is active:
 5. Select **Save Webhook**.
 6. Select **Test Webhook**.
 7. Confirm the success message appears only in the intended Discord channel.
-8. Open **Chat Filters** and intentionally enable the desired channels. All filters begin off.
+8. Open **Chat Filters** and intentionally enable the desired channels. All filters begin off. **Rewards / Hunt Results** is an optional inbound-only system feed and cannot send anything back into FFXIV.
 
 The saved URL is masked and protected in the local Dalamud configuration using Windows DPAPI. `/srelay status` and `/srelay debug` report only whether it is configured.
 

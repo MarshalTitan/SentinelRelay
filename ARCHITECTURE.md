@@ -8,7 +8,7 @@ Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The live `0.3.0.1` release includes a separately optional REST-polling path:
+The live `0.3.1.0` release includes a separately optional REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
@@ -30,6 +30,15 @@ There is still no hosted Sentinel backend, listening port, WebSocket, Discord Ga
 10. Successful delivery times and sanitized errors are returned to the game thread through a small action queue.
 
 No HTTP, cryptography, disk, or retry delay runs inside the FFXIV chat callback.
+
+## Reward / hunt-result flow
+
+1. `ChatCaptureService` checks sanitized chat text for the narrow hunt-credit, obtained-reward, and capped-currency patterns.
+2. A line is classified as `RewardsHuntResults` only when its API 15 `XivChatType` RowId is one of `SystemMessage` (57), `SystemError` (58), `ErrorMessage` (60), `LootNotice` (62), or `Progress` (64). Player chat can never impersonate this inbound channel.
+3. The per-character Rewards / Hunt Results filter must be enabled; it defaults off and is absent from every outbound allowlist and parser.
+4. Consecutive lines are accumulated for a 1.25-second quiet window, capped at 20 lines/four seconds, then emitted in original order as one compact `【REWARD】` embed. An intervening ordinary chat message flushes the pending reward batch first.
+5. The embed has no sender header, timestamp, or timestamp footer. Discord's native message timestamp remains available.
+6. Optional per-character diagnostics observe raw `IChatGui.LogMessage` IDs in memory and correlate them with reward-pattern `ChatMessage` observations. They never invoke `FormatLogMessageForDebugging`, never write message bodies to logs, and clear on character switch or reload.
 
 ## Discord reply flow
 
@@ -94,6 +103,8 @@ Compact mode:
 ```
 
 Embed mode uses a small channel-specific color, sender/channel title, and message description. It deliberately omits an embed timestamp and footer so Discord's native message timestamp is the only timestamp shown. Long content is split on Unicode rune boundaries so surrogate pairs are not broken.
+
+Reward batches always use the compact embed presentation regardless of the ordinary-chat formatting preference, preserving one reward line per display line.
 
 Every payload has an empty `allowed_mentions.parse` array. Raw FFXIV text also has mention-like syntax neutralized. A keyword rule may separately authorize exactly one validated Discord user ID; that ID is the only entry in `allowed_mentions.users` for that alert.
 

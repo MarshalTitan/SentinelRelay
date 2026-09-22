@@ -111,6 +111,7 @@ public static class ChannelPolicy
         RelayChatType.NoviceNetwork => "Novice Network",
         RelayChatType.StandardEmote => "Standard Emotes",
         RelayChatType.CustomEmote => "Custom Emotes",
+        RelayChatType.RewardsHuntResults => "Rewards / Hunt Results",
         RelayChatType.CrossWorldLinkshell1 => "CWLS 1",
         RelayChatType.CrossWorldLinkshell2 => "CWLS 2",
         RelayChatType.CrossWorldLinkshell3 => "CWLS 3",
@@ -140,6 +141,7 @@ public static class ChannelPolicy
         RelayChatType.NoviceNetwork => "NN",
         RelayChatType.StandardEmote => "EMOTE",
         RelayChatType.CustomEmote => "EMOTE",
+        RelayChatType.RewardsHuntResults => "REWARD",
         RelayChatType.CrossWorldLinkshell1 => "CWLS1",
         RelayChatType.CrossWorldLinkshell2 => "CWLS2",
         RelayChatType.CrossWorldLinkshell3 => "CWLS3",
@@ -171,6 +173,7 @@ public static class ChannelPolicy
         >= RelayChatType.Linkshell1 and <= RelayChatType.CrossWorldLinkshell8 => 0xAB47BC,
         RelayChatType.NoviceNetwork => 0x43A047,
         RelayChatType.StandardEmote or RelayChatType.CustomEmote => 0x9E9E9E,
+        RelayChatType.RewardsHuntResults => 0xF9A825,
         _ => 0x5C6BC0,
     };
 }

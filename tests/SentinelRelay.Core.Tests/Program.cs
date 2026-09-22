@@ -8,6 +8,9 @@ using SentinelRelay.Services;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("all chat filters default off", Sync(FiltersAreOptIn)),
+    ("Rewards / Hunt Results defaults off and is inbound-only", Sync(RewardsAreOptInAndInboundOnly)),
+    ("reward classifier requires both system LogKind and reward text", Sync(RewardClassifierIsNarrow)),
+    ("consecutive reward lines batch in original order", Sync(RewardBatchingPreservesOrder)),
     ("enabled chat is forwarded", Sync(EnabledChatIsForwarded)),
     ("disabled chat is never forwarded", Sync(DisabledChatIsNotForwarded)),
     ("pause blocks forwarding and resume restores it", Sync(PauseResumeWorks)),
@@ -23,6 +26,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("bounded queue rejects overflow", Sync(QueueRejectsOverflow)),
     ("formatter splits long Discord messages safely", Sync(LongMessagesAreSplit)),
     ("embed formatter is compact and omits a duplicate timestamp", Sync(EmbedFormattingWorks)),
+    ("reward embed is compact, multiline, sender-free, and timestamp-free", Sync(RewardEmbedFormattingWorks)),
     ("/fc parser preserves message text", Sync(FreeCompanyCommandParses)),
     ("explicit chat command allowlist maps every supported destination", Sync(OutboundCommandsParse)),
     ("Tell reply requires a recent incoming Tell", Sync(TellReplyRequiresRecentTarget)),
@@ -77,7 +81,56 @@ static void FiltersAreOptIn()
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "FC defaulted on");
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.IncomingTell), "incoming Tell defaulted on");
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.OutgoingTell), "outgoing Tell defaulted on");
+    Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.RewardsHuntResults), "rewards defaulted on");
     Assert(profile.EnabledOutboundChannels.Count == 0, "outbound destinations defaulted on");
+}
+
+static void RewardsAreOptInAndInboundOnly()
+{
+    var profile = ConfiguredProfile(RelayChatType.RewardsHuntResults);
+    Assert(RelayFilter.ShouldForward(profile, RelayChatType.RewardsHuntResults), "enabled rewards were blocked");
+    Assert(!ChannelPolicy.ImplementedOutboundChannels.Contains(RelayChatType.RewardsHuntResults),
+        "rewards appeared in the outbound allowlist");
+    var threw = false;
+    try
+    {
+        _ = ChannelPolicy.GetCommandPrefix(RelayChatType.RewardsHuntResults);
+    }
+    catch (InvalidOperationException)
+    {
+        threw = true;
+    }
+    Assert(threw, "rewards received an outbound game command prefix");
+}
+
+static void RewardClassifierIsNarrow()
+{
+    const string credit = "You have been rewarded for your contribution in slaying the mark.";
+    Assert(RewardMessageClassifier.TryClassify(57, credit, out var kind)
+           && kind == RewardLineKind.HuntCredit, "SystemMessage hunt credit was not recognized");
+    Assert(RewardMessageClassifier.TryClassify(62, "You obtain 60 Allied Seals.", out kind)
+           && kind == RewardLineKind.ObtainedReward, "LootNotice reward was not recognized");
+    Assert(RewardMessageClassifier.TryClassify(58, "You cannot carry any more Allagan tomestones of poetics.", out kind)
+           && kind == RewardLineKind.CurrencyCapped, "capped currency line was not recognized");
+    Assert(!RewardMessageClassifier.TryClassify(10, credit, out _),
+        "player chat was allowed to impersonate a reward system line");
+    Assert(!RewardMessageClassifier.TryClassify(57, "The weather has changed.", out _),
+        "unrelated system text was recognized as a reward");
+}
+
+static void RewardBatchingPreservesOrder()
+{
+    var batcher = new RewardMessageBatcher(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(4));
+    var now = DateTime.SpecifyKind(new DateTime(2026, 9, 22, 12, 0, 0), DateTimeKind.Utc);
+    var first = RewardChat("You have been rewarded for your contribution in slaying the mark.");
+    var second = RewardChat("You obtain 60 Allied Seals.");
+    Assert(batcher.Add(first, now) is null, "batch flushed after its first line");
+    Assert(batcher.Add(second, now.AddMilliseconds(200)) is null, "batch flushed before the quiet window");
+    Assert(batcher.FlushIfDue(now.AddMilliseconds(900)) is null, "batch flushed too early");
+    var combined = batcher.FlushIfDue(now.AddSeconds(2));
+    Assert(combined is not null, "batch did not flush after the quiet window");
+    Assert(combined.Message == first.Message + "\n" + second.Message, "reward line order changed");
+    Assert(batcher.Count == 0, "flushed reward lines remained queued");
 }
 
 static void EnabledChatIsForwarded()
@@ -249,6 +302,22 @@ static void EmbedFormattingWorks()
     var json = JsonSerializer.Serialize(payload);
     Assert(!json.Contains("\"timestamp\"", StringComparison.OrdinalIgnoreCase), "embed timestamp was serialized");
     Assert(!json.Contains("\"footer\"", StringComparison.OrdinalIgnoreCase), "timestamp footer was substituted");
+}
+
+static void RewardEmbedFormattingWorks()
+{
+    var chat = RewardChat(
+        "You have been rewarded for your contribution in slaying the mark.\n"
+        + "You obtain 60 Allied Seals.\n"
+        + "You cannot carry any more Allagan tomestones of poetics.");
+    var payload = WebhookMessageFormatter.Format(chat, includeWorld: true, useEmbeds: true).Single();
+    var embed = payload.Embeds?.Single() ?? throw new InvalidOperationException("reward embed missing");
+    Assert(embed.Title == "【REWARD】", "reward title included sender noise");
+    Assert(embed.Description.Contains('\n'), "reward line breaks were removed");
+    Assert(!embed.Title.Contains("FFXIV", StringComparison.Ordinal), "reward sender was displayed");
+    var json = JsonSerializer.Serialize(payload);
+    Assert(!json.Contains("\"timestamp\"", StringComparison.OrdinalIgnoreCase), "reward timestamp was serialized");
+    Assert(!json.Contains("\"footer\"", StringComparison.OrdinalIgnoreCase), "reward timestamp footer was substituted");
 }
 
 static void FreeCompanyCommandParses()
@@ -577,6 +646,7 @@ static void ConfigurationModelPersists()
     first.IncludeSenderWorld = false;
     first.UseDiscordEmbeds = true;
     first.Paused = true;
+    first.CaptureRewardDiagnostics = true;
     first.EnabledInboundChannels = [RelayChatType.FreeCompany, RelayChatType.Shout];
     first.DiscordMentionUserId = "123456789012345678";
     first.Keywords = [new KeywordRule { Keyword = "ready", Channels = [RelayChatType.FreeCompany] }];
@@ -606,6 +676,7 @@ static void ConfigurationModelPersists()
     Assert(restoredFirst.EnabledInboundChannels.SetEquals(first.EnabledInboundChannels), "first filters were lost");
     Assert(restoredSecond.EnabledInboundChannels.SetEquals(second.EnabledInboundChannels), "second filters were lost");
     Assert(restoredFirst.Paused && restoredFirst.UseDiscordEmbeds && !restoredFirst.IncludeSenderWorld, "preferences were lost");
+    Assert(restoredFirst.CaptureRewardDiagnostics, "reward diagnostic preference was lost");
     Assert(restoredFirst.Keywords.Single().Keyword == "ready", "keyword was lost");
     Assert(restoredFirst.ProtectedDiscordBotToken == first.ProtectedDiscordBotToken, "protected bot credential was lost");
     Assert(restoredFirst.DiscordRepliesEnabled, "reply enabled state was lost");
@@ -672,6 +743,13 @@ static CapturedChat SampleChat(string message) => new(
     "Example World",
     message,
     DateTime.SpecifyKind(new DateTime(2026, 9, 21, 12, 0, 0), DateTimeKind.Utc));
+
+static CapturedChat RewardChat(string message) => new(
+    RelayChatType.RewardsHuntResults,
+    "FFXIV",
+    null,
+    message,
+    DateTime.SpecifyKind(new DateTime(2026, 9, 22, 12, 0, 0), DateTimeKind.Utc));
 
 static void Assert(bool condition, string message)
 {

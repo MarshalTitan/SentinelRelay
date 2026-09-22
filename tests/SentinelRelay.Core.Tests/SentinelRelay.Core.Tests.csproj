@@ -17,6 +17,8 @@
     <Compile Include="../../Core/KeywordMatcher.cs" Link="Core/KeywordMatcher.cs" />
     <Compile Include="../../Core/MessageSanitizer.cs" Link="Core/MessageSanitizer.cs" />
     <Compile Include="../../Core/RelayFilter.cs" Link="Core/RelayFilter.cs" />
+    <Compile Include="../../Core/RewardMessageBatcher.cs" Link="Core/RewardMessageBatcher.cs" />
+    <Compile Include="../../Core/RewardMessageClassifier.cs" Link="Core/RewardMessageClassifier.cs" />
     <Compile Include="../../Core/SlidingWindowRateLimiter.cs" Link="Core/SlidingWindowRateLimiter.cs" />
     <Compile Include="../../Core/WebhookEndpoint.cs" Link="Core/WebhookEndpoint.cs" />
     <Compile Include="../../Core/WebhookMessageFormatter.cs" Link="Core/WebhookMessageFormatter.cs" />

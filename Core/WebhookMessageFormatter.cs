@@ -16,7 +16,9 @@ public static class WebhookMessageFormatter
     {
         var sender = MessageSanitizer.SanitizeForDiscord(chat.Sender);
         var world = MessageSanitizer.SanitizeForDiscord(chat.SenderWorld);
-        var message = MessageSanitizer.SanitizeForDiscord(chat.Message);
+        var message = chat.ChatType == RelayChatType.RewardsHuntResults
+            ? SanitizeMultilineForDiscord(chat.Message)
+            : MessageSanitizer.SanitizeForDiscord(chat.Message);
         var senderLabel = includeWorld && world.Length > 0 ? $"{sender} @ {world}" : sender;
         var channel = ChannelPolicy.GetShortLabel(chat.ChatType);
         var alert = BuildAlert(matchedKeywords, mentionUserId);
@@ -24,16 +26,21 @@ public static class WebhookMessageFormatter
         if (useEmbeds)
         {
             var chunks = SplitByRune(message, ChannelPolicy.SafeDiscordEmbedDescriptionLimit);
+            var reward = chat.ChatType == RelayChatType.RewardsHuntResults;
             return chunks.Select((chunk, index) => new DiscordWebhookPayload(
                 index == 0 ? alert.Content : null,
                 [new DiscordEmbedPayload(
-                    index == 0 ? $"【{channel}】 {senderLabel}" : $"【{channel}】 {senderLabel} (continued)",
+                    reward
+                        ? index == 0 ? "【REWARD】" : "【REWARD】 (continued)"
+                        : index == 0 ? $"【{channel}】 {senderLabel}" : $"【{channel}】 {senderLabel} (continued)",
                     chunk,
                     ChannelPolicy.GetDiscordColor(chat.ChatType))],
                 index == 0 ? alert.AllowedMentions : NoMentions)).ToArray();
         }
 
-        var prefix = $"【{channel}】 {senderLabel}: ";
+        var prefix = chat.ChatType == RelayChatType.RewardsHuntResults
+            ? "【REWARD】 "
+            : $"【{channel}】 {senderLabel}: ";
         var alertPrefix = alert.Content is null ? string.Empty : alert.Content + "\n";
         var firstLimit = Math.Max(1, ChannelPolicy.SafeDiscordContentLimit - prefix.Length - alertPrefix.Length);
         var chunksForContent = SplitByRune(message, firstLimit);
@@ -59,6 +66,11 @@ public static class WebhookMessageFormatter
         $"Sentinel Relay connected successfully for {MessageSanitizer.SanitizeForDiscord(characterName)}.",
         null,
         NoMentions);
+
+    private static string SanitizeMultilineForDiscord(string value) => string.Join('\n', value
+        .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        .Select(MessageSanitizer.SanitizeForDiscord)
+        .Where(line => line.Length > 0));
 
     private static (string? Content, DiscordAllowedMentions AllowedMentions) BuildAlert(
         IReadOnlyList<KeywordRule>? matches,

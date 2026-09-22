@@ -58,6 +58,11 @@ public sealed class MainWindow : Window
         RelayChatType.CrossWorldLinkshell8,
     ];
 
+    private static readonly RelayChatType[] SystemInboundChannels =
+    [
+        RelayChatType.RewardsHuntResults,
+    ];
+
     private static readonly (RelayChatType Channel, string Command, string Label)[] CommonReplyChannels =
     [
         (RelayChatType.Say, "/say or /s", "Say"),
@@ -98,6 +103,7 @@ public sealed class MainWindow : Window
     private readonly Func<CharacterProfile?> getProfile;
     private readonly Func<Uri?> getWebhookEndpoint;
     private readonly WebhookRelayClient relay;
+    private readonly ChatCaptureService chatCapture;
     private readonly DiscordReplyReader replyReader;
     private readonly Func<string, WebhookConfigurationResult> saveWebhook;
     private readonly Action removeWebhook;
@@ -132,6 +138,7 @@ public sealed class MainWindow : Window
         Func<CharacterProfile?> getProfile,
         Func<Uri?> getWebhookEndpoint,
         WebhookRelayClient relay,
+        ChatCaptureService chatCapture,
         Func<string, WebhookConfigurationResult> saveWebhook,
         Action removeWebhook,
         Func<bool> testWebhook,
@@ -147,6 +154,7 @@ public sealed class MainWindow : Window
         this.getProfile = getProfile;
         this.getWebhookEndpoint = getWebhookEndpoint;
         this.relay = relay;
+        this.chatCapture = chatCapture;
         this.replyReader = replyReader;
         this.saveWebhook = saveWebhook;
         this.removeWebhook = removeWebhook;
@@ -423,6 +431,8 @@ public sealed class MainWindow : Window
         ImGui.Spacing();
         DrawChannelGroup("Common and public chats", PublicChannels, profile, defaultOpen: true);
         DrawChannelGroup("Private or group chats", PrivateChannels, profile, defaultOpen: true);
+        DrawChannelGroup("System messages (inbound only)", SystemInboundChannels, profile, defaultOpen: true);
+        ImGui.TextDisabled("Rewards / Hunt Results forwards only recognized reward lines from narrow system LogKinds. It has no Discord reply command.");
         DrawChannelGroup("Linkshells and cross-world linkshells", LinkshellChannels, profile, defaultOpen: false);
     }
 
@@ -658,6 +668,41 @@ public sealed class MainWindow : Window
         ImGui.TextUnformatted($"Reader last success: {FormatTimestamp(replyReader.LastSuccessUtc)}");
         ImGui.TextUnformatted($"Reader last error: {replyReader.LastError ?? "none"}");
         ImGui.TextDisabled("Webhook URLs, bot tokens, and message bodies are intentionally excluded from diagnostics and logs.");
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Reward type diagnostics");
+        if (profile is null)
+        {
+            ImGui.TextDisabled("Log into a character to record reward diagnostics.");
+            return;
+        }
+
+        var captureRewardDiagnostics = profile.CaptureRewardDiagnostics;
+        if (ImGui.Checkbox("Record reward XivChatType / LogKind diagnostics", ref captureRewardDiagnostics))
+        {
+            profile.CaptureRewardDiagnostics = captureRewardDiagnostics;
+            if (!captureRewardDiagnostics)
+                chatCapture.RewardDiagnostics.Clear();
+            save();
+        }
+        ImGui.TextWrapped("When enabled, only reward-pattern observations are shown below. Raw LogMessage IDs are correlated in memory; Sentinel Relay does not call Dalamud's side-effecting debug formatter or write message bodies to logs.");
+        if (ImGui.Button("Clear Reward Diagnostics"))
+            chatCapture.RewardDiagnostics.Clear();
+
+        var observations = chatCapture.RewardDiagnostics.Snapshot();
+        ImGui.SameLine();
+        ImGui.TextDisabled($"{observations.Count} observation(s), cleared on character switch or reload");
+        foreach (var observation in observations.Reverse())
+        {
+            var ids = observation.NearbyLogMessageIds.Count == 0
+                ? "none observed nearby"
+                : string.Join(", ", observation.NearbyLogMessageIds);
+            var accepted = observation.CandidateLogKind ? "relay candidate" : "diagnostic only";
+            ImGui.TextUnformatted($"{observation.TimestampUtc.ToLocalTime():T} | XivChatType={observation.LogKindName} ({observation.LogKindValue}) | {observation.MatchKind} | {accepted}");
+            ImGui.TextDisabled($"Nearby LogMessage IDs: {ids}");
+            ImGui.TextWrapped(observation.Message);
+            ImGui.Spacing();
+        }
     }
 
     private static string FormatTimestamp(DateTime? value) => value?.ToLocalTime().ToString("G") ?? "never";

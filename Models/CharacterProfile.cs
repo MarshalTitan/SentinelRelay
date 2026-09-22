@@ -33,6 +33,10 @@ public sealed class CharacterProfile
     // Privacy-first: every chat channel is off until the user selects it.
     public HashSet<RelayChatType> EnabledInboundChannels { get; set; } = [];
 
+    // Opt-in, per-character, in-memory diagnostics control. Diagnostic
+    // observations themselves are never persisted.
+    public bool CaptureRewardDiagnostics { get; set; }
+
     public bool IncludeSenderWorld { get; set; } = true;
 
     public bool UseDiscordEmbeds { get; set; }

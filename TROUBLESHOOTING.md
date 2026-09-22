@@ -48,6 +48,16 @@ Confirm the PC can reach Discord over HTTPS. VPN, firewall, DNS, security softwa
 
 Each character requires a separate webhook. Webhook URLs must not be swapped or reused between profiles.
 
+## Hunt rewards do not appear
+
+1. Open **Chat Filters** and enable **Rewards / Hunt Results** for the active character. It defaults off and is not included by **Enable common chats**.
+2. Confirm the webhook is configured and the relay is not paused.
+3. Open **Debug** and enable **Record reward XivChatType / LogKind diagnostics** before the next S-rank.
+4. After rewards appear in FFXIV, inspect the observations for the exact `XivChatType` name/value and nearby raw `LogMessage` IDs.
+5. If the line is marked **diagnostic only**, record that observation for a follow-up mapping update; Sentinel Relay deliberately refuses to forward reward-looking text from an unverified LogKind.
+
+Diagnostics are in memory only and disappear on character switch or plugin reload. The current text rules target the English client.
+
 ## Queue full or dropped messages increase
 
 Discord may be unavailable or heavily rate limiting. The queue is deliberately capped at 100 and messages older than two minutes are discarded. Sentinel Relay will not accumulate hours of private chat and later dump it into Discord.

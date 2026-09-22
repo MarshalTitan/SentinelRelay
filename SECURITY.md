@@ -114,7 +114,9 @@ Normal logs contain lifecycle information and sanitized HTTP/status errors. They
 - keyword text; or
 - decrypted configuration.
 
-`/srelay debug` shows only state, queue length, drop count, active character, configured/not-configured status, timestamps, and the last sanitized error.
+`/srelay debug` shows only state, queue length, drop count, active character, configured/not-configured status, timestamps, the last sanitized error, and the latest reward LogKind summary. It never prints a reward body.
+
+The Debug tab has a separate per-character, default-off reward diagnostic. When enabled, it holds at most 20 recognized reward-pattern lines plus nearby numeric `LogMessage` IDs in memory. It does not collect player chat, does not persist observations, does not write bodies to logs, and clears on character switch, disable, or reload.
 
 ## Known limitations
 
@@ -129,6 +131,7 @@ Normal logs contain lifecycle information and sanitized HTTP/status errors. They
 - Discord message-content access requires the Message Content privileged intent on the bot application.
 - The reverse path uses an internal FFXIV chat-shell interface. Automated tests can verify policy and construction, but only a second live FFXIV client can prove a server-visible FC send after a game/API update.
 - REST polling is intentionally near-real-time rather than instantaneous and functions only while the configured FFXIV client/plugin is running.
+- Reward recognition currently targets the English client phrases documented in the live-test checklist. Other client languages require separately verified patterns.
 
 ## Dependency and licensing review
 

@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The live `0.3.0.1` release expands the proven `/fc` reply path to explicit commands for public, group, linkshell, cross-world linkshell, Novice Network, and recent Tell replies, including familiar short chat aliases. It does not register Discord slash commands and does not change the webhook relay's independent operation.
+The live `0.3.1.0` release adds an opt-in, inbound-only **Rewards / Hunt Results** feed. It recognizes narrow reward patterns from API 15 system LogKinds, batches consecutive reward lines into a compact timestamp-free embed, and provides opt-in diagnostics for live LogKind verification. Discord reply commands remain fixed and separately allowlisted.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -32,8 +32,11 @@ When Discord replies are enabled, the same profile also owns its protected bot c
 - Incoming Tell and Outgoing Tell as separate choices
 - Novice Network
 - Standard Emotes and Custom Emotes
+- Rewards / Hunt Results (inbound-only, default off)
 
-Incoming chat comes from Dalamud's structured `IChatGui.ChatMessage` event and `XivChatType`; Sentinel Relay does not scrape the visible chat window. `SeString` content is converted into safe, readable text.
+Incoming chat comes from Dalamud's structured `IChatGui.ChatMessage` event and `XivChatType`; Sentinel Relay does not scrape the visible chat window. The reward diagnostic also observes the API 15 `IChatGui.LogMessage` event's numeric IDs without formatting or forwarding arbitrary system messages. `SeString` content is converted into safe, readable text.
+
+The reward filter currently recognizes the English client lines for hunt contribution, `You obtain ...`, and `You cannot carry any more ...` only when they originate from the narrow API 15 system candidates `SystemMessage`, `SystemError`, `ErrorMessage`, `LootNotice`, or `Progress`. This prevents player chat containing similar text from bypassing its own disabled filter. Consecutive lines are kept in order and grouped after a short quiet window.
 
 ## Safety and privacy
 
@@ -48,6 +51,7 @@ Incoming chat comes from Dalamud's structured `IChatGui.ChatMessage` event and `
 - Arbitrary FFXIV text cannot ping `@everyone`, `@here`, users, roles, or channels.
 - There is no HTTP listener, WebSocket server, Discord Gateway client, or generic remote command executor.
 - Discord replies are off by default. Every outbound destination has a separate opt-in permission and fixed FFXIV chat mapping.
+- Rewards / Hunt Results is never an outbound destination and has no Discord reply command.
 - `/r` is accepted only for 30 minutes after the active character receives a Tell during the current session; Sentinel Relay never accepts an arbitrary `/tell` target.
 - Bot-authored, webhook-authored, wrong-channel, wrong-user, stale, duplicate, and cross-character messages are rejected locally.
 
@@ -55,7 +59,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.3.0.1` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
+Version `0.3.1.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
