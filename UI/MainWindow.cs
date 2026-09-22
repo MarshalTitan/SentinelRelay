@@ -58,6 +58,42 @@ public sealed class MainWindow : Window
         RelayChatType.CrossWorldLinkshell8,
     ];
 
+    private static readonly (RelayChatType Channel, string Command, string Label)[] CommonReplyChannels =
+    [
+        (RelayChatType.Say, "/say", "Say"),
+        (RelayChatType.Yell, "/yell", "Yell"),
+        (RelayChatType.Shout, "/shout", "Shout"),
+        (RelayChatType.FreeCompany, "/fc", "Free Company"),
+    ];
+
+    private static readonly (RelayChatType Channel, string Command, string Label)[] GroupReplyChannels =
+    [
+        (RelayChatType.Party, "/party", "Party / Cross-world Party"),
+        (RelayChatType.Alliance, "/alliance", "Alliance"),
+        (RelayChatType.PvPTeam, "/pvpteam", "PvP Team"),
+        (RelayChatType.NoviceNetwork, "/novice", "Novice Network"),
+    ];
+
+    private static readonly (RelayChatType Channel, string Command, string Label)[] LinkshellReplyChannels =
+    [
+        (RelayChatType.Linkshell1, "/ls1", "Linkshell 1"),
+        (RelayChatType.Linkshell2, "/ls2", "Linkshell 2"),
+        (RelayChatType.Linkshell3, "/ls3", "Linkshell 3"),
+        (RelayChatType.Linkshell4, "/ls4", "Linkshell 4"),
+        (RelayChatType.Linkshell5, "/ls5", "Linkshell 5"),
+        (RelayChatType.Linkshell6, "/ls6", "Linkshell 6"),
+        (RelayChatType.Linkshell7, "/ls7", "Linkshell 7"),
+        (RelayChatType.Linkshell8, "/ls8", "Linkshell 8"),
+        (RelayChatType.CrossWorldLinkshell1, "/cwls1", "Cross-world Linkshell 1"),
+        (RelayChatType.CrossWorldLinkshell2, "/cwls2", "Cross-world Linkshell 2"),
+        (RelayChatType.CrossWorldLinkshell3, "/cwls3", "Cross-world Linkshell 3"),
+        (RelayChatType.CrossWorldLinkshell4, "/cwls4", "Cross-world Linkshell 4"),
+        (RelayChatType.CrossWorldLinkshell5, "/cwls5", "Cross-world Linkshell 5"),
+        (RelayChatType.CrossWorldLinkshell6, "/cwls6", "Cross-world Linkshell 6"),
+        (RelayChatType.CrossWorldLinkshell7, "/cwls7", "Cross-world Linkshell 7"),
+        (RelayChatType.CrossWorldLinkshell8, "/cwls8", "Cross-world Linkshell 8"),
+    ];
+
     private readonly Func<CharacterIdentity?> getIdentity;
     private readonly Func<CharacterProfile?> getProfile;
     private readonly Func<Uri?> getWebhookEndpoint;
@@ -87,7 +123,7 @@ public sealed class MainWindow : Window
     private string replyChannelId = string.Empty;
     private string authorizedUserId = string.Empty;
     private bool repliesEnabled;
-    private bool allowFreeCompany;
+    private readonly HashSet<RelayChatType> outboundChannels = [];
     private string? replyFeedback;
     private bool replyFeedbackIsError;
 
@@ -143,7 +179,9 @@ public sealed class MainWindow : Window
             replyChannelId = profile?.DiscordRelayChannelId ?? string.Empty;
             authorizedUserId = profile?.AuthorizedDiscordUserId ?? string.Empty;
             repliesEnabled = profile?.DiscordRepliesEnabled ?? false;
-            allowFreeCompany = profile?.EnabledOutboundChannels.Contains(RelayChatType.FreeCompany) ?? false;
+            outboundChannels.Clear();
+            if (profile is not null)
+                outboundChannels.UnionWith(profile.EnabledOutboundChannels.Where(ChannelPolicy.ImplementedOutboundChannels.Contains));
             newKeywordChannels.Clear();
             keywordChannelsInitialized = false;
         }
@@ -173,7 +211,7 @@ public sealed class MainWindow : Window
             DrawWebhook(identity, profile);
             ImGui.EndTabItem();
         }
-        if (ImGui.BeginTabItem("Experimental Replies"))
+        if (ImGui.BeginTabItem("Discord Replies"))
         {
             DrawExperimentalReplies(identity, profile);
             ImGui.EndTabItem();
@@ -200,7 +238,7 @@ public sealed class MainWindow : Window
         ImGui.TextColored(color, status);
         ImGui.SameLine();
         var direction = profile?.DiscordRepliesEnabled == true
-            ? "FFXIV → Discord | replies experimental"
+            ? "FFXIV ↔ Discord"
             : "FFXIV → Discord";
         ImGui.TextUnformatted($" | {identity?.CharacterName ?? "No character"} | {direction}");
     }
@@ -223,7 +261,7 @@ public sealed class MainWindow : Window
         if (profile.Paused)
         {
             ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f),
-                "RELAY PAUSED — webhook delivery and experimental replies are stopped.");
+                "RELAY PAUSED — webhook delivery and Discord replies are stopped.");
             if (ImGui.Button("Resume Relay"))
                 setPaused(false);
         }
@@ -240,18 +278,27 @@ public sealed class MainWindow : Window
     {
         if (profile is null || identity is null)
         {
-            ImGui.TextUnformatted("Log into a character to configure experimental Discord replies.");
+            ImGui.TextUnformatted("Log into a character to configure Discord replies.");
             return;
         }
 
-        ImGui.TextColored(new Vector4(1f, 0.72f, 0.2f, 1f), "EXPERIMENTAL — /fc only");
-        ImGui.TextWrapped("This optional reader checks one private Discord channel and may submit authorized /fc messages as real Free Company chat. It does not use a hosted Sentinel service or Discord Gateway connection.");
+        ImGui.TextWrapped("This optional reader checks one private Discord channel and submits only explicitly allowed chat destinations. It does not use a hosted Sentinel service, Discord Gateway connection, or arbitrary FFXIV command execution.");
         ImGui.Spacing();
         ImGui.TextWrapped("The bot token is a powerful secret. Use a dedicated bot with only View Channel and Read Message History access to the single relay channel. It is masked here and protected locally with Windows DPAPI.");
         ImGui.Spacing();
 
         ImGui.Checkbox("Enable Discord → FFXIV Replies", ref repliesEnabled);
-        ImGui.Checkbox("Allow /fc (Free Company) replies", ref allowFreeCompany);
+        ImGui.TextUnformatted("Allowed Discord reply destinations");
+        ImGui.TextDisabled("These permissions are separate from Chat Filters. Monitoring a channel never automatically permits sending to it.");
+        DrawReplyChannelGroup("Common chats", CommonReplyChannels, defaultOpen: true);
+        DrawReplyChannelGroup("Group chats", GroupReplyChannels, defaultOpen: true);
+        if (ImGui.CollapsingHeader("Tell reply", ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            DrawReplyChannelToggle(RelayChatType.IncomingTell, "/r", "Reply to the latest incoming Tell");
+            ImGui.TextDisabled("/r is accepted only for 30 minutes after this character receives a Tell during the current session.");
+        }
+        DrawReplyChannelGroup("Linkshells and cross-world linkshells", LinkshellReplyChannels, defaultOpen: false);
+        ImGui.Spacing();
         ImGui.TextUnformatted($"Discord Bot Credential: {(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken) ? "Not Configured" : "Configured (secret hidden)")}");
         ImGui.SetNextItemWidth(-1);
         ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
@@ -271,7 +318,7 @@ public sealed class MainWindow : Window
                 botTokenInput,
                 replyChannelId,
                 authorizedUserId,
-                allowFreeCompany));
+                new HashSet<RelayChatType>(outboundChannels)));
             replyFeedback = result.Success
                 ? "Reply settings saved. Starting the reader establishes a fresh checkpoint so old messages cannot execute."
                 : result.Error;
@@ -319,6 +366,36 @@ public sealed class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(replyReader.LastError))
             ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Reader Error: {replyReader.LastError}");
         ImGui.TextDisabled("Sentinel Relay never prints the bot token and never treats Discord text as an arbitrary FFXIV command.");
+    }
+
+    private void DrawReplyChannelGroup(
+        string title,
+        IReadOnlyList<(RelayChatType Channel, string Command, string Label)> channels,
+        bool defaultOpen)
+    {
+        var flags = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
+        if (!ImGui.CollapsingHeader(title, flags))
+            return;
+        var columns = channels.Count > 8 ? 2 : 1;
+        if (!ImGui.BeginTable($"reply-channels-{title}", columns))
+            return;
+        foreach (var item in channels)
+        {
+            ImGui.TableNextColumn();
+            DrawReplyChannelToggle(item.Channel, item.Command, item.Label);
+        }
+        ImGui.EndTable();
+    }
+
+    private void DrawReplyChannelToggle(RelayChatType channel, string command, string label)
+    {
+        var enabled = outboundChannels.Contains(channel);
+        if (!ImGui.Checkbox($"Allow {command} ({label})", ref enabled))
+            return;
+        if (enabled)
+            outboundChannels.Add(channel);
+        else
+            outboundChannels.Remove(channel);
     }
 
     private void DrawFilters(CharacterProfile? profile)

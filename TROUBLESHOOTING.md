@@ -76,10 +76,10 @@ If the protected URL becomes unreadable after moving a Dalamud configuration fil
 
 ## Discord reader test fails
 
-- **HTTP 401:** the bot token is invalid or has been reset. Paste the current token in **Experimental Replies** and save.
+- **HTTP 401:** the bot token is invalid or has been reset. Paste the current token in **Discord Replies** and save.
 - **HTTP 403:** the bot lacks **View Channel** or **Read Message History** in the configured channel.
 - **HTTP 404:** the Relay Channel ID is wrong or the channel is unavailable to the bot.
-- **Reader connected but content is ignored:** enable **Message Content Intent** on the application Bot page, verify the exact Authorized Discord User ID, and verify both reply checkboxes.
+- **Reader connected but content is ignored:** enable **Message Content Intent** on the application Bot page, verify the exact Authorized Discord User ID, enable the master reply switch, and enable that command's outbound destination.
 
 The webhook relay still works if the bot reader is disabled or broken. The bot is not required for FFXIV → Discord.
 
@@ -97,6 +97,16 @@ Do not use `/fc message: hi`, quote syntax, BotGhost, or a registered slash comm
 ## An old `/fc` message did not send after restart
 
 This is intentional. Starting, resuming, reconnecting, or switching characters advances to the newest current Discord message before polling. Commands written while the reader was offline are never replayed later.
+
+## `/r message` does nothing
+
+1. Enable **Allow /r (Reply to the latest incoming Tell)** under **Discord Replies**.
+2. Enable the master **Discord → FFXIV Replies** switch and save.
+3. Receive a new incoming Tell on the active character while Sentinel Relay is loaded.
+4. Post `/r message` within 30 minutes from the exact authorized Discord user and channel.
+5. Check `/srelay debug`; `recentTellTarget` should report `available`.
+
+Sentinel Relay intentionally clears the Tell-reply target when changing characters or reloading the plugin. It never accepts an arbitrary Discord-supplied `/tell` target.
 
 ## Safe diagnostic information to share
 

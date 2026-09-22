@@ -18,7 +18,7 @@ public sealed record DiscordReplyConfigurationInput(
     string BotToken,
     string ChannelId,
     string AuthorizedUserId,
-    bool AllowFreeCompany);
+    IReadOnlySet<RelayChatType> EnabledOutboundChannels);
 
 public sealed class Plugin : IDalamudPlugin
 {
@@ -52,6 +52,7 @@ public sealed class Plugin : IDalamudPlugin
     private int droppedOutboundCount;
     private string? lastOutboundError;
     private DateTime? lastOutboundSubmitUtc;
+    private DateTime? lastIncomingTellUtc;
     private bool disposed;
 
     public Plugin()
@@ -150,6 +151,7 @@ public sealed class Plugin : IDalamudPlugin
         outboundQueue.Clear();
         outboundRateLimiter.Clear();
         lastOutboundError = null;
+        lastIncomingTellUtc = null;
         duplicateFilter.Clear();
         activeIdentity = identity;
         activeProfile = null;
@@ -191,7 +193,7 @@ public sealed class Plugin : IDalamudPlugin
             || activeIdentity is null
             || activeProfile.Paused
             || !activeProfile.DiscordRepliesEnabled
-            || !activeProfile.EnabledOutboundChannels.Contains(RelayChatType.FreeCompany))
+            || !activeProfile.EnabledOutboundChannels.Overlaps(ChannelPolicy.ImplementedOutboundChannels))
             return;
 
         var token = secretProtector.UnprotectDiscordBotToken(activeProfile.ProtectedDiscordBotToken);
@@ -272,8 +274,10 @@ public sealed class Plugin : IDalamudPlugin
         if (newToken.Length == 0
             && string.IsNullOrWhiteSpace(activeProfile.ProtectedDiscordBotToken))
             return new WebhookConfigurationResult(false, "Paste the Discord bot token before saving.");
-        if (input.Enabled && !input.AllowFreeCompany)
-            return new WebhookConfigurationResult(false, "Enable the /fc allowlist before enabling Discord replies.");
+        if (input.EnabledOutboundChannels.Any(channel => !ChannelPolicy.ImplementedOutboundChannels.Contains(channel)))
+            return new WebhookConfigurationResult(false, "The outbound reply list contains an unsupported destination.");
+        if (input.Enabled && input.EnabledOutboundChannels.Count == 0)
+            return new WebhookConfigurationResult(false, "Enable at least one outbound chat destination before enabling Discord replies.");
 
         try
         {
@@ -282,10 +286,7 @@ public sealed class Plugin : IDalamudPlugin
             activeProfile.DiscordRelayChannelId = channelId;
             activeProfile.AuthorizedDiscordUserId = userId;
             activeProfile.DiscordRepliesEnabled = input.Enabled;
-            if (input.AllowFreeCompany)
-                activeProfile.EnabledOutboundChannels.Add(RelayChatType.FreeCompany);
-            else
-                activeProfile.EnabledOutboundChannels.Remove(RelayChatType.FreeCompany);
+            activeProfile.EnabledOutboundChannels = [.. input.EnabledOutboundChannels];
             SaveConfiguration();
             RefreshDiscordReplyReader();
             return new WebhookConfigurationResult(true, null);
@@ -348,6 +349,12 @@ public sealed class Plugin : IDalamudPlugin
         // of secret decryption and configuration I/O.
         if (characterContext.Current?.CharacterKey != activeIdentity?.CharacterKey)
             return;
+
+        // /r is deliberately available only after this active character has
+        // received a Tell during the current session. The target remains under
+        // FFXIV's own /reply semantics and expires locally after 30 minutes.
+        if (chat.ChatType == RelayChatType.IncomingTell)
+            lastIncomingTellUtc = DateTime.UtcNow;
 
         if (!RelayFilter.ShouldForward(activeProfile, chat.ChatType) || activeWebhookEndpoint is null || activeIdentity is null)
             return;
@@ -416,10 +423,15 @@ public sealed class Plugin : IDalamudPlugin
                     source,
                     batch.CheckpointBeforeBatch,
                     DateTime.UtcNow,
+                    lastIncomingTellUtc,
                     out var command,
-                    out _)
+                    out var rejection)
                 || command is null)
+            {
+                if (rejection == DiscordReplyRejection.NoRecentTellTarget)
+                    lastOutboundError = "Ignored /r: no incoming Tell has been seen for this character in the last 30 minutes.";
                 continue;
+            }
 
             if (!outboundRateLimiter.TryAcquire(DateTime.UtcNow, out var retryAfter))
             {
@@ -448,6 +460,13 @@ public sealed class Plugin : IDalamudPlugin
             || !activeProfile.DiscordRepliesEnabled
             || !activeProfile.EnabledOutboundChannels.Contains(command.Destination))
             return;
+        if (command.Destination == RelayChatType.IncomingTell
+            && !DiscordReplyPolicy.HasRecentTellTarget(lastIncomingTellUtc, utcNow))
+        {
+            lastOutboundError = "The recent Tell reply target expired before the message could be sent.";
+            droppedOutboundCount++;
+            return;
+        }
 
         try
         {
@@ -459,7 +478,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             lastOutboundError = "FFXIV rejected the experimental chat submission.";
             Log.Warning("Sentinel Relay FFXIV chat submission failed ({ExceptionType}).", ex.GetType().Name);
-            ChatGui.PrintError("[Sentinel Relay] Experimental Discord reply could not be submitted to FFXIV.");
+            ChatGui.PrintError("[Sentinel Relay] Discord reply could not be submitted to FFXIV.");
         }
     }
 
@@ -516,7 +535,7 @@ public sealed class Plugin : IDalamudPlugin
                     break;
                 }
                 SetPaused(true);
-                ChatGui.Print("[Sentinel Relay] Relay paused. Webhook delivery and experimental Discord replies are stopped.");
+                ChatGui.Print("[Sentinel Relay] Relay paused. Webhook delivery and Discord replies are stopped.");
                 break;
             case "resume":
                 if (activeProfile is null)
@@ -532,6 +551,7 @@ public sealed class Plugin : IDalamudPlugin
                     + $"dropped={webhookRelay.DroppedCount}, character={activeIdentity?.CharacterName ?? "none"}, "
                     + $"webhook={(activeWebhookEndpoint is null ? "not configured" : "configured")}, "
                     + $"replyReader={discordReplyReader.State}, replyQueue={outboundQueue.Count}, replyDropped={droppedOutboundCount}, "
+                    + $"recentTellTarget={(DiscordReplyPolicy.HasRecentTellTarget(lastIncomingTellUtc, DateTime.UtcNow) ? "available" : "none")}, "
                     + $"lastReplySubmit={lastOutboundSubmitUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"lastSuccess={webhookRelay.LastSuccessUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"lastError={webhookRelay.LastError ?? "none"}, replyError={lastOutboundError ?? discordReplyReader.LastError ?? "none"}");
@@ -559,7 +579,7 @@ public sealed class Plugin : IDalamudPlugin
             + $"Discord webhook: {(activeWebhookEndpoint is null ? "not configured" : "configured")}; "
             + $"relay: {relayState}; "
             + $"enabled chats: {(enabled.Length == 0 ? "none" : enabled)}; queue: {webhookRelay.QueueLength}; "
-            + $"experimental replies: {replyState}.");
+            + $"Discord replies: {replyState}.");
     }
 
     private static bool IsPlausibleBotToken(string? value) =>

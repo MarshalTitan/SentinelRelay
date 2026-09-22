@@ -51,7 +51,8 @@ public sealed class WebhookRelayClient : IDisposable
         {
             Timeout = TimeSpan.FromSeconds(30),
         };
-        httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SentinelRelay", "0.1.0.1"));
+        var version = typeof(WebhookRelayClient).Assembly.GetName().Version?.ToString() ?? "unknown";
+        httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SentinelRelay", version));
         sender = new WebhookHttpSender(httpClient);
         worker = Task.Run(() => RunAsync(cancellation.Token));
     }

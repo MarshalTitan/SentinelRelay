@@ -56,7 +56,8 @@ public sealed class DiscordReplyReader : IDisposable
         {
             Timeout = TimeSpan.FromSeconds(30),
         };
-        httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SentinelRelay", "0.2.0.0"));
+        var version = typeof(DiscordReplyReader).Assembly.GetName().Version?.ToString() ?? "unknown";
+        httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SentinelRelay", version));
         client = new DiscordRestMessageClient(httpClient);
     }
 

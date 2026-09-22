@@ -1,10 +1,10 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.2.0.0</Version>
+    <Version>0.3.0.0</Version>
     <Author>MTitan</Author>
     <Name>Sentinel Relay</Name>
-    <Punchline>Private FFXIV-to-Discord chat relay with no hosted backend.</Punchline>
-    <Description>Sends selected FFXIV chat directly to a per-character Discord webhook, with an optional experimental, strictly authorized /fc reply reader.</Description>
+    <Punchline>Private per-character FFXIV and Discord chat relay.</Punchline>
+    <Description>Sends selected FFXIV chat directly to Discord and accepts only explicitly allowed, authorized chat replies including safe recent-Tell /r support.</Description>
     <RepoUrl>https://github.com/MarshalTitan/SentinelRelay</RepoUrl>
     <IconUrl>https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png</IconUrl>
     <Tags>chat;discord;relay;utility;sentinel</Tags>

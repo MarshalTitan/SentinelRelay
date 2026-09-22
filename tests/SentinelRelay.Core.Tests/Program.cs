@@ -24,6 +24,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("formatter splits long Discord messages safely", Sync(LongMessagesAreSplit)),
     ("embed formatter is compact and omits a duplicate timestamp", Sync(EmbedFormattingWorks)),
     ("/fc parser preserves message text", Sync(FreeCompanyCommandParses)),
+    ("explicit chat command allowlist maps every supported destination", Sync(OutboundCommandsParse)),
+    ("Tell reply requires a recent incoming Tell", Sync(TellReplyRequiresRecentTarget)),
     ("empty and unknown Discord commands are rejected", Sync(InvalidReplyCommandsAreRejected)),
     ("authorized /fc command is accepted", Sync(AuthorizedReplyIsAccepted)),
     ("wrong channel is rejected", Sync(WrongReplyChannelIsRejected)),
@@ -75,6 +77,7 @@ static void FiltersAreOptIn()
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "FC defaulted on");
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.IncomingTell), "incoming Tell defaulted on");
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.OutgoingTell), "outgoing Tell defaulted on");
+    Assert(profile.EnabledOutboundChannels.Count == 0, "outbound destinations defaulted on");
 }
 
 static void EnabledChatIsForwarded()
@@ -258,11 +261,80 @@ static void FreeCompanyCommandParses()
     Assert(message == "I'll be there in about 5 minutes!", "spaces or punctuation changed");
 }
 
+static void OutboundCommandsParse()
+{
+    var expected = new Dictionary<string, RelayChatType>
+    {
+        ["/say hello"] = RelayChatType.Say,
+        ["/yell hello"] = RelayChatType.Yell,
+        ["/shout hello"] = RelayChatType.Shout,
+        ["/r hello"] = RelayChatType.IncomingTell,
+        ["/party hello"] = RelayChatType.Party,
+        ["/alliance hello"] = RelayChatType.Alliance,
+        ["/fc hello"] = RelayChatType.FreeCompany,
+        ["/pvpteam hello"] = RelayChatType.PvPTeam,
+        ["/novice hello"] = RelayChatType.NoviceNetwork,
+    };
+    for (var slot = 1; slot <= 8; slot++)
+    {
+        expected[$"/ls{slot} hello"] = (RelayChatType)((int)RelayChatType.Linkshell1 + slot - 1);
+        expected[$"/cwls{slot} hello"] = (RelayChatType)((int)RelayChatType.CrossWorldLinkshell1 + slot - 1);
+    }
+
+    Assert(expected.Values.ToHashSet().SetEquals(ChannelPolicy.ImplementedOutboundChannels),
+        "parser and implemented outbound destination sets differ");
+
+    foreach (var pair in expected)
+    {
+        Assert(DiscordReplyCommandParser.TryParse(pair.Key, out var destination, out var message),
+            $"supported command was rejected: {pair.Key}");
+        Assert(destination == pair.Value, $"wrong destination for {pair.Key}: {destination}");
+        Assert(message == "hello", $"message changed for {pair.Key}");
+        Assert(ChannelPolicy.ImplementedOutboundChannels.Contains(destination), $"{destination} missing from implementation allowlist");
+        Assert(ChannelPolicy.GetCommandPrefix(destination).StartsWith("/", StringComparison.Ordinal),
+            $"{destination} has no fixed game prefix");
+    }
+}
+
+static void TellReplyRequiresRecentTarget()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredReplyProfile();
+    profile.EnabledOutboundChannels.Add(RelayChatType.IncomingTell);
+    var source = ReplyMessage("100000000000000002", "/r yes, one moment", now);
+
+    var accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        source,
+        "100000000000000001",
+        now,
+        now.Subtract(TimeSpan.FromMinutes(1)),
+        out var command,
+        out var rejection);
+    Assert(accepted, $"recent Tell reply was rejected: {rejection}");
+    Assert(command?.Destination == RelayChatType.IncomingTell, "Tell reply used the wrong destination");
+
+    accepted = DiscordReplyPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        source,
+        "100000000000000001",
+        now,
+        now.Subtract(TimeSpan.FromMinutes(31)),
+        out _,
+        out rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.NoRecentTellTarget,
+        "stale Tell target was accepted");
+}
+
 static void InvalidReplyCommandsAreRejected()
 {
     Assert(!DiscordReplyCommandParser.TryParse("/fc", out _, out _), "empty /fc was accepted");
     Assert(!DiscordReplyCommandParser.TryParse("/fc   ", out _, out _), "blank /fc was accepted");
-    Assert(!DiscordReplyCommandParser.TryParse("/say hello", out _, out _), "unknown command was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/fcwhatever hello", out _, out _), "prefix extension was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/logout now", out _, out _), "arbitrary command was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/tell Someone Else hello", out _, out _), "arbitrary Tell target was accepted");
     Assert(!DiscordReplyCommandParser.TryParse(" /fc hello", out _, out _), "non-prefix command was accepted");
 }
 
@@ -276,6 +348,7 @@ static void AuthorizedReplyIsAccepted()
         ReplyMessage("100000000000000002", "/fc hi", now),
         "100000000000000001",
         now,
+        null,
         out var command,
         out var rejection);
     Assert(accepted, $"authorized command was rejected: {rejection}");
@@ -320,6 +393,7 @@ static void WrongCharacterIsRejected()
         ReplyMessage("100000000000000002", "/fc hi", now),
         "100000000000000001",
         now,
+        null,
         out _,
         out var rejection);
     Assert(!accepted && rejection == DiscordReplyRejection.WrongCharacter, "wrong character was accepted");
@@ -336,6 +410,7 @@ static void DisabledRepliesAreRejected()
         ReplyMessage("100000000000000002", "/fc hi", now),
         "100000000000000001",
         now,
+        null,
         out _,
         out var rejection);
     Assert(!accepted && rejection == DiscordReplyRejection.Disabled, "disabled feature accepted a command");
@@ -352,6 +427,7 @@ static void PausedRepliesAreRejected()
         ReplyMessage("100000000000000002", "/fc hi", now),
         "100000000000000001",
         now,
+        null,
         out _,
         out var rejection);
     Assert(!accepted && rejection == DiscordReplyRejection.Paused, "paused feature accepted a command");
@@ -381,6 +457,7 @@ static void OutboundAllowlistIsRequired()
         ReplyMessage("100000000000000002", "/fc hi", now),
         "100000000000000001",
         now,
+        null,
         out _,
         out var rejection);
     Assert(!accepted && rejection == DiscordReplyRejection.DestinationNotAllowed, "disabled destination was accepted");
@@ -502,7 +579,13 @@ static void ConfigurationModelPersists()
     first.DiscordRelayChannelId = "123456789012345678";
     first.AuthorizedDiscordUserId = "234567890123456789";
     first.LastProcessedDiscordMessageId = "345678901234567890";
-    first.EnabledOutboundChannels = [RelayChatType.FreeCompany];
+    first.EnabledOutboundChannels =
+    [
+        RelayChatType.FreeCompany,
+        RelayChatType.Say,
+        RelayChatType.IncomingTell,
+        RelayChatType.CrossWorldLinkshell8,
+    ];
     var second = original.GetOrCreateProfile("cid:DEF", "Second Character", "Example World");
     second.ProtectedWebhookUrl = "dpapi-ciphertext-two";
     second.EnabledInboundChannels = [RelayChatType.Party];
@@ -523,7 +606,7 @@ static void ConfigurationModelPersists()
     Assert(restoredFirst.DiscordRelayChannelId == first.DiscordRelayChannelId, "reply channel was lost");
     Assert(restoredFirst.AuthorizedDiscordUserId == first.AuthorizedDiscordUserId, "authorized user was lost");
     Assert(restoredFirst.LastProcessedDiscordMessageId == first.LastProcessedDiscordMessageId, "checkpoint was lost");
-    Assert(restoredFirst.EnabledOutboundChannels.SetEquals([RelayChatType.FreeCompany]), "outbound allowlist was lost");
+    Assert(restoredFirst.EnabledOutboundChannels.SetEquals(first.EnabledOutboundChannels), "outbound allowlist was lost");
 }
 
 static CharacterProfile ConfiguredReplyProfile() => new()
@@ -562,6 +645,7 @@ static void AssertReplyRejected(
         source,
         "100000000000000001",
         now,
+        null,
         out _,
         out var rejection);
     Assert(!accepted && rejection == expected, $"expected {expected}, got {rejection}");

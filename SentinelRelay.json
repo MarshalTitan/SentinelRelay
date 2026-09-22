@@ -1,8 +1,8 @@
 {
   "Name": "Sentinel Relay",
   "Author": "MTitan",
-  "Punchline": "Private FFXIV-to-Discord chat relay with no hosted backend.",
-  "Description": "Sends selected FFXIV chat directly to a per-character Discord webhook, with an optional experimental, strictly authorized /fc reply reader.",
+  "Punchline": "Private per-character FFXIV and Discord chat relay.",
+  "Description": "Sends selected FFXIV chat directly to Discord and accepts only explicitly allowed, authorized chat replies including safe recent-Tell /r support.",
   "RepoUrl": "https://github.com/MarshalTitan/SentinelRelay",
   "IconUrl": "https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png",
   "Tags": ["chat", "discord", "relay", "utility", "sentinel"]

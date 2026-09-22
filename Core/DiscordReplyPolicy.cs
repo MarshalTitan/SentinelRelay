@@ -18,11 +18,13 @@ public enum DiscordReplyRejection
     Stale,
     UnknownOrInvalidCommand,
     DestinationNotAllowed,
+    NoRecentTellTarget,
 }
 
 public static class DiscordReplyPolicy
 {
     public static readonly TimeSpan MaximumCommandAge = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan MaximumTellReplyAge = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan MaximumFutureSkew = TimeSpan.FromSeconds(30);
 
     public static bool TryAuthorize(
@@ -31,6 +33,7 @@ public static class DiscordReplyPolicy
         DiscordChannelMessage source,
         string checkpointBeforeBatch,
         DateTime utcNow,
+        DateTime? lastIncomingTellUtc,
         out DiscordReplyCommand? command,
         out DiscordReplyRejection rejection)
     {
@@ -66,6 +69,9 @@ public static class DiscordReplyPolicy
         if (!ChannelPolicy.ImplementedOutboundChannels.Contains(destination)
             || !profile.EnabledOutboundChannels.Contains(destination))
             return Reject(DiscordReplyRejection.DestinationNotAllowed, out rejection);
+        if (destination == RelayChatType.IncomingTell
+            && !HasRecentTellTarget(lastIncomingTellUtc, utcNow))
+            return Reject(DiscordReplyRejection.NoRecentTellTarget, out rejection);
 
         command = new DiscordReplyCommand(
             source.Id,
@@ -75,6 +81,11 @@ public static class DiscordReplyPolicy
             utcNow);
         return true;
     }
+
+    public static bool HasRecentTellTarget(DateTime? lastIncomingTellUtc, DateTime utcNow) =>
+        lastIncomingTellUtc is { } timestamp
+        && timestamp >= utcNow - MaximumTellReplyAge
+        && timestamp <= utcNow + MaximumFutureSkew;
 
     private static bool Reject(DiscordReplyRejection value, out DiscordReplyRejection rejection)
     {

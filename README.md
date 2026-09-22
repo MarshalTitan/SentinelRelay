@@ -1,10 +1,10 @@
 # Sentinel Relay
 
-Sentinel Relay is a privacy-first **FFXIV → Discord** chat relay for Dalamud. It sends only the chat types a player explicitly enables, directly from the game client to that character's private Discord webhook.
+Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. It sends only the chat types a player explicitly enables to that character's private Discord webhook. Its optional reply reader accepts only individually allowed chat destinations from one authorized Discord user.
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The live `0.2.0.0` release also contains an **optional experimental** reply reader. While FFXIV is running, it polls one configured private Discord channel and recognizes only an authorized ordinary text message beginning with `/fc `. It does not register a Discord slash command and does not change the webhook relay's independent operation.
+The live `0.3.0.0` release expands the proven `/fc` reply path to explicit commands for public, group, linkshell, cross-world linkshell, Novice Network, and recent Tell replies. It does not register Discord slash commands and does not change the webhook relay's independent operation.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -21,7 +21,7 @@ Dalamud structured chat event
 
 Dalamud identifies the active character by content ID. Each character profile independently retains its protected webhook, filters, formatting, keywords, and pause state.
 
-When experimental replies are enabled, the same profile also owns its protected bot credential, exact Discord channel ID, exact authorized Discord user ID, persistent message checkpoint, and outbound allowlist. Those values never route across character profiles.
+When Discord replies are enabled, the same profile also owns its protected bot credential, exact Discord channel ID, exact authorized Discord user ID, persistent message checkpoint, and outbound allowlist. Those values never route across character profiles.
 
 ## Supported chat types
 
@@ -47,14 +47,15 @@ Incoming chat comes from Dalamud's structured `IChatGui.ChatMessage` event and `
 - Discord `429` rate limits and transient server failures are retried in order with bounded delays.
 - Arbitrary FFXIV text cannot ping `@everyone`, `@here`, users, roles, or channels.
 - There is no HTTP listener, WebSocket server, Discord Gateway client, or generic remote command executor.
-- Experimental replies are off by default and understand only the explicitly implemented `/fc` mapping.
+- Discord replies are off by default. Every outbound destination has a separate opt-in permission and fixed FFXIV chat mapping.
+- `/r` is accepted only for 30 minutes after the active character receives a Tell during the current session; Sentinel Relay never accepts an arbitrary `/tell` target.
 - Bot-authored, webhook-authored, wrong-channel, wrong-user, stale, duplicate, and cross-character messages are rejected locally.
 
 See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.2.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
+Version `0.3.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -83,28 +84,37 @@ A match can be highlighted in the relay channel and optionally ping one explicit
 |---|---|
 | `/srelay` | Open or close the settings window |
 | `/srelay status` | Show character, webhook/configuration state, enabled chats, and queue length |
-| `/srelay pause` | Stop webhook delivery and experimental replies, and clear both pending queues |
+| `/srelay pause` | Stop webhook delivery and Discord replies, and clear both pending queues |
 | `/srelay resume` | Resume enabled webhook delivery and restart enabled reply polling at a fresh checkpoint |
 | `/srelay debug` | Show non-secret queue and delivery diagnostics |
 
-There are no registered Discord application commands. When experimental replies are enabled, `/fc hello` is an ordinary text message read through Discord's authenticated REST API. Each client polls only its own configured channel, and all routing and author checks must pass before the fixed Free Company mapping can run. The FFXIV → Discord webhook relay does not depend on the bot reader.
+There are no registered Discord application commands. `/fc hello`, `/party hello`, and the other supported prefixes are ordinary text messages read through Discord's authenticated REST API. Each client polls only its configured channel, and all routing, author, freshness, and destination-permission checks must pass before a fixed chat mapping can run. The FFXIV → Discord webhook relay does not depend on the bot reader.
 
-## Experimental `/fc` replies
+## Discord replies
 
 Do not enable this until the channel-specific bot permissions and IDs are configured as described in [DISCORD_SETUP.md](DISCORD_SETUP.md).
 
-1. Run `/srelay` and open **Experimental Replies**.
+1. Run `/srelay` and open **Discord Replies**.
 2. Paste the bot token, Relay Channel ID, and one Authorized Discord User ID.
-3. Check **Allow /fc (Free Company) replies**.
+3. Enable only the desired reply destinations. These are deliberately separate from the inbound **Chat Filters**.
 4. Check **Enable Discord → FFXIV Replies**, save, and run **Test Discord Reader**.
 5. Post the ordinary Discord message `/fc hi` in that exact channel from that exact user.
 6. Verify on a second FFXIV client that the active character really sent `hi` in Free Company chat.
+
+Supported ordinary-message prefixes:
+
+- `/say`, `/yell`, `/shout`, `/fc`, `/party`, `/alliance`, `/pvpteam`, and `/novice`
+- `/ls1` through `/ls8`
+- `/cwls1` through `/cwls8`
+- `/r` to reply to the latest incoming Tell seen during the current session
+
+`/party` uses the game's Party channel and therefore also reaches a cross-world party when that is the active party type. Tell targeting is intentionally limited to `/r`; arbitrary `/tell name message` input is not accepted.
 
 Starting, resuming, reconnecting, or switching characters first advances to Discord's newest current message. Commands written while the game/reader was offline are never executed later. The processing checkpoint is persisted before a game send is queued, favoring a dropped command over an accidental replay.
 
 ## Building
 
-Sentinel Relay targets Dalamud API 15 and .NET 10. The outbound experiment uses the current FFXIVClientStructs chat-shell interface and therefore still requires an in-game proof on every relevant game/API update.
+Sentinel Relay targets Dalamud API 15 and .NET 10. Outbound chat uses the current FFXIVClientStructs chat-shell interface and therefore still requires an in-game proof on every relevant game/API update.
 
 ```powershell
 $env:DALAMUD_HOME = "C:\path\to\Dalamud\dev"

@@ -2,9 +2,9 @@
 
 ## Security properties
 
-### Narrow experimental reply path
+### Narrow Discord reply path
 
-The stable FFXIV → Discord webhook path remains independent. The optional experimental reply path:
+The FFXIV → Discord webhook path remains independent. The optional reply path:
 
 - makes outbound authenticated Discord REST reads only;
 - connects to no Discord Gateway and accepts no inbound network connection;
@@ -12,7 +12,9 @@ The stable FFXIV → Discord webhook path remains independent. The optional expe
 - accepts one exact channel ID and one exact user ID per active character profile;
 - ignores messages authored by bots or webhooks;
 - uses a persistent Discord snowflake checkpoint and a two-minute freshness window;
-- exposes only the locally enabled `/fc` mapping to `/freecompany`;
+- exposes only locally enabled chat destinations with fixed parser and FFXIV-prefix mappings;
+- maps `/r` only to FFXIV's `/reply`, and only for 30 minutes after the active character receives a Tell;
+- rejects arbitrary `/tell` targets as well as every non-allowlisted slash command;
 - has no generic "execute this slash command" operation;
 - never loads macros; and
 - is disabled by default.
@@ -41,7 +43,7 @@ DPAPI protects the local file at rest but cannot protect secrets from malware or
 
 ### Discord bot credential protection
 
-The experimental reader stores its bot token per character using Windows DPAPI with entropy separate from webhook protection. The token is masked after entry and excluded from status, debug output, errors, and logs.
+The reply reader stores its bot token per character using Windows DPAPI with entropy separate from webhook protection. The token is masked after entry and excluded from status, debug output, errors, and logs.
 
 A bot token represents the bot anywhere it has permissions and is more powerful than one channel's webhook. Use a dedicated bot with only **View Channel** and **Read Message History** access to the intended private relay channel. Do not grant Administrator. Reset the token in the Discord Developer Portal immediately if it may have leaked, then replace it on each intended client.
 
@@ -74,7 +76,7 @@ Stored locally per character:
 - DPAPI-protected webhook URL;
 - optional DPAPI-protected Discord bot token;
 - optional exact relay channel ID and authorized Discord user ID;
-- reply enabled state, `/fc` allowlist, and last processed message snowflake;
+- reply enabled state, outbound destination allowlist, and last processed message snowflake;
 - enabled filters and formatting choices;
 - pause state;
 - keyword rules and optional Discord user ID; and

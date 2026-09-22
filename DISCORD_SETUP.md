@@ -85,11 +85,11 @@ For each character:
 
 Use [LIVE_TEST_CHECKLIST.md](LIVE_TEST_CHECKLIST.md) after updates or configuration changes.
 
-## 7. Optional experimental `/fc` replies
+## 7. Optional Discord replies
 
-The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for the experimental Discord → FFXIV `/fc` reader.
+The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for Discord → FFXIV chat replies.
 
-This feature does **not** register a Discord slash command. `/fc hi` is an ordinary message posted in the private text channel. Do not configure BotGhost or another bot to own `/fc` for Sentinel Relay.
+This feature does **not** register Discord slash commands. `/fc hi`, `/party hi`, and the other supported prefixes are ordinary messages posted in the private text channel. Do not configure BotGhost or another bot to own them for Sentinel Relay.
 
 ### A. Restrict the existing bot to the relay channel
 
@@ -116,7 +116,7 @@ Discord otherwise omits ordinary message content from bot API responses.
 5. Enable **Message Content Intent**.
 6. Save changes if Discord shows a save button.
 
-Presence Intent and Server Members Intent are not required. Although the prototype does not use a Gateway connection, Discord applies the message-content access rule to the bot's message data.
+Presence Intent and Server Members Intent are not required. Although the reader does not use a Gateway connection, Discord applies the message-content access rule to the bot's message data.
 
 ### C. Copy the bot token securely
 
@@ -141,16 +141,16 @@ While the intended FFXIV character is logged in:
 
 1. Run `/srelay`.
 2. Confirm the active character shown in the header.
-3. Open **Experimental Replies**.
+3. Open **Discord Replies**.
 4. Paste the Discord bot token.
 5. Paste that character's **Relay Channel ID**.
 6. Paste the single **Authorized Discord User ID**.
-7. Check **Allow /fc (Free Company) replies**.
+7. Select only the outbound chat destinations this character may use. These permissions are separate from the FFXIV → Discord **Chat Filters**.
 8. Check **Enable Discord → FFXIV Replies**.
 9. Select **Save Reply Settings**.
 10. Select **Test Discord Reader** and wait for the success notice in FFXIV chat.
 
-Saving or starting the reader establishes a checkpoint at the newest current Discord message. Old `/fc` messages are not executed.
+Saving or starting the reader establishes a checkpoint at the newest current Discord message. Old commands are not executed.
 
 ### F. Prove the real round trip
 
@@ -167,6 +167,22 @@ Saving or starting the reader establishes a checkpoint at the newest current Dis
 `IChatGui.Print()` output is not proof. A second client/account must see the server-side FC message.
 
 Configure a second character separately with its own channel ID and authorized user ID. Never copy one character's channel ID into the other character's profile.
+
+### G. Supported ordinary-message commands
+
+- `/say message`
+- `/yell message`
+- `/shout message`
+- `/fc message`
+- `/party message` — also uses Cross-world Party when that is the active party type
+- `/alliance message`
+- `/pvpteam message`
+- `/novice message`
+- `/ls1 message` through `/ls8 message`
+- `/cwls1 message` through `/cwls8 message`
+- `/r message` — replies to the latest incoming Tell
+
+For `/r`, the active character must have received a Tell during the current plugin session within the previous 30 minutes, and **Allow /r** must be enabled. Sentinel Relay sends only the fixed FFXIV `/reply` operation; Discord cannot provide a Tell target or execute `/tell`, `/logout`, macros, plugins, or other arbitrary commands.
 
 ## If a webhook URL leaks
 
@@ -190,6 +206,6 @@ The deleted URL stops working. Other characters' separate webhooks do not need t
 - **Keyword highlight appears but no ping:** save the correct Discord User ID and enable **Ping configured user** on the keyword rule.
 - **Reader test returns HTTP 401:** the bot token is invalid or was reset. Replace it in the character profile.
 - **Reader test returns HTTP 403:** the bot lacks View Channel or Read Message History in that exact channel.
-- **Reader connects but `/fc` is ignored:** verify Message Content Intent, the exact numeric channel/user IDs, both experimental checkboxes, the active FFXIV character, and the literal `/fc ` prefix.
+- **Reader connects but a command is ignored:** verify Message Content Intent, the exact numeric channel/user IDs, the master reply toggle, that command's destination permission, the active FFXIV character, and the literal command prefix. For `/r`, receive a fresh Tell first.
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for diagnostic steps.

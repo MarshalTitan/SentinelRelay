@@ -14,14 +14,66 @@ public static class ChannelPolicy
 
     public static readonly IReadOnlyList<RelayChatType> InboundChannels = Enum.GetValues<RelayChatType>();
 
-    // This prototype intentionally exposes only FC. Adding an enum here does not
-    // create a command: the parser and game sender must also explicitly support it.
+    // Every outbound destination must also have an explicit Discord parser entry
+    // and a fixed FFXIV command prefix. This is a chat allowlist, never a raw
+    // command passthrough.
     public static readonly IReadOnlySet<RelayChatType> ImplementedOutboundChannels =
-        new HashSet<RelayChatType> { RelayChatType.FreeCompany };
+        new HashSet<RelayChatType>
+        {
+            RelayChatType.Say,
+            RelayChatType.Yell,
+            RelayChatType.Shout,
+            RelayChatType.IncomingTell,
+            RelayChatType.Party,
+            RelayChatType.Alliance,
+            RelayChatType.FreeCompany,
+            RelayChatType.PvPTeam,
+            RelayChatType.Linkshell1,
+            RelayChatType.Linkshell2,
+            RelayChatType.Linkshell3,
+            RelayChatType.Linkshell4,
+            RelayChatType.Linkshell5,
+            RelayChatType.Linkshell6,
+            RelayChatType.Linkshell7,
+            RelayChatType.Linkshell8,
+            RelayChatType.CrossWorldLinkshell1,
+            RelayChatType.CrossWorldLinkshell2,
+            RelayChatType.CrossWorldLinkshell3,
+            RelayChatType.CrossWorldLinkshell4,
+            RelayChatType.CrossWorldLinkshell5,
+            RelayChatType.CrossWorldLinkshell6,
+            RelayChatType.CrossWorldLinkshell7,
+            RelayChatType.CrossWorldLinkshell8,
+            RelayChatType.NoviceNetwork,
+        };
 
     public static string GetCommandPrefix(RelayChatType channel) => channel switch
     {
+        RelayChatType.Say => "/say",
+        RelayChatType.Yell => "/yell",
+        RelayChatType.Shout => "/shout",
+        RelayChatType.IncomingTell => "/reply",
+        RelayChatType.Party => "/party",
+        RelayChatType.Alliance => "/alliance",
         RelayChatType.FreeCompany => "/freecompany",
+        RelayChatType.PvPTeam => "/pvpteam",
+        RelayChatType.Linkshell1 => "/linkshell1",
+        RelayChatType.Linkshell2 => "/linkshell2",
+        RelayChatType.Linkshell3 => "/linkshell3",
+        RelayChatType.Linkshell4 => "/linkshell4",
+        RelayChatType.Linkshell5 => "/linkshell5",
+        RelayChatType.Linkshell6 => "/linkshell6",
+        RelayChatType.Linkshell7 => "/linkshell7",
+        RelayChatType.Linkshell8 => "/linkshell8",
+        RelayChatType.CrossWorldLinkshell1 => "/cwlinkshell1",
+        RelayChatType.CrossWorldLinkshell2 => "/cwlinkshell2",
+        RelayChatType.CrossWorldLinkshell3 => "/cwlinkshell3",
+        RelayChatType.CrossWorldLinkshell4 => "/cwlinkshell4",
+        RelayChatType.CrossWorldLinkshell5 => "/cwlinkshell5",
+        RelayChatType.CrossWorldLinkshell6 => "/cwlinkshell6",
+        RelayChatType.CrossWorldLinkshell7 => "/cwlinkshell7",
+        RelayChatType.CrossWorldLinkshell8 => "/cwlinkshell8",
+        RelayChatType.NoviceNetwork => "/novice",
         _ => throw new InvalidOperationException($"{channel} is not an implemented outbound chat destination."),
     };
 

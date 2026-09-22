@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.2.0.0`
+Live catalog version: `0.3.0.0`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.2.0.0` and verify the active character shown in the header.
+5. Confirm version `0.3.0.0` and verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
@@ -137,13 +137,13 @@ For a character that can access each chat type:
 
 - [ ] PASS
 
-## K — Experimental reader setup (first profile only)
+## K — Discord reader setup (first profile only)
 
 Do not enable the second profile yet.
 
 1. Give the Sentinel Relay bot only **View Channel** and **Read Message History** in the first private relay channel.
 2. Enable the bot application's **Message Content Intent**; do not enable Presence or Server Members intents for this feature.
-3. In `/srelay` → **Experimental Replies**, paste the protected bot token, first channel ID, and first authorized user ID.
+3. In `/srelay` → **Discord Replies**, paste the protected bot token, first channel ID, and first authorized user ID.
 4. Enable **Allow /fc** and **Discord → FFXIV Replies**, then save.
 5. Select **Test Discord Reader** and confirm success.
 6. Confirm the reader reports **Connected** and the checkpoint reports **established**.
@@ -167,18 +167,50 @@ Local plugin output is not proof. The second FFXIV client must see the server-si
 
 - [ ] PASS
 
-## M — Authorization and replay rejection
+## M — Additional chat destinations
+
+Enable and test only destinations available to the active character:
+
+- [ ] `/say message` reaches real Say chat.
+- [ ] `/yell message` reaches real Yell chat.
+- [ ] `/shout message` reaches real Shout chat.
+- [ ] `/party message` reaches Party or Cross-world Party as appropriate.
+- [ ] `/alliance message` reaches Alliance chat while in an alliance.
+- [ ] `/pvpteam message` reaches PvP Team chat when available.
+- [ ] `/novice message` reaches Novice Network when available.
+- [ ] `/ls1`–`/ls8` route only to their matching Linkshell slots.
+- [ ] `/cwls1`–`/cwls8` route only to their matching Cross-world Linkshell slots.
+- [ ] A destination disabled under **Discord Replies** is ignored even when its inbound Chat Filter is enabled.
+
+## N — Tell reply
+
+1. Enable Incoming Tell under **Chat Filters** and **Allow /r** under **Discord Replies**.
+2. Have another player send a fresh Tell to the active character.
+3. Confirm the Tell appears in the correct Discord relay channel.
+4. Within 30 minutes, post:
+
+   ```text
+   /r Sentinel Relay Tell reply test
+   ```
+
+5. Confirm the original sender receives the real Tell reply.
+6. Confirm `/r` is ignored after changing characters, reloading the plugin, or when no incoming Tell has been received during the current session.
+
+- [ ] PASS
+
+## O — Authorization and replay rejection
 
 - [ ] The same `/fc hi` message ID executes at most once.
 - [ ] An `/fc` message posted while FFXIV/replies are off does not execute after restart/resume.
 - [ ] A different Discord user is ignored.
 - [ ] The same authorized user in a different channel is ignored.
-- [ ] `/say hi`, `/logout`, and empty `/fc` are ignored.
+- [ ] `/logout`, arbitrary `/tell target message`, unknown prefixes, and empty commands are ignored.
+- [ ] A recognized command is ignored when its outbound destination is not enabled.
 - [ ] Bot and webhook posts are ignored.
 - [ ] Pausing stops both directions and clears the outgoing queue.
 - [ ] A burst above the local limit is dropped rather than spammed into FFXIV.
 
-## N — Second profile isolation
+## P — Second profile isolation
 
 Only after section L passes for the first profile:
 

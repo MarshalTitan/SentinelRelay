@@ -11,12 +11,12 @@ FFXIV / Dalamud
   → private Discord relay channel
 ```
 
-The optional experimental reply path also runs inside the same Dalamud plugin:
+The optional reply path also runs inside the same Dalamud plugin:
 
 ```text
 private Discord relay channel
   → outbound HTTPS REST polling by Sentinel Relay
-  → local authorization and fixed /fc allowlist
+  → local authorization and fixed chat-destination allowlist
   → active FFXIV character
 ```
 
@@ -35,7 +35,7 @@ No purchase or hosting signup is required.
 ## Network behavior
 
 - The plugin makes outbound HTTPS requests only when an enabled FFXIV chat message or explicit webhook test must be delivered.
-- If experimental replies are enabled, the plugin also makes small outbound Discord message-history requests about every two seconds while that character is logged in.
+- If Discord replies are enabled, the plugin also makes small outbound Discord message-history requests about every two seconds while that character is logged in.
 - It accepts only Discord webhook URLs on Discord-owned HTTPS hosts.
 - It never opens a listening port.
 - It does not expose the PC to inbound Internet connections.
