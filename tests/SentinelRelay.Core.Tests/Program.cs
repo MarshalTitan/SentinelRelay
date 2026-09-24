@@ -137,8 +137,8 @@ static void RewardBatchingPreservesOrder()
     Assert(batcher.Add(first, now) is null, "batch flushed after its first line");
     Assert(batcher.Add(second, now.AddMilliseconds(200)) is null, "batch flushed before the quiet window");
     Assert(batcher.FlushIfDue(now.AddMilliseconds(900)) is null, "batch flushed too early");
-    var combined = batcher.FlushIfDue(now.AddSeconds(2));
-    Assert(combined is not null, "batch did not flush after the quiet window");
+    var combined = batcher.FlushIfDue(now.AddSeconds(2))
+        ?? throw new InvalidOperationException("batch did not flush after the quiet window");
     Assert(combined.Message == first.Message + "\n" + second.Message, "reward line order changed");
     Assert(batcher.Count == 0, "flushed reward lines remained queued");
 }
@@ -778,7 +778,10 @@ static async Task ScreenshotUploadIsMultipartAndSafe()
     Assert(body.Contains("payload_json", StringComparison.Ordinal), "multipart payload_json field missing");
     Assert(body.Contains("files[0]", StringComparison.Ordinal), "multipart file field missing");
     Assert(body.Contains("sentinel-relay.png", StringComparison.Ordinal), "safe attachment filename missing");
-    Assert(body.Contains("【SCREENSHOT】 Example @\u200Beveryone", StringComparison.Ordinal), "screenshot title was not mention-safe");
+    Assert(body.Contains("SCREENSHOT", StringComparison.Ordinal), "screenshot title was missing");
+    Assert(!body.Contains("@everyone", StringComparison.OrdinalIgnoreCase), "screenshot title allowed a mass mention");
+    Assert(body.Contains("@\\u200Beveryone", StringComparison.OrdinalIgnoreCase),
+        "screenshot title did not contain the neutralized mention marker");
     Assert(body.Contains("\"parse\":[]", StringComparison.Ordinal), "screenshot allowed_mentions was not empty");
 }
 
