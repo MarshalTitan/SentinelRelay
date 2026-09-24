@@ -2,7 +2,7 @@
   "Name": "Sentinel Relay",
   "Author": "MTitan",
   "Punchline": "Private per-character FFXIV and Discord chat relay.",
-  "Description": "Sends selected FFXIV chat and opt-in hunt reward results directly to Discord, with explicitly allowed authorized replies.",
+  "Description": "Sends selected FFXIV chat and hunt rewards to Discord, with authorized chat replies and experimental FFXIV-window screenshots.",
   "RepoUrl": "https://github.com/MarshalTitan/SentinelRelay",
   "IconUrl": "https://raw.githubusercontent.com/MarshalTitan/SentinelRelay/main/assets/icon.png",
   "Tags": ["chat", "discord", "relay", "utility", "sentinel"]

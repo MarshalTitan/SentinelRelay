@@ -5,7 +5,7 @@ namespace SentinelRelay;
 
 public sealed class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 4;
 
     public Dictionary<string, CharacterProfile> CharacterProfiles { get; set; } = new(StringComparer.Ordinal);
 

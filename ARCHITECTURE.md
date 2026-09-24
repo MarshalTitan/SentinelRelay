@@ -8,7 +8,7 @@ Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The live `0.3.1.0` release includes a separately optional REST-polling path:
+The `0.4.0.0` revision includes a separately optional REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
@@ -55,6 +55,18 @@ No HTTP, cryptography, disk, or retry delay runs inside the FFXIV chat callback.
 
 The checkpoint advances before submission. A crash can therefore drop an individual command, but cannot cause that command to execute twice after restart. Starting, resuming, reconnecting, or switching characters primes to the newest message, so commands written while offline never execute later.
 
+## Remote screenshot control flow
+
+1. `DiscordControlCommandParser` recognizes only a message whose trimmed content is exactly `/screenshot`. It is separate from the FFXIV chat-command parser.
+2. `RemoteScreenshotPolicy` applies the same enabled, pause, active-character, channel, user, bot/webhook, snowflake, freshness, and replay checks as chat replies, plus the per-character screenshot toggle and a 15-second cooldown.
+3. The processing checkpoint is persisted before capture begins, so a restart cannot repeat an old capture.
+4. `GameWindowCapture` accepts only a visible top-level window owned by the current FFXIV process. It captures that HWND's client area into a memory DIB; it never selects another process, screen region, or desktop framebuffer.
+5. Capture, resize, PNG encoding, and HTTPS upload run outside the framework thread. The output is at most 1280×720 and 7.5 MB, and no persistent file is created.
+6. `ScreenshotWebhookSender` uploads a mention-safe `【SCREENSHOT】 Character Name` message and PNG attachment through the active character's already-validated webhook, with redirects disabled and bounded `429`/5xx retries.
+7. Character switch, pause, or plugin shutdown cancels the active upload. A completion notice and sanitized status are returned to the framework thread.
+
+Windows window capture cannot obtain a current frame from a minimized window, so minimized requests fail closed. A blank-frame check also rejects unusable Direct3D captures rather than uploading an empty image or falling back to the desktop.
+
 ## Per-character routing
 
 Dalamud's `IPlayerState.ContentId` becomes a key such as `cid:0011223344556677`. Each key owns a `CharacterProfile` containing:
@@ -67,7 +79,7 @@ Dalamud's `IPlayerState.ContentId` becomes a key such as `cid:0011223344556677`.
 - local keyword rules and optional Discord mention user ID; and
 - last successful webhook test/delivery timestamp.
 
-Reply fields are also per character: DPAPI-protected bot token, enabled state, exact relay channel ID, exact authorized user ID, persistent snowflake checkpoint, outbound destination allowlist, and last reader success time.
+Reply/control fields are also per character: DPAPI-protected bot token, enabled state, exact relay channel ID, exact authorized user ID, persistent snowflake checkpoint, outbound destination allowlist, remote-screenshot opt-in, and last reader/screenshot success times.
 
 The framework checks for a content-ID change every 250 ms. When it changes, Sentinel Relay cancels/clears pending delivery, clears the duplicate cache, loads only the new profile, decrypts only its webhook into memory, and updates the UI. A queued item also carries the endpoint selected at capture time; it is never rerouted through another profile. A chat event that lands inside the transition window is discarded, never sent through the previous route.
 
@@ -110,7 +122,7 @@ Every payload has an empty `allowed_mentions.parse` array. Raw FFXIV text also h
 
 ## Discord command decision
 
-Registered Discord slash commands are intentionally absent. `/fc hi`, `/party hi`, `/r hi`, and the other supported prefixes are ordinary channel messages, not application commands. A Gateway connection is unnecessary: each FFXIV client performs authenticated REST reads against only its configured channel and accepts only its configured user ID.
+Registered Discord slash commands are intentionally absent. `/fc hi`, `/party hi`, `/r hi`, `/screenshot`, and the other supported prefixes are ordinary channel messages, not application commands. A Gateway connection is unnecessary: each FFXIV client performs authenticated REST reads against only its configured channel and accepts only its configured user ID.
 
 All configuration lives in the `/srelay` UI. The bot remains unnecessary for FFXIV → Discord webhook delivery and is contacted only when that character explicitly enables Discord replies.
 

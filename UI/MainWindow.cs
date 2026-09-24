@@ -105,6 +105,7 @@ public sealed class MainWindow : Window
     private readonly WebhookRelayClient relay;
     private readonly ChatCaptureService chatCapture;
     private readonly DiscordReplyReader replyReader;
+    private readonly RemoteScreenshotService remoteScreenshotService;
     private readonly Func<string, WebhookConfigurationResult> saveWebhook;
     private readonly Action removeWebhook;
     private readonly Func<bool> testWebhook;
@@ -129,6 +130,7 @@ public sealed class MainWindow : Window
     private string replyChannelId = string.Empty;
     private string authorizedUserId = string.Empty;
     private bool repliesEnabled;
+    private bool remoteScreenshotsEnabled;
     private readonly HashSet<RelayChatType> outboundChannels = [];
     private string? replyFeedback;
     private bool replyFeedbackIsError;
@@ -146,6 +148,7 @@ public sealed class MainWindow : Window
         Func<DiscordReplyConfigurationInput, WebhookConfigurationResult> saveReplySettings,
         Action removeDiscordBotCredential,
         Func<bool> testDiscordReader,
+        RemoteScreenshotService remoteScreenshotService,
         Action<bool> setPaused,
         Action save)
         : base("Sentinel Relay###SentinelRelayMain")
@@ -162,6 +165,7 @@ public sealed class MainWindow : Window
         this.saveReplySettings = saveReplySettings;
         this.removeDiscordBotCredential = removeDiscordBotCredential;
         this.testDiscordReader = testDiscordReader;
+        this.remoteScreenshotService = remoteScreenshotService;
         this.setPaused = setPaused;
         this.save = save;
         SizeConstraints = new WindowSizeConstraints
@@ -187,6 +191,7 @@ public sealed class MainWindow : Window
             replyChannelId = profile?.DiscordRelayChannelId ?? string.Empty;
             authorizedUserId = profile?.AuthorizedDiscordUserId ?? string.Empty;
             repliesEnabled = profile?.DiscordRepliesEnabled ?? false;
+            remoteScreenshotsEnabled = profile?.RemoteScreenshotsEnabled ?? false;
             outboundChannels.Clear();
             if (profile is not null)
                 outboundChannels.UnionWith(profile.EnabledOutboundChannels.Where(ChannelPolicy.ImplementedOutboundChannels.Contains));
@@ -296,6 +301,10 @@ public sealed class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.Checkbox("Enable Discord → FFXIV Replies", ref repliesEnabled);
+        ImGui.Checkbox("Allow authorized /screenshot window capture", ref remoteScreenshotsEnabled);
+        ImGui.TextDisabled("Captures only this FFXIV process's client area into memory, then uploads a bounded PNG through this character's webhook.");
+        ImGui.TextDisabled("The game must not be minimized. A 15-second cooldown applies, and every accepted request prints an in-game notice.");
+        ImGui.Spacing();
         ImGui.TextUnformatted("Allowed Discord reply destinations");
         ImGui.TextDisabled("These permissions are separate from Chat Filters. Monitoring a channel never automatically permits sending to it.");
         DrawReplyChannelGroup("Common chats", CommonReplyChannels, defaultOpen: true);
@@ -323,6 +332,7 @@ public sealed class MainWindow : Window
         {
             var result = saveReplySettings(new DiscordReplyConfigurationInput(
                 repliesEnabled,
+                remoteScreenshotsEnabled,
                 botTokenInput,
                 replyChannelId,
                 authorizedUserId,
@@ -352,7 +362,8 @@ public sealed class MainWindow : Window
             removeDiscordBotCredential();
             botTokenInput = string.Empty;
             repliesEnabled = false;
-            replyFeedback = "Bot credential removed and Discord replies disabled for this character.";
+            remoteScreenshotsEnabled = false;
+            replyFeedback = "Bot credential removed; Discord replies and remote screenshots are disabled for this character.";
             replyFeedbackIsError = false;
         }
         if (!hasBotCredential)
@@ -371,6 +382,11 @@ public sealed class MainWindow : Window
         ImGui.TextUnformatted($"Reader Status: {readerStatus}");
         ImGui.TextUnformatted($"Last Reader Success: {FormatTimestamp(profile.LastDiscordReaderSuccessUtc)}");
         ImGui.TextUnformatted($"Checkpoint: {(string.IsNullOrWhiteSpace(profile.LastProcessedDiscordMessageId) ? "not established" : "established")}");
+        ImGui.TextUnformatted($"Screenshot Status: {(profile.RemoteScreenshotsEnabled ? remoteScreenshotService.State.ToString() : "Disabled")}");
+        ImGui.TextUnformatted($"Last Screenshot Upload: {FormatTimestamp(profile.LastRemoteScreenshotSuccessUtc)}");
+        ImGui.TextUnformatted($"Last Screenshot Size: {remoteScreenshotService.LastDimensions ?? "never"}");
+        if (!string.IsNullOrWhiteSpace(remoteScreenshotService.LastError))
+            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Screenshot Error: {remoteScreenshotService.LastError}");
         if (!string.IsNullOrWhiteSpace(replyReader.LastError))
             ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Reader Error: {replyReader.LastError}");
         ImGui.TextDisabled("Sentinel Relay never prints the bot token and never treats Discord text as an arbitrary FFXIV command.");
@@ -667,6 +683,10 @@ public sealed class MainWindow : Window
         ImGui.TextUnformatted($"Discord reply reader: {replyReader.State}");
         ImGui.TextUnformatted($"Reader last success: {FormatTimestamp(replyReader.LastSuccessUtc)}");
         ImGui.TextUnformatted($"Reader last error: {replyReader.LastError ?? "none"}");
+        ImGui.TextUnformatted($"Remote screenshot state: {remoteScreenshotService.State}");
+        ImGui.TextUnformatted($"Remote screenshot last success: {FormatTimestamp(remoteScreenshotService.LastSuccessUtc)}");
+        ImGui.TextUnformatted($"Remote screenshot size: {remoteScreenshotService.LastDimensions ?? "never"}");
+        ImGui.TextUnformatted($"Remote screenshot error: {remoteScreenshotService.LastError ?? "none"}");
         ImGui.TextDisabled("Webhook URLs, bot tokens, and message bodies are intentionally excluded from diagnostics and logs.");
 
         ImGui.Separator();

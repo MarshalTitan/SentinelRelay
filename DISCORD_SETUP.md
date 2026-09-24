@@ -87,9 +87,9 @@ Use [LIVE_TEST_CHECKLIST.md](LIVE_TEST_CHECKLIST.md) after updates or configurat
 
 ## 7. Optional Discord replies
 
-The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for Discord → FFXIV chat replies.
+The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for Discord → FFXIV chat replies and the experimental `/screenshot` control.
 
-This feature does **not** register Discord slash commands. `/fc hi`, `/party hi`, and the other supported prefixes are ordinary messages posted in the private text channel. Do not configure BotGhost or another bot to own them for Sentinel Relay.
+This feature does **not** register Discord slash commands. `/fc hi`, `/party hi`, `/screenshot`, and the other supported prefixes are ordinary messages posted in the private text channel. Do not configure BotGhost or another bot to own them for Sentinel Relay.
 
 ### A. Restrict the existing bot to the relay channel
 
@@ -146,9 +146,10 @@ While the intended FFXIV character is logged in:
 5. Paste that character's **Relay Channel ID**.
 6. Paste the single **Authorized Discord User ID**.
 7. Select only the outbound chat destinations this character may use. These permissions are separate from the FFXIV → Discord **Chat Filters**.
-8. Check **Enable Discord → FFXIV Replies**.
-9. Select **Save Reply Settings**.
-10. Select **Test Discord Reader** and wait for the success notice in FFXIV chat.
+8. To test window capture, separately check **Allow authorized /screenshot window capture**. Leave it off if this character should never be remotely captured.
+9. Check **Enable Discord → FFXIV Replies**. This master reader switch is also required for `/screenshot`.
+10. Select **Save Reply Settings**.
+11. Select **Test Discord Reader** and wait for the success notice in FFXIV chat.
 
 Saving or starting the reader establishes a checkpoint at the newest current Discord message. Old commands are not executed.
 
@@ -184,6 +185,26 @@ Configure a second character separately with its own channel ID and authorized u
 
 For `/r`, the active character must have received a Tell during the current plugin session within the previous 30 minutes, and **Allow /r** must be enabled. Sentinel Relay sends only the fixed FFXIV `/reply` operation; Discord cannot provide a Tell target or execute `/tell`, `/logout`, macros, plugins, or other arbitrary commands.
 
+### H. Experimental `/screenshot` control
+
+This is a Sentinel Relay control, not an FFXIV command and not a registered Discord slash command.
+
+1. Keep the intended character logged in and restore the FFXIV window if it is minimized.
+2. Confirm **Enable Discord → FFXIV Replies** and **Allow authorized /screenshot window capture** are both saved for that character.
+3. From the exact authorized account in the exact configured relay channel, post:
+
+   ```text
+   /screenshot
+   ```
+
+4. FFXIV prints a local notice when the authorized request is accepted.
+5. Discord should receive `【SCREENSHOT】 Character Name` followed by a PNG of that FFXIV client only.
+6. Wait at least 15 seconds before requesting another screenshot.
+
+No new Discord permission is required beyond the reader's existing **View Channel**, **Read Message History**, and Message Content Intent. The image is uploaded by the character-specific webhook, not by a bot Send Messages permission. The plugin captures and encodes in memory and does not create a persistent image file.
+
+Minimized FFXIV windows are deliberately rejected. If a restored game returns a blank-frame error, try borderless-windowed or windowed mode and report the graphics mode and GPU/driver details; Sentinel Relay will never substitute a whole-desktop capture.
+
 ## If a webhook URL leaks
 
 Treat a leaked URL like a leaked password:
@@ -207,5 +228,6 @@ The deleted URL stops working. Other characters' separate webhooks do not need t
 - **Reader test returns HTTP 401:** the bot token is invalid or was reset. Replace it in the character profile.
 - **Reader test returns HTTP 403:** the bot lacks View Channel or Read Message History in that exact channel.
 - **Reader connects but a command is ignored:** verify Message Content Intent, the exact numeric channel/user IDs, the master reply toggle, that command's destination permission, the active FFXIV character, and the literal command prefix. For `/r`, receive a fresh Tell first.
+- **`/screenshot` is ignored:** verify its separate opt-in, the master reader, exact user/channel IDs, configured webhook, 15-second cooldown, and that the game is not minimized.
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for diagnostic steps.

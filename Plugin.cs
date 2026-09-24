@@ -15,6 +15,7 @@ public sealed record WebhookConfigurationResult(bool Success, string? Error);
 
 public sealed record DiscordReplyConfigurationInput(
     bool Enabled,
+    bool RemoteScreenshotsEnabled,
     string BotToken,
     string ChannelId,
     string AuthorizedUserId,
@@ -38,6 +39,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CharacterContextService characterContext;
     private readonly WebhookRelayClient webhookRelay;
     private readonly DiscordReplyReader discordReplyReader;
+    private readonly RemoteScreenshotService remoteScreenshotService;
     private readonly GameChatSender gameChatSender = new();
     private readonly BoundedOrderedQueue<DiscordReplyCommand> outboundQueue = new(5);
     private readonly SlidingWindowRateLimiter outboundRateLimiter = new(5, TimeSpan.FromSeconds(30));
@@ -54,6 +56,8 @@ public sealed class Plugin : IDalamudPlugin
     private string? lastOutboundError;
     private DateTime? lastOutboundSubmitUtc;
     private DateTime? lastIncomingTellUtc;
+    private DateTime? lastAcceptedScreenshotUtc;
+    private string? lastRemoteScreenshotError;
     private bool disposed;
 
     public Plugin()
@@ -67,6 +71,9 @@ public sealed class Plugin : IDalamudPlugin
             mainThreadActions.Enqueue(() => OnDiscordCheckpointEstablished(characterKey, checkpoint, timestamp));
         discordReplyReader.MessagesReceived += batch =>
             mainThreadActions.Enqueue(() => OnDiscordMessagesReceived(batch));
+        remoteScreenshotService = new RemoteScreenshotService(Log);
+        remoteScreenshotService.Completed += result =>
+            mainThreadActions.Enqueue(() => OnRemoteScreenshotCompleted(result));
         chatCapture = new ChatCaptureService(
             ChatGui,
             Log,
@@ -85,6 +92,7 @@ public sealed class Plugin : IDalamudPlugin
             SaveDiscordReplySettings,
             RemoveDiscordBotCredential,
             TestDiscordReader,
+            remoteScreenshotService,
             SetPaused,
             SaveConfiguration);
 
@@ -116,6 +124,7 @@ public sealed class Plugin : IDalamudPlugin
         chatCapture.Dispose();
         webhookRelay.Dispose();
         discordReplyReader.Dispose();
+        remoteScreenshotService.Dispose();
         outboundQueue.Clear();
         windows.RemoveAllWindows();
     }
@@ -155,12 +164,15 @@ public sealed class Plugin : IDalamudPlugin
 
         webhookRelay.ClearQueue();
         discordReplyReader.Stop();
+        remoteScreenshotService.Cancel();
         outboundQueue.Clear();
         outboundRateLimiter.Clear();
         rewardBatcher.Clear();
         chatCapture.RewardDiagnostics.Clear();
         lastOutboundError = null;
         lastIncomingTellUtc = null;
+        lastAcceptedScreenshotUtc = null;
+        lastRemoteScreenshotError = null;
         duplicateFilter.Clear();
         activeIdentity = identity;
         activeProfile = null;
@@ -202,7 +214,8 @@ public sealed class Plugin : IDalamudPlugin
             || activeIdentity is null
             || activeProfile.Paused
             || !activeProfile.DiscordRepliesEnabled
-            || !activeProfile.EnabledOutboundChannels.Overlaps(ChannelPolicy.ImplementedOutboundChannels))
+            || (!activeProfile.EnabledOutboundChannels.Overlaps(ChannelPolicy.ImplementedOutboundChannels)
+                && !activeProfile.RemoteScreenshotsEnabled))
             return;
 
         var token = secretProtector.UnprotectDiscordBotToken(activeProfile.ProtectedDiscordBotToken);
@@ -227,6 +240,8 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
+            remoteScreenshotService.Cancel();
+            lastAcceptedScreenshotUtc = null;
             activeProfile.ProtectedWebhookUrl = secretProtector.Protect(value.Trim());
             activeProfile.LastWebhookSuccessUtc = null;
             activeWebhookEndpoint = endpoint;
@@ -250,6 +265,8 @@ public sealed class Plugin : IDalamudPlugin
         activeProfile.LastWebhookSuccessUtc = null;
         activeWebhookEndpoint = null;
         webhookRelay.ClearQueue();
+        remoteScreenshotService.Cancel();
+        lastAcceptedScreenshotUtc = null;
         webhookRelay.SetConfigured(false);
         SaveConfiguration();
     }
@@ -285,16 +302,19 @@ public sealed class Plugin : IDalamudPlugin
             return new WebhookConfigurationResult(false, "Paste the Discord bot token before saving.");
         if (input.EnabledOutboundChannels.Any(channel => !ChannelPolicy.ImplementedOutboundChannels.Contains(channel)))
             return new WebhookConfigurationResult(false, "The outbound reply list contains an unsupported destination.");
-        if (input.Enabled && input.EnabledOutboundChannels.Count == 0)
-            return new WebhookConfigurationResult(false, "Enable at least one outbound chat destination before enabling Discord replies.");
+        if (input.Enabled && input.EnabledOutboundChannels.Count == 0 && !input.RemoteScreenshotsEnabled)
+            return new WebhookConfigurationResult(false, "Enable at least one reply destination or authorized remote screenshots before enabling the reader.");
 
         try
         {
+            remoteScreenshotService.Cancel();
+            lastAcceptedScreenshotUtc = null;
             if (newToken.Length > 0)
                 activeProfile.ProtectedDiscordBotToken = secretProtector.ProtectDiscordBotToken(newToken);
             activeProfile.DiscordRelayChannelId = channelId;
             activeProfile.AuthorizedDiscordUserId = userId;
             activeProfile.DiscordRepliesEnabled = input.Enabled;
+            activeProfile.RemoteScreenshotsEnabled = input.RemoteScreenshotsEnabled;
             activeProfile.EnabledOutboundChannels = [.. input.EnabledOutboundChannels];
             SaveConfiguration();
             RefreshDiscordReplyReader();
@@ -313,9 +333,11 @@ public sealed class Plugin : IDalamudPlugin
             return;
         activeProfile.ProtectedDiscordBotToken = string.Empty;
         activeProfile.DiscordRepliesEnabled = false;
+        activeProfile.RemoteScreenshotsEnabled = false;
         activeProfile.LastProcessedDiscordMessageId = string.Empty;
         activeProfile.LastDiscordReaderSuccessUtc = null;
         discordReplyReader.Stop();
+        remoteScreenshotService.Cancel();
         outboundQueue.Clear();
         SaveConfiguration();
     }
@@ -441,14 +463,61 @@ public sealed class Plugin : IDalamudPlugin
         profile.LastDiscordReaderSuccessUtc = DateTime.UtcNow;
         SaveConfiguration();
 
-        if (activeIdentity?.CharacterKey != batch.CharacterKey || activeProfile != profile)
+        var identity = activeIdentity;
+        if (identity is null || identity.CharacterKey != batch.CharacterKey || activeProfile != profile)
             return;
 
         foreach (var source in batch.Messages)
         {
+            if (DiscordControlCommandParser.TryParse(source.Content, out var controlCommand)
+                && controlCommand == DiscordControlCommand.Screenshot)
+            {
+                if (!RemoteScreenshotPolicy.TryAuthorize(
+                        profile,
+                        identity,
+                        source,
+                        batch.CheckpointBeforeBatch,
+                        DateTime.UtcNow,
+                        lastAcceptedScreenshotUtc,
+                        out var screenshotRejection))
+                {
+                    lastRemoteScreenshotError = screenshotRejection switch
+                    {
+                        DiscordReplyRejection.ScreenshotDisabled => "Ignored /screenshot: remote screenshots are disabled for this character.",
+                        DiscordReplyRejection.ScreenshotCooldown => "Ignored /screenshot: the 15-second screenshot cooldown is active.",
+                        _ => "Ignored an unauthorized /screenshot request.",
+                    };
+                    continue;
+                }
+
+                if (activeWebhookEndpoint is null)
+                {
+                    lastRemoteScreenshotError = "Ignored /screenshot: this character has no valid Discord webhook.";
+                    continue;
+                }
+
+                var gameWindow = GameWindowCapture.FindCurrentProcessGameWindow();
+                var started = remoteScreenshotService.TryStart(new RemoteScreenshotRequest(
+                    identity.CharacterKey,
+                    identity.CharacterName,
+                    source.Id,
+                    activeWebhookEndpoint,
+                    gameWindow));
+                if (!started)
+                {
+                    lastRemoteScreenshotError = "Ignored /screenshot: another screenshot is already being processed.";
+                    continue;
+                }
+
+                lastAcceptedScreenshotUtc = DateTime.UtcNow;
+                lastRemoteScreenshotError = null;
+                ChatGui.Print("[Sentinel Relay] Authorized remote screenshot requested; capturing the FFXIV window.");
+                continue;
+            }
+
             if (!DiscordReplyPolicy.TryAuthorize(
                     profile,
-                    activeIdentity,
+                    identity,
                     source,
                     batch.CheckpointBeforeBatch,
                     DateTime.UtcNow,
@@ -474,6 +543,28 @@ public sealed class Plugin : IDalamudPlugin
                 lastOutboundError = "The Discord reply queue is full; newest command was dropped.";
                 droppedOutboundCount++;
             }
+        }
+    }
+
+    private void OnRemoteScreenshotCompleted(RemoteScreenshotResult result)
+    {
+        if (Configuration.CharacterProfiles.TryGetValue(result.CharacterKey, out var profile) && result.Success)
+        {
+            profile.LastRemoteScreenshotSuccessUtc = result.CompletedAtUtc;
+            SaveConfiguration();
+        }
+
+        if (result.CharacterKey != activeIdentity?.CharacterKey)
+            return;
+        if (result.Success)
+        {
+            lastRemoteScreenshotError = null;
+            ChatGui.Print($"[Sentinel Relay] FFXIV screenshot uploaded to Discord ({result.Width}x{result.Height}).");
+        }
+        else
+        {
+            lastRemoteScreenshotError = result.Error ?? "Remote screenshot failed.";
+            ChatGui.PrintError($"[Sentinel Relay] Remote screenshot failed: {lastRemoteScreenshotError}");
         }
     }
 
@@ -539,6 +630,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             webhookRelay.ClearQueue();
             discordReplyReader.Stop();
+            remoteScreenshotService.Cancel();
             outboundQueue.Clear();
             rewardBatcher.Clear();
         }
@@ -583,12 +675,14 @@ public sealed class Plugin : IDalamudPlugin
                     + $"dropped={webhookRelay.DroppedCount}, character={activeIdentity?.CharacterName ?? "none"}, "
                     + $"webhook={(activeWebhookEndpoint is null ? "not configured" : "configured")}, "
                     + $"replyReader={discordReplyReader.State}, replyQueue={outboundQueue.Count}, replyDropped={droppedOutboundCount}, "
+                    + $"screenshotState={remoteScreenshotService.State}, screenshotLastSuccess={remoteScreenshotService.LastSuccessUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"recentTellTarget={(DiscordReplyPolicy.HasRecentTellTarget(lastIncomingTellUtc, DateTime.UtcNow) ? "available" : "none")}, "
                     + $"rewardDiagnostics={(activeProfile?.CaptureRewardDiagnostics == true ? "on" : "off")}, rewardObservations={rewardDiagnostics.Count}, "
                     + $"lastRewardLogKind={(latestReward is null ? "none" : $"{latestReward.LogKindName}({latestReward.LogKindValue})")}, "
                     + $"lastReplySubmit={lastOutboundSubmitUtc?.ToLocalTime().ToString("G") ?? "never"}, "
                     + $"lastSuccess={webhookRelay.LastSuccessUtc?.ToLocalTime().ToString("G") ?? "never"}, "
-                    + $"lastError={webhookRelay.LastError ?? "none"}, replyError={lastOutboundError ?? discordReplyReader.LastError ?? "none"}");
+                    + $"lastError={webhookRelay.LastError ?? "none"}, replyError={lastOutboundError ?? discordReplyReader.LastError ?? "none"}, "
+                    + $"screenshotError={lastRemoteScreenshotError ?? remoteScreenshotService.LastError ?? "none"}");
                 break;
             default:
                 ChatGui.PrintError("[Sentinel Relay] Use /srelay, status, pause, resume, or debug.");
@@ -613,7 +707,7 @@ public sealed class Plugin : IDalamudPlugin
             + $"Discord webhook: {(activeWebhookEndpoint is null ? "not configured" : "configured")}; "
             + $"relay: {relayState}; "
             + $"enabled chats: {(enabled.Length == 0 ? "none" : enabled)}; queue: {webhookRelay.QueueLength}; "
-            + $"Discord replies: {replyState}.");
+            + $"Discord replies: {replyState}; remote screenshots: {(activeProfile?.RemoteScreenshotsEnabled == true ? "enabled" : "disabled")}.");
     }
 
     private static bool IsPlausibleBotToken(string? value) =>

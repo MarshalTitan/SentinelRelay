@@ -21,6 +21,23 @@ The FFXIV → Discord webhook path remains independent. The optional reply path:
 
 The checkpoint is saved before game submission. This deliberately favors dropping a command during a crash over replaying it. Every reader start/reconnect first advances to the newest current Discord message, so messages posted while the reader is offline are not executed later.
 
+### Remote screenshot boundary
+
+Remote screenshots are disabled by default and require the master Discord reader plus a separate per-character opt-in. The exact `/screenshot` message is authorized with the same character key, channel ID, user ID, author-type, freshness, checkpoint, pause, and replay checks as chat replies. A 15-second local cooldown and single in-flight capture limit prevent continuous capture.
+
+`/screenshot` never enters the FFXIV chat sender. The capture implementation:
+
+- resolves only a visible top-level window owned by the current FFXIV process;
+- never accepts a process, monitor, desktop region, window handle, or filesystem path from Discord;
+- captures only that window's client area into an in-memory bitmap;
+- refuses minimized and blank frames rather than falling back to desktop capture;
+- downsizes to at most 1280×720 and caps encoded data at 7.5 MB;
+- encodes and uploads without writing a persistent screenshot file;
+- disables HTTP redirects and uses only the active character's validated webhook; and
+- cancels in-flight work on pause, character switch, or shutdown.
+
+The plugin prints an in-game notice when an authorized capture is accepted, so remote capture is not silent. The screenshot can contain anything visible inside the FFXIV render output, including chat, UI, names, plugins, and overlays rendered into the game window. Users should enable this experimental feature only in a private relay channel they trust.
+
 ### Local privacy enforcement
 
 Every chat filter defaults off. The plugin tests the active character's filter before formatting, queueing, or making an HTTP request. Disabled chat does not leave the FFXIV process.
@@ -76,7 +93,7 @@ Stored locally per character:
 - DPAPI-protected webhook URL;
 - optional DPAPI-protected Discord bot token;
 - optional exact relay channel ID and authorized Discord user ID;
-- reply enabled state, outbound destination allowlist, and last processed message snowflake;
+- reply enabled state, outbound destination allowlist, remote-screenshot opt-in, and last processed message snowflake;
 - enabled filters and formatting choices;
 - pause state;
 - keyword rules and optional Discord user ID; and
@@ -132,6 +149,9 @@ The Debug tab has a separate per-character, default-off reward diagnostic. When 
 - The reverse path uses an internal FFXIV chat-shell interface. Automated tests can verify policy and construction, but only a second live FFXIV client can prove a server-visible FC send after a game/API update.
 - REST polling is intentionally near-real-time rather than instantaneous and functions only while the configured FFXIV client/plugin is running.
 - Reward recognition currently targets the English client phrases documented in the live-test checklist. Other client languages require separately verified patterns.
+- Remote screenshots also function only while that character's FFXIV client and plugin are running; GitHub or Discord cannot capture an offline client.
+- Minimized windows are intentionally unsupported. Restored Direct3D window capture can still return blank on some graphics modes/drivers; the plugin rejects that frame and never falls back to desktop capture.
+- A successful screenshot includes all visible content rendered inside the FFXIV client area. Sentinel Relay cannot selectively redact chat, names, Dalamud overlays, or game UI from the captured pixels.
 
 ## Dependency and licensing review
 
