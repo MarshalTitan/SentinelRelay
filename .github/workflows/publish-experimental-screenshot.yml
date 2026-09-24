@@ -1,0 +1,82 @@
+name: Publish Experimental Screenshot Build
+
+on:
+  push:
+    branches: [experimental-remote-screenshot]
+    paths: [.github/workflows/publish-experimental-screenshot.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: contains(github.event.head_commit.message, '[publish-experimental]')
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out experimental source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download current Dalamud development assemblies
+        shell: pwsh
+        run: |
+          $dalamudDir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Path $dalamudDir -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-latest.zip'
+          Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
+
+      - name: Restore locked dependencies
+        run: dotnet restore SentinelRelay.csproj --locked-mode
+
+      - name: Run plugin core tests
+        run: dotnet run --project tests/SentinelRelay.Core.Tests/SentinelRelay.Core.Tests.csproj -c Release
+
+      - name: Build experimental package
+        run: dotnet build SentinelRelay.csproj -c Release --no-restore
+
+      - name: Validate installable package
+        shell: pwsh
+        run: >-
+          ./.github/scripts/Validate-Package.ps1
+          -PackagePath 'bin/Release/SentinelRelay/latest.zip'
+          -ExpectedVersion '0.4.0.0'
+
+      - name: Publish immutable prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'v0.4.0.0-experimental.1'
+          gh release view $tag --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Prerelease '$tag' already exists." }
+          $global:LASTEXITCODE = 0
+          Copy-Item -LiteralPath 'bin/Release/SentinelRelay/latest.zip' -Destination "$env:RUNNER_TEMP\SentinelRelay.zip" -Force
+          gh release create $tag "$env:RUNNER_TEMP\SentinelRelay.zip" `
+            --repo '${{ github.repository }}' `
+            --target '${{ github.sha }}' `
+            --title 'Sentinel Relay 0.4.0.0 Experimental Screenshot' `
+            --prerelease `
+            --notes 'Default-off experimental remote FFXIV-window screenshot build. Stable 0.3.1.0 remains the normal catalog version until a real Discord-requested capture is verified.'
+
+      - name: Verify public prerelease asset
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/${{ github.repository }}/releases/download/v0.4.0.0-experimental.1/SentinelRelay.zip'
+          $download = Join-Path $env:RUNNER_TEMP 'public-SentinelRelay.zip'
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri "$url`?run=${{ github.run_id }}-$attempt" -OutFile $download
+              if ((Get-Item $download).Length -gt 0) { break }
+            }
+            catch {
+              if ($attempt -eq 12) { throw }
+            }
+            Start-Sleep -Seconds 5
+          }
+          ./.github/scripts/Validate-Package.ps1 -PackagePath $download -ExpectedVersion '0.4.0.0'
