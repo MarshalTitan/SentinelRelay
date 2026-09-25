@@ -118,6 +118,27 @@ This is intentional. Starting, resuming, reconnecting, or switching characters a
 
 Sentinel Relay intentionally clears the Tell-reply target when changing characters or reloading the plugin. It never accepts an arbitrary Discord-supplied `/tell` target.
 
+## `/screenshot` does nothing
+
+1. Confirm the intended character is logged in and the reader is **Connected**.
+2. Confirm the active profile has a valid Discord webhook, exact Relay Channel ID, and exact Authorized Discord User ID.
+3. Enable both **Allow authorized /screenshot window capture** and **Enable Discord → FFXIV Replies**, then save.
+4. Post exactly `/screenshot` as ordinary text from the configured user in the configured channel. Arguments are not accepted.
+5. Wait at least 15 seconds after the previous accepted request.
+6. Confirm the relay is not paused.
+
+Every accepted request prints an in-game notice. If there is no notice, authorization, checkpoint, or cooldown policy rejected it.
+
+## Screenshot reports minimized or blank frame
+
+Minimized windows cannot provide a current Windows application-window capture. Restore FFXIV and retry. If a restored game produces a blank frame, try borderless-windowed or windowed mode. DirectX presentation behavior can vary by graphics driver and mode.
+
+Sentinel Relay deliberately fails closed: it does not crop the desktop, select another window, run an external screenshot program, or read a screenshot file as a fallback. Leave the per-character screenshot toggle disabled if the current graphics configuration cannot return a usable window frame.
+
+## Screenshot uploads to the wrong channel
+
+Disable remote screenshots immediately. Confirm that the active character's saved webhook and Relay Channel ID both belong to the same private channel. Each character must have its own webhook and channel ID. Replace any swapped webhook, run **Test Webhook**, then repeat the two-profile isolation checklist before re-enabling capture.
+
 ## Safe diagnostic information to share
 
 - plugin version;
@@ -128,5 +149,6 @@ Sentinel Relay intentionally clears the Tell-reply target when changing characte
 - queue length and drop count;
 - last success time; and
 - last sanitized error.
+- remote screenshot state, last success time, dimensions, and sanitized error.
 
 Never share the webhook URL, bot token, a screenshot containing either, or a local protected-secret value.

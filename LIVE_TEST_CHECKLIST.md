@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.3.1.0`
+Live catalog version: `0.4.0.0`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.3.1.0` and verify the active character shown in the header.
+5. Confirm version `0.4.0.0` and verify the active character shown in the header.
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 
@@ -239,6 +239,35 @@ Run this during a real S-rank reward event; ordinary chat cannot simulate the ga
 Expected API 15 candidate RowIds are `SystemMessage` (57), `SystemError` (58), `ErrorMessage` (60), `LootNotice` (62), and `Progress` (64). Treat the Debug observations from the live client as authoritative and report any matching line marked **diagnostic only**.
 
 - [ ] PASS
+
+## R — Remote FFXIV screenshot
+
+Run this first on one character/profile. Keep the other profile's screenshot toggle off until the first route is proven.
+
+1. In `/srelay` → **Discord Replies**, confirm the bot reader test succeeds and the profile has its own webhook, relay channel ID, and authorized user ID.
+2. Enable **Allow authorized /screenshot window capture** and the master **Enable Discord → FFXIV Replies** switch, then save.
+3. With FFXIV restored in the normal foreground state, post the ordinary Discord message `/screenshot` from the authorized account in the configured relay channel.
+4. Confirm FFXIV immediately prints the accepted-request notice.
+5. Confirm Discord receives `【SCREENSHOT】 Character Name` plus an image of only the correct FFXIV client. Check that no desktop, taskbar, other application, or other FFXIV client is visible.
+6. Confirm the image has no redundant embed timestamp and is no larger than 1280×720.
+7. Repeat in borderless-windowed and windowed modes as available.
+8. Put the game behind another application without minimizing it, request again after the cooldown, and record whether the correct game frame returns.
+9. Minimize FFXIV and request again. Confirm the plugin reports a controlled minimized-window failure and uploads no desktop or stale substitute.
+10. Test at each available game resolution and verify readable output with UI visible.
+11. Send two `/screenshot` messages inside 15 seconds. Confirm only the first accepted request captures/uploads.
+12. Send `/screenshot` from a different Discord user and from a different channel. Confirm neither triggers an in-game notice or upload.
+13. Post `/screenshot now`, `/screenshot.exe`, and a webhook-authored message containing `/screenshot`. Confirm all are ignored.
+14. Restart/reload with an old `/screenshot` already in the channel. Confirm it is checkpointed and never runs.
+15. Configure the second profile with its separate channel and webhook, then repeat. Confirm each Discord channel can capture only its own FFXIV process and no image cross-routes.
+16. Pause Sentinel Relay and confirm `/screenshot` is ignored; resume and confirm the reader primes to the newest message before accepting a fresh request.
+
+- [ ] Foreground restored capture succeeds
+- [ ] Background non-minimized result recorded
+- [ ] Minimized request fails closed without any upload
+- [ ] Wrong user/channel and replay tests pass
+- [ ] Two-client routing isolation passes
+
+If foreground/windowed capture returns a blank-frame error, leave the feature disabled and report the graphics mode, resolution, Windows version, and GPU/driver. The stable chat relay and Discord reply features remain independent.
 
 ## Final sign-off
 

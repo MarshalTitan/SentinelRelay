@@ -16,8 +16,9 @@ The optional reply path also runs inside the same Dalamud plugin:
 ```text
 private Discord relay channel
   → outbound HTTPS REST polling by Sentinel Relay
-  → local authorization and fixed chat-destination allowlist
-  → active FFXIV character
+  → local authorization
+  → fixed chat-destination allowlist or exact /screenshot control
+  → active FFXIV character or character-specific webhook attachment
 ```
 
 There is nothing to deploy to Railway, Render, Fly.io, a VPS, a home server, Docker, Node.js, SQLite, Tailscale, or a router.
@@ -34,7 +35,7 @@ No purchase or hosting signup is required.
 
 ## Network behavior
 
-- The plugin makes outbound HTTPS requests only when an enabled FFXIV chat message or explicit webhook test must be delivered.
+- The plugin makes outbound HTTPS requests only when an enabled FFXIV chat message, explicit webhook test, or authorized screenshot attachment must be delivered.
 - If Discord replies are enabled, the plugin also makes small outbound Discord message-history requests about every two seconds while that character is logged in.
 - It accepts only Discord webhook URLs on Discord-owned HTTPS hosts.
 - It never opens a listening port.

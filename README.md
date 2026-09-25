@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The live `0.3.1.0` release adds an opt-in, inbound-only **Rewards / Hunt Results** feed. It recognizes narrow reward patterns from API 15 system LogKinds, batches consecutive reward lines into a compact timestamp-free embed, and provides opt-in diagnostics for live LogKind verification. Discord reply commands remain fixed and separately allowlisted.
+The `0.4.0.0` release adds an opt-in remote **FFXIV-window screenshot** control while preserving the direct webhook relay, fixed chat-reply allowlist, and inbound-only Rewards / Hunt Results feed.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -54,12 +54,14 @@ The reward filter currently recognizes the English client lines for hunt contrib
 - Rewards / Hunt Results is never an outbound destination and has no Discord reply command.
 - `/r` is accepted only for 30 minutes after the active character receives a Tell during the current session; Sentinel Relay never accepts an arbitrary `/tell` target.
 - Bot-authored, webhook-authored, wrong-channel, wrong-user, stale, duplicate, and cross-character messages are rejected locally.
+- Remote screenshots are off by default, accept only the exact `/screenshot` control, capture only the current FFXIV process's client area, and have a 15-second cooldown.
+- Screenshot pixels are downscaled and PNG-encoded in memory; Sentinel Relay does not create a persistent screenshot file or capture the whole desktop.
 
 See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.3.1.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply reader remains off until configured per character.
+Version `0.4.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -92,7 +94,7 @@ A match can be highlighted in the relay channel and optionally ping one explicit
 | `/srelay resume` | Resume enabled webhook delivery and restart enabled reply polling at a fresh checkpoint |
 | `/srelay debug` | Show non-secret queue and delivery diagnostics |
 
-There are no registered Discord application commands. `/fc hello`, `/party hello`, and the other supported prefixes are ordinary text messages read through Discord's authenticated REST API. Each client polls only its configured channel, and all routing, author, freshness, and destination-permission checks must pass before a fixed chat mapping can run. The FFXIV → Discord webhook relay does not depend on the bot reader.
+There are no registered Discord application commands. `/fc hello`, `/party hello`, `/screenshot`, and the other supported prefixes are ordinary text messages read through Discord's authenticated REST API. Each client polls only its configured channel, and all routing, author, freshness, and feature-permission checks must pass. The FFXIV → Discord webhook relay does not depend on the bot reader.
 
 ## Discord replies
 
@@ -116,6 +118,18 @@ Supported ordinary-message prefixes:
 `/party` uses the game's Party channel and therefore also reaches a cross-world party when that is the active party type. Tell targeting is intentionally limited to `/r`; arbitrary `/tell name message` input is not accepted.
 
 Starting, resuming, reconnecting, or switching characters first advances to Discord's newest current message. Commands written while the game/reader was offline are never executed later. The processing checkpoint is persisted before a game send is queued, favoring a dropped command over an accidental replay.
+
+## Remote screenshot
+
+`/screenshot` is a Sentinel Relay control command, not an FFXIV chat command. In `/srelay` → **Discord Replies**, enable **Allow authorized /screenshot window capture**, keep the master reader enabled, and save. A fresh ordinary Discord message containing exactly `/screenshot` then:
+
+1. passes the same active-character, channel, user, bot/webhook, freshness, and replay checks as a chat reply;
+2. selects only the current FFXIV process's verified game window;
+3. captures the game client area into memory on a background task;
+4. resizes it to at most 1280×720 and encodes an in-memory PNG; and
+5. uploads it through that character's configured webhook as `【SCREENSHOT】 Character Name`.
+
+The command never enters `DiscordReplyCommandParser` or `GameChatSender`, cannot select another process or filesystem path, and cannot capture the desktop. A local FFXIV notice appears whenever a request is accepted. Requests have a 15-second cooldown. Minimized windows are deliberately rejected because Windows does not provide a current capturable window frame in that state; restore the game and try again. Background and borderless/windowed behavior can vary with each PC and graphics-driver configuration.
 
 ## Building
 

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Buffers.Binary;
 using System.Text.Json;
 using SentinelRelay;
 using SentinelRelay.Core;
@@ -41,12 +42,20 @@ var tests = new (string Name, Func<Task> Run)[]
     ("duplicate and stale commands are rejected", Sync(ReplayAndStaleRepliesAreRejected)),
     ("outbound allowlist blocks unapproved destinations", Sync(OutboundAllowlistIsRequired)),
     ("local reply rate limit is enforced", Sync(ReplyRateLimitIsEnforced)),
+    ("/screenshot is an isolated exact control command", Sync(ScreenshotCommandIsIsolated)),
+    ("authorized screenshot command is accepted", Sync(AuthorizedScreenshotIsAccepted)),
+    ("screenshot authorization rejects wrong routes and automated authors", Sync(ScreenshotAuthorizationIsIsolated)),
+    ("screenshots require explicit opt-in and obey cooldown", Sync(ScreenshotOptInAndCooldownAreEnforced)),
+    ("screenshot replay and stale protection match Discord replies", Sync(ScreenshotReplayAndStaleAreRejected)),
+    ("in-memory PNG encoder produces bounded valid dimensions", Sync(PngEncodingWorks)),
     ("malformed and non-Discord webhooks are rejected", Sync(MalformedWebhooksAreRejected)),
     ("valid Discord webhook is normalized with wait=true", Sync(ValidWebhookIsNormalized)),
     ("Discord allowed_mentions is always empty", Sync(AllowedMentionsAreDisabled)),
     ("429 response is delayed and retried", RateLimitIsRetried),
     ("Discord reader honors 429 and preserves message order data", DiscordReaderRateLimitIsRetried),
     ("webhook test reports successful delivery", WebhookTestSucceeds),
+    ("screenshot webhook upload is multipart and mention-safe", ScreenshotUploadIsMultipartAndSafe),
+    ("screenshot webhook honors Discord rate limits", ScreenshotUploadRateLimitIsRetried),
     ("configuration model survives serialization", Sync(ConfigurationModelPersists)),
 };
 
@@ -83,6 +92,7 @@ static void FiltersAreOptIn()
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.OutgoingTell), "outgoing Tell defaulted on");
     Assert(!profile.EnabledInboundChannels.Contains(RelayChatType.RewardsHuntResults), "rewards defaulted on");
     Assert(profile.EnabledOutboundChannels.Count == 0, "outbound destinations defaulted on");
+    Assert(!profile.RemoteScreenshotsEnabled, "remote screenshots defaulted on");
 }
 
 static void RewardsAreOptInAndInboundOnly()
@@ -127,8 +137,8 @@ static void RewardBatchingPreservesOrder()
     Assert(batcher.Add(first, now) is null, "batch flushed after its first line");
     Assert(batcher.Add(second, now.AddMilliseconds(200)) is null, "batch flushed before the quiet window");
     Assert(batcher.FlushIfDue(now.AddMilliseconds(900)) is null, "batch flushed too early");
-    var combined = batcher.FlushIfDue(now.AddSeconds(2));
-    Assert(combined is not null, "batch did not flush after the quiet window");
+    var combined = batcher.FlushIfDue(now.AddSeconds(2))
+        ?? throw new InvalidOperationException("batch did not flush after the quiet window");
     Assert(combined.Message == first.Message + "\n" + second.Message, "reward line order changed");
     Assert(batcher.Count == 0, "flushed reward lines remained queued");
 }
@@ -548,6 +558,123 @@ static void ReplyRateLimitIsEnforced()
     Assert(limiter.TryAcquire(now.AddSeconds(31), out _), "expired rate-limit entry was not released");
 }
 
+static void ScreenshotCommandIsIsolated()
+{
+    Assert(DiscordControlCommandParser.TryParse("/screenshot", out var command)
+           && command == DiscordControlCommand.Screenshot, "exact screenshot command was rejected");
+    Assert(DiscordControlCommandParser.TryParse("  /SCREENSHOT  ", out command)
+           && command == DiscordControlCommand.Screenshot, "case-insensitive screenshot command was rejected");
+    Assert(!DiscordControlCommandParser.TryParse("/screenshot now", out _), "screenshot arguments were accepted");
+    Assert(!DiscordControlCommandParser.TryParse("/screenshot.exe", out _), "screenshot prefix extension was accepted");
+    Assert(!DiscordReplyCommandParser.TryParse("/screenshot", out _, out _),
+        "screenshot leaked into the FFXIV chat-command parser");
+}
+
+static void AuthorizedScreenshotIsAccepted()
+{
+    var now = DateTime.UtcNow;
+    var accepted = RemoteScreenshotPolicy.TryAuthorize(
+        ConfiguredScreenshotProfile(),
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/screenshot", now),
+        "100000000000000001",
+        now,
+        null,
+        out var rejection);
+    Assert(accepted, $"authorized screenshot was rejected: {rejection}");
+}
+
+static void ScreenshotAuthorizationIsIsolated()
+{
+    var now = DateTime.UtcNow;
+    var wrongChannel = ReplyMessage("100000000000000002", "/screenshot", now);
+    wrongChannel.ChannelId = "999999999999999999";
+    AssertScreenshotRejected(wrongChannel, now, null, DiscordReplyRejection.WrongChannel);
+
+    var wrongUser = ReplyMessage("100000000000000003", "/screenshot", now);
+    wrongUser.Author.Id = "999999999999999999";
+    AssertScreenshotRejected(wrongUser, now, null, DiscordReplyRejection.WrongUser);
+
+    var bot = ReplyMessage("100000000000000004", "/screenshot", now);
+    bot.Author.Bot = true;
+    AssertScreenshotRejected(bot, now, null, DiscordReplyRejection.BotAuthor);
+
+    var webhook = ReplyMessage("100000000000000005", "/screenshot", now);
+    webhook.WebhookId = "777777777777777777";
+    AssertScreenshotRejected(webhook, now, null, DiscordReplyRejection.WebhookAuthor);
+
+    var accepted = RemoteScreenshotPolicy.TryAuthorize(
+        ConfiguredScreenshotProfile(),
+        new CharacterIdentity("cid:other", "Other Character", "Example World", 2),
+        ReplyMessage("100000000000000006", "/screenshot", now),
+        "100000000000000001",
+        now,
+        null,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.WrongCharacter,
+        "screenshot crossed to the wrong FFXIV character");
+}
+
+static void ScreenshotOptInAndCooldownAreEnforced()
+{
+    var now = DateTime.UtcNow;
+    var profile = ConfiguredScreenshotProfile();
+    profile.RemoteScreenshotsEnabled = false;
+    var accepted = RemoteScreenshotPolicy.TryAuthorize(
+        profile,
+        ActiveIdentity(),
+        ReplyMessage("100000000000000002", "/screenshot", now),
+        "100000000000000001",
+        now,
+        null,
+        out var rejection);
+    Assert(!accepted && rejection == DiscordReplyRejection.ScreenshotDisabled,
+        "screenshot was accepted without explicit opt-in");
+
+    AssertScreenshotRejected(
+        ReplyMessage("100000000000000003", "/screenshot", now.AddSeconds(5)),
+        now.AddSeconds(5),
+        now,
+        DiscordReplyRejection.ScreenshotCooldown);
+    var afterCooldown = RemoteScreenshotPolicy.TryAuthorize(
+        ConfiguredScreenshotProfile(),
+        ActiveIdentity(),
+        ReplyMessage("100000000000000004", "/screenshot", now.AddSeconds(16)),
+        "100000000000000001",
+        now.AddSeconds(16),
+        now,
+        out rejection);
+    Assert(afterCooldown, $"screenshot remained blocked after cooldown: {rejection}");
+}
+
+static void ScreenshotReplayAndStaleAreRejected()
+{
+    var now = DateTime.UtcNow;
+    AssertScreenshotRejected(
+        ReplyMessage("100000000000000001", "/screenshot", now),
+        now,
+        null,
+        DiscordReplyRejection.Duplicate);
+    AssertScreenshotRejected(
+        ReplyMessage("100000000000000002", "/screenshot", now.Subtract(TimeSpan.FromMinutes(3))),
+        now,
+        null,
+        DiscordReplyRejection.Stale);
+}
+
+static void PngEncodingWorks()
+{
+    const int width = 2;
+    const int height = 1;
+    byte[] bgra = [0, 0, 255, 0, 0, 255, 0, 0];
+    var png = PngEncoder.EncodeBgra(bgra, width, height);
+    Assert(png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
+        "PNG signature was invalid");
+    Assert(BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4)) == width, "PNG width was invalid");
+    Assert(BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4)) == height, "PNG height was invalid");
+    Assert(png.Length < 1_000_000, "tiny PNG output was unexpectedly large");
+}
+
 static void MalformedWebhooksAreRejected()
 {
     Assert(!WebhookEndpoint.TryCreate("https://example.com/api/webhooks/123/token", out _, out _), "foreign host accepted");
@@ -638,6 +765,50 @@ static async Task WebhookTestSucceeds()
     Assert(handler.Bodies.Single().Contains("connected successfully for Example Character", StringComparison.Ordinal), "test content missing");
 }
 
+static async Task ScreenshotUploadIsMultipartAndSafe()
+{
+    var handler = new SequenceHandler(() => new HttpResponseMessage(HttpStatusCode.NoContent));
+    using var client = new HttpClient(handler);
+    var sender = new ScreenshotWebhookSender(client, (_, _) => Task.CompletedTask);
+    WebhookEndpoint.TryCreate(FakeWebhook(), out var endpoint, out _);
+    var result = await sender.SendAsync(endpoint, "Example @everyone", new byte[] { 137, 80, 78, 71 }, CancellationToken.None);
+
+    Assert(result.Success, result.Error ?? "screenshot upload failed");
+    var body = handler.Bodies.Single();
+    Assert(body.Contains("payload_json", StringComparison.Ordinal), "multipart payload_json field missing");
+    Assert(body.Contains("files[0]", StringComparison.Ordinal), "multipart file field missing");
+    Assert(body.Contains("sentinel-relay.png", StringComparison.Ordinal), "safe attachment filename missing");
+    Assert(body.Contains("SCREENSHOT", StringComparison.Ordinal), "screenshot title was missing");
+    Assert(!body.Contains("@everyone", StringComparison.OrdinalIgnoreCase), "screenshot title allowed a mass mention");
+    Assert(body.Contains("@\\u200Beveryone", StringComparison.OrdinalIgnoreCase),
+        "screenshot title did not contain the neutralized mention marker");
+    Assert(body.Contains("\"parse\":[]", StringComparison.Ordinal), "screenshot allowed_mentions was not empty");
+}
+
+static async Task ScreenshotUploadRateLimitIsRetried()
+{
+    var handler = new SequenceHandler(
+        () => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("{\"retry_after\":0.25}"),
+        },
+        () => new HttpResponseMessage(HttpStatusCode.NoContent));
+    using var client = new HttpClient(handler);
+    var delays = new List<TimeSpan>();
+    var sender = new ScreenshotWebhookSender(client, (duration, _) =>
+    {
+        delays.Add(duration);
+        return Task.CompletedTask;
+    });
+    WebhookEndpoint.TryCreate(FakeWebhook(), out var endpoint, out _);
+    var result = await sender.SendAsync(endpoint, "Example Character", new byte[] { 137, 80, 78, 71 }, CancellationToken.None);
+
+    Assert(result.Success && result.Attempts == 2, result.Error ?? "screenshot retry failed");
+    Assert(result.WasRateLimited, "screenshot rate-limit flag missing");
+    Assert(delays.Count == 1 && delays[0] >= TimeSpan.FromMilliseconds(100),
+        "screenshot retry delay was not honored");
+}
+
 static void ConfigurationModelPersists()
 {
     var original = new Configuration();
@@ -652,6 +823,7 @@ static void ConfigurationModelPersists()
     first.Keywords = [new KeywordRule { Keyword = "ready", Channels = [RelayChatType.FreeCompany] }];
     first.ProtectedDiscordBotToken = "dpapi-bot-ciphertext-one";
     first.DiscordRepliesEnabled = true;
+    first.RemoteScreenshotsEnabled = true;
     first.DiscordRelayChannelId = "123456789012345678";
     first.AuthorizedDiscordUserId = "234567890123456789";
     first.LastProcessedDiscordMessageId = "345678901234567890";
@@ -680,6 +852,7 @@ static void ConfigurationModelPersists()
     Assert(restoredFirst.Keywords.Single().Keyword == "ready", "keyword was lost");
     Assert(restoredFirst.ProtectedDiscordBotToken == first.ProtectedDiscordBotToken, "protected bot credential was lost");
     Assert(restoredFirst.DiscordRepliesEnabled, "reply enabled state was lost");
+    Assert(restoredFirst.RemoteScreenshotsEnabled, "remote screenshot enabled state was lost");
     Assert(restoredFirst.DiscordRelayChannelId == first.DiscordRelayChannelId, "reply channel was lost");
     Assert(restoredFirst.AuthorizedDiscordUserId == first.AuthorizedDiscordUserId, "authorized user was lost");
     Assert(restoredFirst.LastProcessedDiscordMessageId == first.LastProcessedDiscordMessageId, "checkpoint was lost");
@@ -693,6 +866,15 @@ static CharacterProfile ConfiguredReplyProfile() => new()
     DiscordRelayChannelId = "123456789012345678",
     AuthorizedDiscordUserId = "234567890123456789",
     EnabledOutboundChannels = [RelayChatType.FreeCompany],
+};
+
+static CharacterProfile ConfiguredScreenshotProfile() => new()
+{
+    CharacterKey = "cid:one",
+    DiscordRepliesEnabled = true,
+    RemoteScreenshotsEnabled = true,
+    DiscordRelayChannelId = "123456789012345678",
+    AuthorizedDiscordUserId = "234567890123456789",
 };
 
 static CharacterIdentity ActiveIdentity() =>
@@ -724,6 +906,23 @@ static void AssertReplyRejected(
         now,
         null,
         out _,
+        out var rejection);
+    Assert(!accepted && rejection == expected, $"expected {expected}, got {rejection}");
+}
+
+static void AssertScreenshotRejected(
+    DiscordChannelMessage source,
+    DateTime now,
+    DateTime? lastAcceptedScreenshotUtc,
+    DiscordReplyRejection expected)
+{
+    var accepted = RemoteScreenshotPolicy.TryAuthorize(
+        ConfiguredScreenshotProfile(),
+        ActiveIdentity(),
+        source,
+        "100000000000000001",
+        now,
+        lastAcceptedScreenshotUtc,
         out var rejection);
     Assert(!accepted && rejection == expected, $"expected {expected}, got {rejection}");
 }

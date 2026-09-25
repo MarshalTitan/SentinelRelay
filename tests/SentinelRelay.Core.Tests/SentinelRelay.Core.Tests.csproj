@@ -12,10 +12,12 @@
     <Compile Include="../../Core/ChannelPolicy.cs" Link="Core/ChannelPolicy.cs" />
     <Compile Include="../../Core/DuplicateMessageFilter.cs" Link="Core/DuplicateMessageFilter.cs" />
     <Compile Include="../../Core/DiscordReplyCommandParser.cs" Link="Core/DiscordReplyCommandParser.cs" />
+    <Compile Include="../../Core/DiscordControlCommandParser.cs" Link="Core/DiscordControlCommandParser.cs" />
     <Compile Include="../../Core/DiscordReplyPolicy.cs" Link="Core/DiscordReplyPolicy.cs" />
     <Compile Include="../../Core/DiscordSnowflake.cs" Link="Core/DiscordSnowflake.cs" />
     <Compile Include="../../Core/KeywordMatcher.cs" Link="Core/KeywordMatcher.cs" />
     <Compile Include="../../Core/MessageSanitizer.cs" Link="Core/MessageSanitizer.cs" />
+    <Compile Include="../../Core/PngEncoder.cs" Link="Core/PngEncoder.cs" />
     <Compile Include="../../Core/RelayFilter.cs" Link="Core/RelayFilter.cs" />
     <Compile Include="../../Core/RewardMessageBatcher.cs" Link="Core/RewardMessageBatcher.cs" />
     <Compile Include="../../Core/RewardMessageClassifier.cs" Link="Core/RewardMessageClassifier.cs" />
@@ -32,5 +34,6 @@
     <Compile Include="../../Models/RelayChatType.cs" Link="Models/RelayChatType.cs" />
     <Compile Include="../../Services/WebhookHttpSender.cs" Link="Services/WebhookHttpSender.cs" />
     <Compile Include="../../Services/DiscordRestMessageClient.cs" Link="Services/DiscordRestMessageClient.cs" />
+    <Compile Include="../../Services/ScreenshotWebhookSender.cs" Link="Services/ScreenshotWebhookSender.cs" />
   </ItemGroup>
 </Project>
