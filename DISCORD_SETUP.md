@@ -87,7 +87,7 @@ Use [LIVE_TEST_CHECKLIST.md](LIVE_TEST_CHECKLIST.md) after updates or configurat
 
 ## 7. Optional Discord replies
 
-The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for Discord → FFXIV chat replies and the experimental `/screenshot` control.
+The direct FFXIV → Discord webhook works without a bot. The steps below are needed only for Discord → FFXIV chat replies and the `/screenshot` control.
 
 This feature does **not** register Discord slash commands. `/fc hi`, `/party hi`, `/screenshot`, and the other supported prefixes are ordinary messages posted in the private text channel. Do not configure BotGhost or another bot to own them for Sentinel Relay.
 
@@ -185,7 +185,7 @@ Configure a second character separately with its own channel ID and authorized u
 
 For `/r`, the active character must have received a Tell during the current plugin session within the previous 30 minutes, and **Allow /r** must be enabled. Sentinel Relay sends only the fixed FFXIV `/reply` operation; Discord cannot provide a Tell target or execute `/tell`, `/logout`, macros, plugins, or other arbitrary commands.
 
-### H. Experimental `/screenshot` control
+### H. `/screenshot` control
 
 This is a Sentinel Relay control, not an FFXIV command and not a registered Discord slash command.
 
