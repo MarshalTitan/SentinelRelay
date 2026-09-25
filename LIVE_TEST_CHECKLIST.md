@@ -240,7 +240,7 @@ Expected API 15 candidate RowIds are `SystemMessage` (57), `SystemError` (58), `
 
 - [ ] PASS
 
-## R — Experimental remote FFXIV screenshot
+## R — Remote FFXIV screenshot
 
 Run this first on one character/profile. Keep the other profile's screenshot toggle off until the first route is proven.
 
