@@ -95,7 +95,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes 'Live Sentinel Relay release with an opt-in experimental authorized /screenshot control that captures only the active FFXIV window into memory and uploads through its character-specific webhook. Includes a 15-second cooldown, replay and route isolation, bounded PNG output, and the existing compact chat/reward relay and allowlisted Discord chat replies. No hosted relay service or companion program is required.'
+            --notes 'Live Sentinel Relay release with an opt-in authorized /screenshot control that captures only the active FFXIV window into memory and uploads through its character-specific webhook. Includes a 15-second cooldown, replay and route isolation, bounded PNG output, and the existing compact chat/reward relay and allowlisted Discord chat replies. No hosted relay service or companion program is required.'
 
       - name: Remove personal wording from superseded release notes
         shell: pwsh
