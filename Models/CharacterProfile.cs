@@ -12,7 +12,7 @@ public sealed class CharacterProfile
     public string ProtectedWebhookUrl { get; set; } = string.Empty;
 
     // Windows-DPAPI protected with separate entropy from the webhook secret.
-    // This is an experimental, opt-in credential used only for Discord REST reads.
+    // This is an opt-in credential used only for Discord REST reads.
     public string ProtectedDiscordBotToken { get; set; } = string.Empty;
 
     public bool DiscordRepliesEnabled { get; set; }
