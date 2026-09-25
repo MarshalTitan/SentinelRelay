@@ -596,7 +596,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
-            lastOutboundError = "FFXIV rejected the experimental chat submission.";
+            lastOutboundError = "FFXIV rejected the authorized chat submission.";
             Log.Warning("Sentinel Relay FFXIV chat submission failed ({ExceptionType}).", ex.GetType().Name);
             ChatGui.PrintError("[Sentinel Relay] Discord reply could not be submitted to FFXIV.");
         }
