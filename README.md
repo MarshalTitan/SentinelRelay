@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The `0.4.0.0` revision adds an opt-in experimental remote **FFXIV-window screenshot** control while preserving the direct webhook relay, fixed chat-reply allowlist, and inbound-only Rewards / Hunt Results feed.
+The `0.4.0.0` release adds an opt-in remote **FFXIV-window screenshot** control while preserving the direct webhook relay, fixed chat-reply allowlist, and inbound-only Rewards / Hunt Results feed.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -119,7 +119,7 @@ Supported ordinary-message prefixes:
 
 Starting, resuming, reconnecting, or switching characters first advances to Discord's newest current message. Commands written while the game/reader was offline are never executed later. The processing checkpoint is persisted before a game send is queued, favoring a dropped command over an accidental replay.
 
-## Experimental remote screenshot
+## Remote screenshot
 
 `/screenshot` is a Sentinel Relay control command, not an FFXIV chat command. In `/srelay` → **Discord Replies**, enable **Allow authorized /screenshot window capture**, keep the master reader enabled, and save. A fresh ordinary Discord message containing exactly `/screenshot` then:
 
@@ -129,7 +129,7 @@ Starting, resuming, reconnecting, or switching characters first advances to Disc
 4. resizes it to at most 1280×720 and encodes an in-memory PNG; and
 5. uploads it through that character's configured webhook as `【SCREENSHOT】 Character Name`.
 
-The command never enters `DiscordReplyCommandParser` or `GameChatSender`, cannot select another process or filesystem path, and cannot capture the desktop. A local FFXIV notice appears whenever a request is accepted. Requests have a 15-second cooldown. Minimized windows are deliberately rejected because Windows does not provide a current capturable window frame in that state; restore the game and try again. Background and borderless/windowed behavior require live verification on each PC and graphics-driver configuration.
+The command never enters `DiscordReplyCommandParser` or `GameChatSender`, cannot select another process or filesystem path, and cannot capture the desktop. A local FFXIV notice appears whenever a request is accepted. Requests have a 15-second cooldown. Minimized windows are deliberately rejected because Windows does not provide a current capturable window frame in that state; restore the game and try again. Background and borderless/windowed behavior can vary with each PC and graphics-driver configuration.
 
 ## Building
 
