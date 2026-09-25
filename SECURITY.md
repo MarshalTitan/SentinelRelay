@@ -36,7 +36,7 @@ Remote screenshots are disabled by default and require the master Discord reader
 - disables HTTP redirects and uses only the active character's validated webhook; and
 - cancels in-flight work on pause, character switch, or shutdown.
 
-The plugin prints an in-game notice when an authorized capture is accepted, so remote capture is not silent. The screenshot can contain anything visible inside the FFXIV render output, including chat, UI, names, plugins, and overlays rendered into the game window. Users should enable this experimental feature only in a private relay channel they trust.
+The plugin prints an in-game notice when an authorized capture is accepted, so remote capture is not silent. The screenshot can contain anything visible inside the FFXIV render output, including chat, UI, names, plugins, and overlays rendered into the game window. Users should enable this opt-in feature only in a private relay channel they trust.
 
 ### Local privacy enforcement
 
