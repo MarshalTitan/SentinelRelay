@@ -226,7 +226,7 @@ public sealed class MainWindow : Window
         }
         if (ImGui.BeginTabItem("Discord Replies"))
         {
-            DrawExperimentalReplies(identity, profile);
+            DrawDiscordReplies(identity, profile);
             ImGui.EndTabItem();
         }
         if (ImGui.BeginTabItem("Debug"))
@@ -287,7 +287,7 @@ public sealed class MainWindow : Window
         ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
     }
 
-    private void DrawExperimentalReplies(CharacterIdentity? identity, CharacterProfile? profile)
+    private void DrawDiscordReplies(CharacterIdentity? identity, CharacterProfile? profile)
     {
         if (profile is null || identity is null)
         {
