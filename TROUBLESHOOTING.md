@@ -50,7 +50,7 @@ Each character requires a separate webhook. Webhook URLs must not be swapped or 
 
 ## Hunt rewards do not appear
 
-1. Open **Chat Filters** and enable **Rewards / Hunt Results** for the active character. It defaults off and is not included by **Enable common chats**.
+1. Open **Chat Filters** and enable **Rewards / Hunt Results** for the active character. It defaults off and must be selected explicitly.
 2. Confirm the webhook is configured and the relay is not paused.
 3. Open **Debug** and enable **Record reward XivChatType / LogKind diagnostics** before the next S-rank.
 4. After rewards appear in FFXIV, inspect the observations for the exact `XivChatType` name/value and nearby raw `LogMessage` IDs.

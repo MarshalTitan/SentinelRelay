@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.5.0.1`
+Live catalog version: `0.5.0.2`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.5.0.1` and verify the active character shown in the header.
+5. Confirm version `0.5.0.2` and verify the active character shown in the header.
 
 ## Appearance and interaction
 
@@ -22,12 +22,12 @@ Test with two independent FFXIV character profiles and two private Discord chann
 2. In **General**, select **Sentinel Modern**.
 3. Confirm there is one header across the top with no internal scrollbar.
 4. Confirm grouped navigation stays in one dedicated left rail, including when the window is narrowed to its minimum size.
-5. Confirm the selected page heading, description, and settings remain together in the right pane and never move below the navigation.
+5. Confirm each right-pane page begins directly with its functional settings, without a repeated page heading, description, or card heading.
 6. Confirm normal scrolling appears only in the navigation or page content when their contents require it.
 7. Confirm the normal Dalamud collapse and close controls still work.
 8. Move and resize the window, close/reopen it, and confirm its position and any larger size persist.
 9. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
-10. Switch back to **Classic**, reload the plugin, and confirm Classic renders normally and the selection persists; then repeat with **Sentinel Modern**.
+10. Use **Use Classic theme** in the Modern left navigation, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
 
 - [ ] PASS
 
