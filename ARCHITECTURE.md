@@ -8,7 +8,7 @@ Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The `0.5.0.0` revision retains the separately optional REST-polling path:
+The `0.5.0.1` revision retains the separately optional REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
@@ -18,9 +18,9 @@ There is still no hosted Sentinel backend, listening port, WebSocket, Discord Ga
 
 ## Configuration UI
 
-Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.2.0 release package. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing schema versions migrate to Classic, unknown values fail back to Classic, and only an explicit selection changes the theme.
+Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.2.1 release package. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing theme selections and all other configuration values persist; unknown values fail back to Classic.
 
-The modern window uses Core's canonical style scope, responsive configuration shell, grouped navigation, cards, switches, status chips, scaling, and procedural ambient background. Relay supplies only its page structure, content, and semantic delivery state. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
+The modern window uses Core's canonical style scope, default configuration shell, grouped navigation, cards, switches, status chips, scaling, layout calculations, and procedural ambient background. Relay supplies only its page structure, content, and semantic delivery state. It does not enable `AllowStackedNavigation`, does not override Core's corrected header height, and enforces a 620×520 logical-pixel minimum window. Navigation therefore remains a dedicated left rail while the page heading, description, and settings remain together in the right pane. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
 
 ## Runtime flow
 
