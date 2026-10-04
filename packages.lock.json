@@ -10,16 +10,16 @@
       },
       "MarshalTitan.SentinelCore": {
         "type": "Transitive",
-        "resolved": "0.2.0",
-        "contentHash": "vtpSMJU3JE9NUwACnPzjGcyTDLER8Pb/yS1psOgKd0hEYysczkW+KAIieLczHBYhAEjJcICaFVjPdslz6545JQ=="
+        "resolved": "0.2.1",
+        "contentHash": "8d3HKchXIVZxGqXiy5eDSIJC/OgRG90D/ImOI0asq0sf0qHORcfGc7jUEZCWmlMgqgs5FBBK/fcsdveo32hrSA=="
       },
       "MarshalTitan.SentinelCore.UI": {
         "type": "Direct",
-        "requested": "[0.2.0, )",
-        "resolved": "0.2.0",
-        "contentHash": "Fc1YUp5/+8y8U52hQeEb2aZShhB99F7XcwDhNsCoEae5Dt9PlM4GEd7uW8TupWM/MvwSchjFJl/twLNu0zryAw==",
+        "requested": "[0.2.1, 0.2.1]",
+        "resolved": "0.2.1",
+        "contentHash": "C5bwSHZ2PotnHMWLm5MhqUNMMvZ+0GI5AmVRnE1TYkN6UdbUbsqN4/Mdywhmmq3198xbZLsAa1KSXY2mqLNR4g==",
         "dependencies": {
-          "MarshalTitan.SentinelCore": "0.2.0"
+          "MarshalTitan.SentinelCore": "0.2.1"
         }
       },
       "DotNet.ReproducibleBuilds": {

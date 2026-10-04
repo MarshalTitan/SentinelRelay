@@ -203,7 +203,7 @@ public sealed class MainWindow : Window, IDisposable
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(590, 440),
+            MinimumSize = new Vector2(620, 520),
             MaximumSize = new Vector2(1100, 900),
         };
     }
