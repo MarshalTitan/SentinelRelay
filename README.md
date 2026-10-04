@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The `0.4.0.0` release adds an opt-in remote **FFXIV-window screenshot** control while preserving the direct webhook relay, fixed chat-reply allowlist, and inbound-only Rewards / Hunt Results feed.
+The `0.5.0.0` release adopts the shared **Sentinel Modern** configuration theme from SentinelCore UI 0.2.0. Classic remains available and is retained for existing users until they explicitly select the modern theme. Relay, reply, reward, and screenshot behavior is unchanged.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -61,7 +61,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.4.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
+Version `0.5.0.0` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -71,6 +71,10 @@ Version `0.4.0.0` is distributed through the live Sentinel catalog. Dalamud down
 6. Open **Discord Webhook**, paste that character's webhook URL, select **Save Webhook**, and then **Test Webhook**.
 7. Open **Chat Filters** and enable only the desired chat types.
 8. Repeat on the other character/client with its own webhook.
+
+## Configuration appearance
+
+Open `/srelay` → **General** and choose either **Classic** or **Sentinel Modern**. Existing configurations migrate explicitly to Classic, so an update never changes the window appearance without the user's selection. The modern presentation comes from the version-pinned `MarshalTitan.SentinelCore.UI` package; Sentinel Relay does not carry a private copy of the palette, shell, cards, switches, status chips, or ambient treatment, and no separate Sentinel Core plugin is installed at runtime.
 
 The successful test message is:
 

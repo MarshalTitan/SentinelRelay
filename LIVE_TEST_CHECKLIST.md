@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.4.0.0`
+Live catalog version: `0.5.0.0`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,19 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.4.0.0` and verify the active character shown in the header.
+5. Confirm version `0.5.0.0` and verify the active character shown in the header.
+
+## Appearance and interaction
+
+1. Run `/srelay` and confirm the updated plugin initially preserves the **Classic** theme.
+2. In **General**, select **Sentinel Modern**.
+3. Confirm the shared Sentinel header, status chip, responsive sidebar, cards, switches, spacing, rounding, and ambient background appear.
+4. Confirm the normal Dalamud collapse and close controls still work.
+5. Move and resize the window, close/reopen it, and confirm its position and size persist.
+6. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
+7. Switch back to **Classic**, reload the plugin, and confirm the selection persists; then repeat with **Sentinel Modern**.
+
+- [ ] PASS
 
 The plugin runs inside each active FFXIV client and sends directly to Discord. There is no separate PC-hosted relay process.
 

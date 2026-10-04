@@ -1,14 +1,27 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using SentinelCore.UI;
 using SentinelRelay.Core;
 using SentinelRelay.Models;
 using SentinelRelay.Services;
 
 namespace SentinelRelay.UI;
 
-public sealed class MainWindow : Window
+public sealed class MainWindow : Window, IDisposable
 {
+    private enum ConfigurationPage
+    {
+        General,
+        ChatFilters,
+        Keywords,
+        DiscordWebhook,
+        DiscordReplies,
+        Debug,
+    }
+
+    private static readonly string[] ConfigurationThemes = ["Classic", "Sentinel Modern"];
     private static readonly RelayChatType[] CommonChannels =
     [
         RelayChatType.Say,
@@ -113,7 +126,13 @@ public sealed class MainWindow : Window
     private readonly Action removeDiscordBotCredential;
     private readonly Func<bool> testDiscordReader;
     private readonly Action<bool> setPaused;
+    private readonly Func<int> getConfigurationTheme;
+    private readonly Action<int> setConfigurationTheme;
     private readonly Action save;
+    private readonly SentinelModernStyleScope modernStyle = new();
+    private readonly SentinelThemeState<ConfigurationPage> themeState;
+    private readonly Action drawModernNavigation;
+    private readonly Action drawModernContent;
     private string webhookInput = string.Empty;
     private string? webhookFeedback;
     private bool webhookFeedbackIsError;
@@ -134,6 +153,9 @@ public sealed class MainWindow : Window
     private readonly HashSet<RelayChatType> outboundChannels = [];
     private string? replyFeedback;
     private bool replyFeedbackIsError;
+    private bool modernThemeActive;
+    private CharacterIdentity? drawingIdentity;
+    private CharacterProfile? drawingProfile;
 
     public MainWindow(
         Func<CharacterIdentity?> getIdentity,
@@ -150,6 +172,8 @@ public sealed class MainWindow : Window
         Func<bool> testDiscordReader,
         RemoteScreenshotService remoteScreenshotService,
         Action<bool> setPaused,
+        Func<int> getConfigurationTheme,
+        Action<int> setConfigurationTheme,
         Action save)
         : base("Sentinel Relay###SentinelRelayMain")
     {
@@ -167,7 +191,16 @@ public sealed class MainWindow : Window
         this.testDiscordReader = testDiscordReader;
         this.remoteScreenshotService = remoteScreenshotService;
         this.setPaused = setPaused;
+        this.getConfigurationTheme = getConfigurationTheme;
+        this.setConfigurationTheme = setConfigurationTheme;
         this.save = save;
+        themeState = new SentinelThemeState<ConfigurationPage>(
+            ConfigurationPage.General,
+            SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme()));
+        drawModernNavigation = DrawModernNavigation;
+        drawModernContent = DrawModernContent;
+        Size = new Vector2(920, 720);
+        SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(590, 440),
@@ -175,10 +208,24 @@ public sealed class MainWindow : Window
         };
     }
 
+    public override void PreDraw()
+    {
+        modernThemeActive = SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme())
+                            == SentinelThemeKind.Modern;
+        if (modernThemeActive)
+            modernStyle.Push(ImGuiHelpers.GlobalScale);
+    }
+
+    public override void PostDraw() => modernStyle.Pop();
+
+    public void Dispose() => modernStyle.Dispose();
+
     public override void Draw()
     {
         var identity = getIdentity();
         var profile = getProfile();
+        drawingIdentity = identity;
+        drawingProfile = profile;
         if (identity?.CharacterKey != lastCharacterKey)
         {
             lastCharacterKey = identity?.CharacterKey;
@@ -199,6 +246,17 @@ public sealed class MainWindow : Window
             keywordChannelsInitialized = false;
         }
 
+        if (modernThemeActive)
+        {
+            DrawModernShell(identity, profile);
+            return;
+        }
+
+        DrawClassicShell(identity, profile);
+    }
+
+    private void DrawClassicShell(CharacterIdentity? identity, CharacterProfile? profile)
+    {
         DrawStatus(identity, profile);
         ImGui.Separator();
 
@@ -237,6 +295,98 @@ public sealed class MainWindow : Window
         ImGui.EndTabBar();
     }
 
+    private void DrawModernShell(CharacterIdentity? identity, CharacterProfile? profile)
+    {
+        themeState.SelectTheme(SentinelThemeKind.Modern);
+        var direction = profile?.DiscordRepliesEnabled == true ? "FFXIV ↔ Discord" : "FFXIV → Discord";
+        var options = new SentinelModernShellOptions(
+            "SentinelRelay",
+            "MARSHALTITAN  /  SENTINEL",
+            "SENTINEL RELAY",
+            "Private, character-specific chat relay and authorized remote controls")
+        {
+            Scale = ImGuiHelpers.GlobalScale,
+            ContextLabel = $"{identity?.CharacterName ?? "No character"} · {direction}",
+            Status = GetModernStatus(profile),
+            AmbientIntensity = 0.82f,
+        };
+
+        SentinelModernConfigurationShell.Draw(options, drawModernNavigation, drawModernContent);
+    }
+
+    private SentinelModernStatus GetModernStatus(CharacterProfile? profile)
+    {
+        if (profile?.Paused == true)
+            return new SentinelModernStatus("PAUSED", SentinelModernStatusTone.Warning);
+        if (relay.State == WebhookRelayState.Error)
+            return new SentinelModernStatus("ERROR", SentinelModernStatusTone.Warning);
+        return getWebhookEndpoint() is not null
+            ? new SentinelModernStatus("READY", SentinelModernStatusTone.Success)
+            : new SentinelModernStatus("NOT CONFIGURED", SentinelModernStatusTone.Accent);
+    }
+
+    private void DrawModernNavigation()
+    {
+        DrawNavigationGroup("RELAY", (ConfigurationPage.General, "General"),
+            (ConfigurationPage.ChatFilters, "Chat Filters"), (ConfigurationPage.Keywords, "Keywords"));
+        ImGui.Spacing();
+        DrawNavigationGroup("DISCORD", (ConfigurationPage.DiscordWebhook, "Webhook"),
+            (ConfigurationPage.DiscordReplies, "Replies & Controls"));
+        ImGui.Spacing();
+        DrawNavigationGroup("TOOLS", (ConfigurationPage.Debug, "Diagnostics"));
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextColored(SentinelModernPalette.Muted, "SENTINEL MODERN");
+        if (ImGui.Button("Use Classic theme", new Vector2(-1f, 0f)))
+            SelectTheme(SentinelThemeKind.Classic);
+    }
+
+    private void DrawNavigationGroup(
+        string label,
+        params (ConfigurationPage Page, string Label)[] pages)
+    {
+        SentinelModernNavigation.GroupLabel(label);
+        foreach (var item in pages)
+        {
+            if (SentinelModernNavigation.Item(
+                    item.Page.ToString(),
+                    item.Label,
+                    themeState.SelectedPage == item.Page,
+                    ImGuiHelpers.GlobalScale))
+                themeState.SelectPage(item.Page);
+        }
+    }
+
+    private void DrawModernContent()
+    {
+        var (title, description) = themeState.SelectedPage switch
+        {
+            ConfigurationPage.General => ("General", "Active character, relay state, and configuration-window appearance."),
+            ConfigurationPage.ChatFilters => ("Chat Filters", "Choose exactly which local FFXIV messages may leave this PC."),
+            ConfigurationPage.Keywords => ("Keywords", "Local channel-scoped matching and explicit Discord highlights."),
+            ConfigurationPage.DiscordWebhook => ("Discord Webhook", "Character-specific destination and compact message formatting."),
+            ConfigurationPage.DiscordReplies => ("Replies & Controls", "Authorized, allowlisted chat replies and FFXIV-window screenshots."),
+            _ => ("Diagnostics", "Live delivery state and privacy-safe reward type observations."),
+        };
+
+        SentinelModernUi.PageHeading(title, description);
+        ImGui.Spacing();
+        using var card = SentinelModernCard.Begin($"{themeState.SelectedPage}Card");
+        if (!card.IsVisible)
+            return;
+
+        SentinelModernUi.SectionHeader(title.ToUpperInvariant());
+        switch (themeState.SelectedPage)
+        {
+            case ConfigurationPage.General: DrawGeneral(drawingIdentity, drawingProfile); break;
+            case ConfigurationPage.ChatFilters: DrawFilters(drawingProfile); break;
+            case ConfigurationPage.Keywords: DrawKeywords(drawingIdentity, drawingProfile); break;
+            case ConfigurationPage.DiscordWebhook: DrawWebhook(drawingIdentity, drawingProfile); break;
+            case ConfigurationPage.DiscordReplies: DrawDiscordReplies(drawingIdentity, drawingProfile); break;
+            case ConfigurationPage.Debug: DrawDebug(drawingIdentity, drawingProfile); break;
+        }
+    }
+
     private void DrawStatus(CharacterIdentity? identity, CharacterProfile? profile)
     {
         var configured = getWebhookEndpoint() is not null;
@@ -258,6 +408,8 @@ public sealed class MainWindow : Window
 
     private void DrawGeneral(CharacterIdentity? identity, CharacterProfile? profile)
     {
+        DrawThemeSelector();
+        ImGui.Spacing();
         ImGui.TextUnformatted($"Character: {identity?.CharacterName ?? "Not logged in"}");
         ImGui.TextUnformatted($"Home world: {identity?.HomeWorld ?? "—"}");
         ImGui.TextUnformatted($"Discord webhook: {WebhookEndpoint.Mask(getWebhookEndpoint())}");
@@ -287,6 +439,22 @@ public sealed class MainWindow : Window
         ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
     }
 
+    private void DrawThemeSelector()
+    {
+        var selectedTheme = (int)SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme());
+        ImGui.SetNextItemWidth(220f * ImGuiHelpers.GlobalScale);
+        if (ImGui.Combo("Configuration theme", ref selectedTheme, ConfigurationThemes, ConfigurationThemes.Length))
+            SelectTheme((SentinelThemeKind)selectedTheme);
+        ImGui.TextDisabled("Existing configurations remain on Classic until Sentinel Modern is selected.");
+    }
+
+    private void SelectTheme(SentinelThemeKind theme)
+    {
+        if (!themeState.SelectTheme(theme))
+            return;
+        setConfigurationTheme((int)theme);
+    }
+
     private void DrawDiscordReplies(CharacterIdentity? identity, CharacterProfile? profile)
     {
         if (profile is null || identity is null)
@@ -300,8 +468,8 @@ public sealed class MainWindow : Window
         ImGui.TextWrapped("The bot token is a powerful secret. Use a dedicated bot with only View Channel and Read Message History access to the single relay channel. It is masked here and protected locally with Windows DPAPI.");
         ImGui.Spacing();
 
-        ImGui.Checkbox("Enable Discord → FFXIV Replies", ref repliesEnabled);
-        ImGui.Checkbox("Allow authorized /screenshot window capture", ref remoteScreenshotsEnabled);
+        DrawBooleanControl("discord-replies-enabled", "Enable Discord → FFXIV Replies", ref repliesEnabled);
+        DrawBooleanControl("remote-screenshots-enabled", "Allow authorized /screenshot window capture", ref remoteScreenshotsEnabled);
         ImGui.TextDisabled("Captures only this FFXIV process's client area into memory, then uploads a bounded PNG through this character's webhook.");
         ImGui.TextDisabled("The game must not be minimized. A 15-second cooldown applies, and every accepted request prints an in-game notice.");
         ImGui.Spacing();
@@ -309,7 +477,7 @@ public sealed class MainWindow : Window
         ImGui.TextDisabled("These permissions are separate from Chat Filters. Monitoring a channel never automatically permits sending to it.");
         DrawReplyChannelGroup("Common chats", CommonReplyChannels, defaultOpen: true);
         DrawReplyChannelGroup("Group chats", GroupReplyChannels, defaultOpen: true);
-        if (ImGui.CollapsingHeader("Tell reply", ImGuiTreeNodeFlags.DefaultOpen))
+        if (OpenSection("Tell reply", ImGuiTreeNodeFlags.DefaultOpen))
         {
             DrawReplyChannelToggle(RelayChatType.IncomingTell, "/r", "Reply to the latest incoming Tell");
             ImGui.TextDisabled("/r is accepted only for 30 minutes after this character receives a Tell during the current session.");
@@ -398,7 +566,7 @@ public sealed class MainWindow : Window
         bool defaultOpen)
     {
         var flags = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
-        if (!ImGui.CollapsingHeader(title, flags))
+        if (!OpenSection(title, flags))
             return;
         var columns = channels.Count > 8 ? 2 : 1;
         if (!ImGui.BeginTable($"reply-channels-{title}", columns))
@@ -414,7 +582,7 @@ public sealed class MainWindow : Window
     private void DrawReplyChannelToggle(RelayChatType channel, string command, string label)
     {
         var enabled = outboundChannels.Contains(channel);
-        if (!ImGui.Checkbox($"Allow {command} ({label})", ref enabled))
+        if (!DrawBooleanControl($"outbound-{channel}", $"Allow {command} ({label})", ref enabled))
             return;
         if (enabled)
             outboundChannels.Add(channel);
@@ -459,7 +627,7 @@ public sealed class MainWindow : Window
         bool defaultOpen)
     {
         var flags = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
-        if (!ImGui.CollapsingHeader(title, flags))
+        if (!OpenSection(title, flags))
             return;
         var columns = channels.Count > 8 ? 2 : 1;
         if (!ImGui.BeginTable($"channels-{title}", columns))
@@ -468,7 +636,7 @@ public sealed class MainWindow : Window
         {
             ImGui.TableNextColumn();
             var enabled = profile.EnabledInboundChannels.Contains(channel);
-            if (!ImGui.Checkbox(ChannelPolicy.GetLabel(channel), ref enabled))
+            if (!DrawBooleanControl($"inbound-{channel}", ChannelPolicy.GetLabel(channel), ref enabled))
                 continue;
             if (enabled)
                 profile.EnabledInboundChannels.Add(channel);
@@ -539,13 +707,13 @@ public sealed class MainWindow : Window
         ImGui.Separator();
         ImGui.TextUnformatted("Message formatting");
         var includeWorld = profile.IncludeSenderWorld;
-        if (ImGui.Checkbox("Include sender world when available", ref includeWorld))
+        if (DrawBooleanControl("include-sender-world", "Include sender world when available", ref includeWorld))
         {
             profile.IncludeSenderWorld = includeWorld;
             save();
         }
         var embeds = profile.UseDiscordEmbeds;
-        if (ImGui.Checkbox("Use compact Discord embeds", ref embeds))
+        if (DrawBooleanControl("compact-discord-embeds", "Use compact Discord embeds", ref embeds))
         {
             profile.UseDiscordEmbeds = embeds;
             save();
@@ -607,7 +775,7 @@ public sealed class MainWindow : Window
             newKeywordChannels.UnionWith(profile.EnabledInboundChannels);
             keywordChannelsInitialized = true;
         }
-        if (ImGui.CollapsingHeader("Channels for new keyword", ImGuiTreeNodeFlags.DefaultOpen))
+        if (OpenSection("Channels for new keyword", ImGuiTreeNodeFlags.DefaultOpen))
         {
             if (ImGui.BeginTable("keyword-channels", 2))
             {
@@ -615,7 +783,7 @@ public sealed class MainWindow : Window
                 {
                     ImGui.TableNextColumn();
                     var selected = newKeywordChannels.Contains(channel);
-                    if (!ImGui.Checkbox($"{ChannelPolicy.GetLabel(channel)}##keyword-{channel}", ref selected))
+                    if (!DrawBooleanControl($"keyword-{channel}", ChannelPolicy.GetLabel(channel), ref selected))
                         continue;
                     if (selected)
                         newKeywordChannels.Add(channel);
@@ -698,7 +866,10 @@ public sealed class MainWindow : Window
         }
 
         var captureRewardDiagnostics = profile.CaptureRewardDiagnostics;
-        if (ImGui.Checkbox("Record reward XivChatType / LogKind diagnostics", ref captureRewardDiagnostics))
+        if (DrawBooleanControl(
+                "reward-diagnostics",
+                "Record reward XivChatType / LogKind diagnostics",
+                ref captureRewardDiagnostics))
         {
             profile.CaptureRewardDiagnostics = captureRewardDiagnostics;
             if (!captureRewardDiagnostics)
@@ -724,6 +895,16 @@ public sealed class MainWindow : Window
             ImGui.Spacing();
         }
     }
+
+    private bool DrawBooleanControl(string id, string label, ref bool value)
+        => modernThemeActive
+            ? SentinelModernControls.Toggle(id, label, ref value, ImGuiHelpers.GlobalScale)
+            : ImGui.Checkbox($"{label}##{id}", ref value);
+
+    private bool OpenSection(string title, ImGuiTreeNodeFlags flags)
+        => modernThemeActive
+            ? SentinelModernControls.CollapsingSection(title, flags)
+            : ImGui.CollapsingHeader(title, flags);
 
     private static string FormatTimestamp(DateTime? value) => value?.ToLocalTime().ToString("G") ?? "never";
 }

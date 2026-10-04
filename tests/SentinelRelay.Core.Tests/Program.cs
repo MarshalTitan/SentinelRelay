@@ -17,6 +17,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("pause blocks forwarding and resume restores it", Sync(PauseResumeWorks)),
     ("character profiles keep independent webhook routes", Sync(CharacterProfilesAreIsolated)),
     ("configuration selects the correct character profile", Sync(ConfigurationSelectsCharacterProfile)),
+    ("legacy configuration migrates explicitly to Classic", Sync(LegacyThemeMigrationIsSafe)),
+    ("invalid configuration theme normalizes to Classic", Sync(InvalidThemeNormalizesSafely)),
     ("chat labels distinguish tell and cross-world party", Sync(ChatLabelsAreExplicit)),
     ("SeString plain text sanitation removes control data", Sync(SanitizerRemovesControlData)),
     ("Discord mention sanitation neutralizes mentions", Sync(MentionSanitizationWorks)),
@@ -196,6 +198,28 @@ static void ConfigurationSelectsCharacterProfile()
     Assert(selectedFirst.ProtectedWebhookUrl == "protected-one", "first webhook route changed");
     Assert(selectedSecond.ProtectedWebhookUrl == "protected-two", "second webhook route changed");
     Assert(!selectedSecond.EnabledInboundChannels.Contains(RelayChatType.FreeCompany), "first filter leaked to second profile");
+}
+
+static void LegacyThemeMigrationIsSafe()
+{
+    var configuration = new Configuration
+    {
+        Version = 4,
+        ConfigurationTheme = Configuration.SentinelModernTheme,
+    };
+
+    Assert(configuration.NormalizeAndMigrate(), "legacy configuration was not migrated");
+    Assert(configuration.Version == Configuration.CurrentVersion, "schema version was not advanced");
+    Assert(configuration.ConfigurationTheme == Configuration.ClassicTheme,
+        "existing user was switched to Sentinel Modern without opting in");
+}
+
+static void InvalidThemeNormalizesSafely()
+{
+    var configuration = new Configuration { ConfigurationTheme = 99 };
+    Assert(configuration.NormalizeAndMigrate(), "invalid theme was not repaired");
+    Assert(configuration.ConfigurationTheme == Configuration.ClassicTheme,
+        "invalid theme did not fall back to Classic");
 }
 
 static void ChatLabelsAreExplicit()
@@ -812,6 +836,7 @@ static async Task ScreenshotUploadRateLimitIsRetried()
 static void ConfigurationModelPersists()
 {
     var original = new Configuration();
+    original.ConfigurationTheme = Configuration.SentinelModernTheme;
     var first = original.GetOrCreateProfile("cid:ABC", "First Character", "Example World");
     first.ProtectedWebhookUrl = "dpapi-ciphertext-one";
     first.IncludeSenderWorld = false;
@@ -843,6 +868,8 @@ static void ConfigurationModelPersists()
         ?? throw new InvalidOperationException("deserialization failed");
     var restoredFirst = restored.CharacterProfiles["cid:ABC"];
     var restoredSecond = restored.CharacterProfiles["cid:DEF"];
+    Assert(restored.Version == Configuration.CurrentVersion, "configuration schema version was lost");
+    Assert(restored.ConfigurationTheme == Configuration.SentinelModernTheme, "configuration theme was lost");
     Assert(restoredFirst.ProtectedWebhookUrl == first.ProtectedWebhookUrl, "first protected webhook was lost");
     Assert(restoredSecond.ProtectedWebhookUrl == second.ProtectedWebhookUrl, "second protected webhook was lost");
     Assert(restoredFirst.EnabledInboundChannels.SetEquals(first.EnabledInboundChannels), "first filters were lost");
