@@ -18,6 +18,8 @@ try {
     $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     $required = @(
         'SentinelRelay.dll',
+        'SentinelCore.dll',
+        'SentinelCore.UI.dll',
         'SentinelRelay.json',
         'SentinelRelay.deps.json',
         'assets/icon.png'

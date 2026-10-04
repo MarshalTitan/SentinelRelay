@@ -8,6 +8,20 @@
         "resolved": "15.0.0",
         "contentHash": "411vwC8/X8Z/sQ2TI6v3SvOn66xFPeOjFn3Zn+h0d3Ox2t1kFm66AhDvmx/qcMwVrR+Hidxj0dadpQ2dgyXMBQ=="
       },
+      "MarshalTitan.SentinelCore": {
+        "type": "Transitive",
+        "resolved": "0.2.0",
+        "contentHash": "vtpSMJU3JE9NUwACnPzjGcyTDLER8Pb/yS1psOgKd0hEYysczkW+KAIieLczHBYhAEjJcICaFVjPdslz6545JQ=="
+      },
+      "MarshalTitan.SentinelCore.UI": {
+        "type": "Direct",
+        "requested": "[0.2.0, )",
+        "resolved": "0.2.0",
+        "contentHash": "Fc1YUp5/+8y8U52hQeEb2aZShhB99F7XcwDhNsCoEae5Dt9PlM4GEd7uW8TupWM/MvwSchjFJl/twLNu0zryAw==",
+        "dependencies": {
+          "MarshalTitan.SentinelCore": "0.2.0"
+        }
+      },
       "DotNet.ReproducibleBuilds": {
         "type": "Direct",
         "requested": "[1.2.39, )",

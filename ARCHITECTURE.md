@@ -8,13 +8,19 @@ Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The `0.4.0.0` revision includes a separately optional REST-polling path:
+The `0.5.0.0` revision retains the separately optional REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
 ```
 
 There is still no hosted Sentinel backend, listening port, WebSocket, Discord Gateway client, or arbitrary command executor. The webhook sender and reply reader are independent.
+
+## Configuration UI
+
+Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.2.0 release package. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing schema versions migrate to Classic, unknown values fail back to Classic, and only an explicit selection changes the theme.
+
+The modern window uses Core's canonical style scope, responsive configuration shell, grouped navigation, cards, switches, status chips, scaling, and procedural ambient background. Relay supplies only its page structure, content, and semantic delivery state. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
 
 ## Runtime flow
 

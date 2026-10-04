@@ -63,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        var configurationMigrated = Configuration.NormalizeAndMigrate();
         characterContext = new CharacterContextService(PlayerState);
         webhookRelay = new WebhookRelayClient(Log);
         webhookRelay.DeliveryCompleted += result => mainThreadActions.Enqueue(() => OnDeliveryCompleted(result));
@@ -94,6 +95,8 @@ public sealed class Plugin : IDalamudPlugin
             TestDiscordReader,
             remoteScreenshotService,
             SetPaused,
+            () => Configuration.ConfigurationTheme,
+            SetConfigurationTheme,
             SaveConfiguration);
 
         windows.AddWindow(mainWindow);
@@ -106,6 +109,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += OpenMainWindow;
         Framework.Update += OnFrameworkUpdate;
         RefreshCharacter(force: true);
+        if (configurationMigrated)
+            SaveConfiguration();
         Log.Information("Sentinel Relay {Version} loaded in direct Discord webhook mode.", PluginVersion);
     }
 
@@ -125,11 +130,20 @@ public sealed class Plugin : IDalamudPlugin
         webhookRelay.Dispose();
         discordReplyReader.Dispose();
         remoteScreenshotService.Dispose();
+        mainWindow.Dispose();
         outboundQueue.Clear();
         windows.RemoveAllWindows();
     }
 
     public void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
+
+    private void SetConfigurationTheme(int theme)
+    {
+        Configuration.ConfigurationTheme = theme is Configuration.SentinelModernTheme
+            ? Configuration.SentinelModernTheme
+            : Configuration.ClassicTheme;
+        SaveConfiguration();
+    }
 
     private void OnFrameworkUpdate(IFramework _)
     {
