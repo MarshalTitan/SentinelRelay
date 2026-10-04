@@ -95,7 +95,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes 'Live Sentinel Relay layout correction pinned exactly to SentinelCore UI 0.2.1. Sentinel Modern now keeps grouped navigation in a dedicated left rail, uses Core’s non-scrolling 84-pixel header, and keeps page headings and settings together in the right pane. Classic and all existing configuration, relay, reply, reward, keyword, and screenshot behavior are preserved.'
+            --notes "Live Sentinel Relay layout correction pinned exactly to SentinelCore UI 0.2.1. Sentinel Modern now keeps grouped navigation in a dedicated left rail, uses the non-scrolling 84-pixel Core header, and keeps page headings and settings together in the right pane. Classic and all existing configuration, relay, reply, reward, keyword, and screenshot behavior are preserved."
 
       - name: Remove personal wording from superseded release notes
         shell: pwsh
