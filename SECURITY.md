@@ -42,7 +42,7 @@ The plugin prints an in-game notice when an authorized capture is accepted, so r
 
 Every chat filter defaults off. The plugin tests the active character's filter before formatting, queueing, or making an HTTP request. Disabled chat does not leave the FFXIV process.
 
-Tell, Party, Cross-world Party, Alliance, linkshell, CWLS, PvP Team, and Novice Network filters require deliberate individual selection. **Enable common chats** does not enable these sensitive channels.
+Tell, Party, Cross-world Party, Alliance, linkshell, CWLS, PvP Team, and Novice Network filters require deliberate individual selection. Sentinel Relay provides no bulk-enable control for these sensitive channels.
 
 ### Webhook credential protection
 

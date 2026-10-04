@@ -22,14 +22,6 @@ public sealed class MainWindow : Window, IDisposable
     }
 
     private static readonly string[] ConfigurationThemes = ["Classic", "Sentinel Modern"];
-    private static readonly RelayChatType[] CommonChannels =
-    [
-        RelayChatType.Say,
-        RelayChatType.Yell,
-        RelayChatType.Shout,
-        RelayChatType.FreeCompany,
-    ];
-
     private static readonly RelayChatType[] PublicChannels =
     [
         RelayChatType.Say,
@@ -359,23 +351,10 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawModernContent()
     {
-        var (title, description) = themeState.SelectedPage switch
-        {
-            ConfigurationPage.General => ("General", "Active character, relay state, and configuration-window appearance."),
-            ConfigurationPage.ChatFilters => ("Chat Filters", "Choose exactly which local FFXIV messages may leave this PC."),
-            ConfigurationPage.Keywords => ("Keywords", "Local channel-scoped matching and explicit Discord highlights."),
-            ConfigurationPage.DiscordWebhook => ("Discord Webhook", "Character-specific destination and compact message formatting."),
-            ConfigurationPage.DiscordReplies => ("Replies & Controls", "Authorized, allowlisted chat replies and FFXIV-window screenshots."),
-            _ => ("Diagnostics", "Live delivery state and privacy-safe reward type observations."),
-        };
-
-        SentinelModernUi.PageHeading(title, description);
-        ImGui.Spacing();
         using var card = SentinelModernCard.Begin($"{themeState.SelectedPage}Card");
         if (!card.IsVisible)
             return;
 
-        SentinelModernUi.SectionHeader(title.ToUpperInvariant());
         switch (themeState.SelectedPage)
         {
             case ConfigurationPage.General: DrawGeneral(drawingIdentity, drawingProfile); break;
@@ -408,8 +387,12 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawGeneral(CharacterIdentity? identity, CharacterProfile? profile)
     {
-        DrawThemeSelector();
-        ImGui.Spacing();
+        if (!modernThemeActive)
+        {
+            DrawThemeSelector();
+            ImGui.Spacing();
+        }
+
         ImGui.TextUnformatted($"Character: {identity?.CharacterName ?? "Not logged in"}");
         ImGui.TextUnformatted($"Home world: {identity?.HomeWorld ?? "—"}");
         ImGui.TextUnformatted($"Discord webhook: {WebhookEndpoint.Mask(getWebhookEndpoint())}");
@@ -462,11 +445,6 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TextUnformatted("Log into a character to configure Discord replies.");
             return;
         }
-
-        ImGui.TextWrapped("This optional reader checks one private Discord channel and submits only explicitly allowed chat destinations. It does not use a hosted Sentinel service, Discord Gateway connection, or arbitrary FFXIV command execution.");
-        ImGui.Spacing();
-        ImGui.TextWrapped("The bot token is a powerful secret. Use a dedicated bot with only View Channel and Read Message History access to the single relay channel. It is masked here and protected locally with Windows DPAPI.");
-        ImGui.Spacing();
 
         DrawBooleanControl("discord-replies-enabled", "Enable Discord → FFXIV Replies", ref repliesEnabled);
         DrawBooleanControl("remote-screenshots-enabled", "Allow authorized /screenshot window capture", ref remoteScreenshotsEnabled);
@@ -598,21 +576,6 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
 
-        ImGui.TextWrapped("Privacy warning: enabling a channel sends its sender and message directly from this PC to Discord. Disabled channels are filtered locally and never sent.");
-        ImGui.Spacing();
-        if (ImGui.Button("Enable common chats"))
-        {
-            profile.EnabledInboundChannels.UnionWith(CommonChannels);
-            save();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Disable all"))
-        {
-            profile.EnabledInboundChannels.Clear();
-            save();
-        }
-        ImGui.TextDisabled("Bulk enable never includes Party, Cross-world Party, Tells, linkshells, Alliance, PvP Team, or Novice Network.");
-        ImGui.Spacing();
         DrawChannelGroup("Common and public chats", PublicChannels, profile, defaultOpen: true);
         DrawChannelGroup("Private or group chats", PrivateChannels, profile, defaultOpen: true);
         DrawChannelGroup("System messages (inbound only)", SystemInboundChannels, profile, defaultOpen: true);
@@ -656,8 +619,6 @@ public sealed class MainWindow : Window, IDisposable
         }
 
         var endpoint = getWebhookEndpoint();
-        ImGui.TextWrapped("Paste the webhook created in this character's private Discord relay channel. The URL is a secret: it is masked here and protected in the local Dalamud configuration with Windows DPAPI.");
-        ImGui.Spacing();
         ImGui.TextUnformatted($"Status: {WebhookEndpoint.Mask(endpoint)}");
         ImGui.TextUnformatted(profile.LastWebhookSuccessUtc is null
             ? "Verification: not yet confirmed by Discord"
@@ -729,8 +690,6 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
 
-        ImGui.TextWrapped("Keyword matching happens locally and only in enabled channels. A match is highlighted in the relay channel. Sentinel Relay can optionally ping one explicitly configured Discord user, but webhooks cannot send DMs.");
-        ImGui.Spacing();
         ImGui.SetNextItemWidth(260);
         ImGui.InputText("Discord User ID", ref mentionUserId, 24);
         ImGui.SameLine();
