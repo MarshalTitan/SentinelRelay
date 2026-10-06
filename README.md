@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The `0.5.0.3` release adopts the shared **Sentinel Modern 2** application shell from SentinelCore UI 0.3.1. Modern uses one compact custom header, a slim icon rail, a unified full-bleed surface, responsive settings rows, stronger motion-aware ambience, and no repeated page headings or introductory blocks. Classic remains available and every relay, reply, reward, and screenshot behavior is unchanged.
+The `0.5.0.4` release uses the shared **Sentinel Modern 2** application shell from SentinelCore UI 0.3.1. Modern uses one compact custom header, a slim icon rail, a unified full-bleed surface, responsive settings rows, stronger motion-aware ambience, and no repeated page headings or introductory blocks. Its minimize control now retains the themed Sentinel header, matching S Rank Sentinel, instead of falling back to an unthemed native title bar. Classic remains available and every relay, reply, reward, and screenshot behavior is unchanged.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -61,7 +61,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.5.0.3` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
+Version `0.5.0.4` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.

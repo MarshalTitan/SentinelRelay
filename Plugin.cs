@@ -98,6 +98,7 @@ public sealed class Plugin : IDalamudPlugin
             SetPaused,
             () => Configuration.ConfigurationTheme,
             SetConfigurationTheme,
+            Configuration,
             SaveConfiguration);
 
         windows.AddWindow(mainWindow);

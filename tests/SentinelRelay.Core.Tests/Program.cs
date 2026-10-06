@@ -843,6 +843,9 @@ static void ConfigurationModelPersists()
 {
     var original = new Configuration();
     original.ConfigurationTheme = Configuration.SentinelModernTheme;
+    original.ModernWindowCollapsed = true;
+    original.ModernExpandedWidth = 920f;
+    original.ModernExpandedHeight = 720f;
     var first = original.GetOrCreateProfile("cid:ABC", "First Character", "Example World");
     first.ProtectedWebhookUrl = "dpapi-ciphertext-one";
     first.IncludeSenderWorld = false;
@@ -876,6 +879,9 @@ static void ConfigurationModelPersists()
     var restoredSecond = restored.CharacterProfiles["cid:DEF"];
     Assert(restored.Version == Configuration.CurrentVersion, "configuration schema version was lost");
     Assert(restored.ConfigurationTheme == Configuration.SentinelModernTheme, "configuration theme was lost");
+    Assert(restored.ModernWindowCollapsed, "Modern minimized state was lost");
+    Assert(restored.ModernExpandedWidth == 920f && restored.ModernExpandedHeight == 720f,
+        "Modern expanded window size was lost");
     Assert(restoredFirst.ProtectedWebhookUrl == first.ProtectedWebhookUrl, "first protected webhook was lost");
     Assert(restoredSecond.ProtectedWebhookUrl == second.ProtectedWebhookUrl, "second protected webhook was lost");
     Assert(restoredFirst.EnabledInboundChannels.SetEquals(first.EnabledInboundChannels), "first filters were lost");
