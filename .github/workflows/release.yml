@@ -35,6 +35,10 @@ jobs:
           Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
 
+      - name: Validate pinned Sentinel Core packages
+        shell: pwsh
+        run: ./.github/scripts/Validate-SentinelCore.ps1
+
       - name: Validate version and immutable release state
         id: version
         shell: pwsh
@@ -95,7 +99,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Live Sentinel Relay UI cleanup pinned exactly to SentinelCore UI 0.2.1. Sentinel Modern keeps its left navigation and shared Core styling while each right-pane page now begins directly with its functional settings. Repeated page headings, introductory copy, and the Chat Filters bulk controls were removed. Classic and all existing relay, reply, reward, keyword, and screenshot behavior are preserved."
+            --notes "Live Sentinel Relay Modern 2 migration pinned exactly to SentinelCore UI 0.3.1 from Core v0.3.1.0. Modern now uses the shared compact custom header, unified full-bleed surface, slim icon rail, real icons, status pills, glass cards, responsive settings rows, animated switches, stronger ambient treatment, and reduced-motion support. Classic and all existing relay, reply, reward, keyword, authorization, rate-limit, loop-protection, and screenshot behavior are preserved."
 
       - name: Remove personal wording from superseded release notes
         shell: pwsh

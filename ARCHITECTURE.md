@@ -8,7 +8,7 @@ Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
 ```
 
-The `0.5.0.2` revision retains the separately optional REST-polling path:
+The `0.5.0.3` revision retains the separately optional REST-polling path:
 
 ```text
 one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
@@ -18,9 +18,9 @@ There is still no hosted Sentinel backend, listening port, WebSocket, Discord Ga
 
 ## Configuration UI
 
-Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.2.1 release package. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing theme selections and all other configuration values persist; unknown values fail back to Classic.
+Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.3.1 release package from Core tag `v0.3.1.0` and commit `300703b360a58fb4b73bf7675d31fe8cab4614cd`. The vendored UI package SHA-256 is `e1a9ce4e1ce36042c0fcd53f4c23874d918640be10eef16c21f1cd436c6ba747`, enforced before every build and release. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing theme selections and all other configuration values persist; unknown values fail back to Classic.
 
-The modern window uses Core's canonical style scope, default configuration shell, grouped navigation, cards, switches, status chips, scaling, layout calculations, and procedural ambient background. Relay supplies only its page structure, functional content, and semantic delivery state. It does not enable `AllowStackedNavigation`, does not override Core's corrected header height, and enforces a 620×520 logical-pixel minimum window. Navigation therefore remains a dedicated left rail while the right pane begins directly with the selected page's settings. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
+The modern window uses Core's canonical custom-header policy, full-bleed style scope, unified application shell, retained Font Awesome icon callbacks, glass cards, status pills, animated switches, responsive settings rows, non-stacking layout, and procedural ambient background. Relay supplies only its page structure, functional content, and semantic delivery states. The icon rail flows directly into the selected content page; Relay has no unnecessary secondary sidebar or navigation inside the content. Reduced motion comes from Dalamud every frame. The window retains a 620×520 logical-pixel minimum, saved position, and saved larger size. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
 
 ## Runtime flow
 

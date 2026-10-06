@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.5.0.2</Version>
+    <Version>0.5.0.3</Version>
     <Author>MTitan</Author>
     <Name>Sentinel Relay</Name>
     <Punchline>Private per-character FFXIV and Discord chat relay.</Punchline>
@@ -14,7 +14,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="MarshalTitan.SentinelCore.UI" Version="[0.2.1]" />
+    <PackageReference Include="MarshalTitan.SentinelCore.UI" Version="[0.3.1]" />
     <Compile Remove="tests/**/*.cs" />
     <None Include="assets/icon.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

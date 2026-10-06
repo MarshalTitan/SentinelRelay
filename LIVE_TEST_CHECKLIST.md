@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.5.0.2`
+Live catalog version: `0.5.0.3`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,20 +14,22 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.5.0.2` and verify the active character shown in the header.
+5. Confirm version `0.5.0.3` and verify the active character shown in the header.
 
 ## Appearance and interaction
 
 1. Run `/srelay` and confirm the updated plugin initially preserves the **Classic** theme.
 2. In **General**, select **Sentinel Modern**.
-3. Confirm there is one header across the top with no internal scrollbar.
-4. Confirm grouped navigation stays in one dedicated left rail, including when the window is narrowed to its minimum size.
+3. Confirm Modern shows one compact custom header and no native duplicate title bar or header scrollbar.
+4. Confirm the slim icon rail stays on the far left and never stacks above the content, including at minimum width.
 5. Confirm each right-pane page begins directly with its functional settings, without a repeated page heading, description, or card heading.
-6. Confirm normal scrolling appears only in the navigation or page content when their contents require it.
-7. Confirm the normal Dalamud collapse and close controls still work.
+6. Confirm long labels and input rows wrap or stack cleanly at 100%, 125%, and 150% UI scale.
+7. Confirm the custom collapse and close controls work and `/srelay` reopens a collapsed window.
 8. Move and resize the window, close/reopen it, and confirm its position and any larger size persist.
 9. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
-10. Use **Use Classic theme** in the Modern left navigation, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
+10. Enable Dalamud reduced motion and confirm page/rail transitions become immediate while the ambient circles stop drifting.
+11. Confirm the header pill represents disconnected, webhook-only, linked-reader, paused/warning, and error states without exposing secrets.
+12. Use the Palette icon's **Switch to Classic** action, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
 
 - [ ] PASS
 

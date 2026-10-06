@@ -84,6 +84,7 @@ public sealed class Plugin : IDalamudPlugin
             () => activeIdentity,
             () => activeProfile,
             () => activeWebhookEndpoint,
+            PluginInterface,
             webhookRelay,
             chatCapture,
             SaveWebhook,
@@ -659,7 +660,7 @@ public sealed class Plugin : IDalamudPlugin
         switch (option)
         {
             case "":
-                mainWindow.IsOpen = !mainWindow.IsOpen;
+                mainWindow.ToggleFromCommand();
                 break;
             case "status":
                 PrintStatus();
@@ -728,5 +729,5 @@ public sealed class Plugin : IDalamudPlugin
         value is { Length: >= 30 }
         && !value.Any(char.IsWhiteSpace);
 
-    private void OpenMainWindow() => mainWindow.IsOpen = true;
+    private void OpenMainWindow() => mainWindow.OpenAndExpand();
 }
