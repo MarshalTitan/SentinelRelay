@@ -19,6 +19,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("configuration selects the correct character profile", Sync(ConfigurationSelectsCharacterProfile)),
     ("legacy configuration migrates explicitly to Classic", Sync(LegacyThemeMigrationIsSafe)),
     ("invalid configuration theme normalizes to Classic", Sync(InvalidThemeNormalizesSafely)),
+    ("Modern status identifies disconnected state", Sync(ModernStatusIdentifiesDisconnected)),
+    ("Modern status identifies webhook-only state", Sync(ModernStatusIdentifiesWebhookOnly)),
+    ("Modern status identifies linked bot state", Sync(ModernStatusIdentifiesLinkedBot)),
+    ("Modern status identifies paused warning state", Sync(ModernStatusIdentifiesPausedWarning)),
+    ("Modern status identifies reader warning state", Sync(ModernStatusIdentifiesReaderWarning)),
+    ("Modern status errors override active connections", Sync(ModernStatusErrorsOverrideConnections)),
     ("chat labels distinguish tell and cross-world party", Sync(ChatLabelsAreExplicit)),
     ("SeString plain text sanitation removes control data", Sync(SanitizerRemovesControlData)),
     ("Discord mention sanitation neutralizes mentions", Sync(MentionSanitizationWorks)),
@@ -894,6 +900,80 @@ static CharacterProfile ConfiguredReplyProfile() => new()
     AuthorizedDiscordUserId = "234567890123456789",
     EnabledOutboundChannels = [RelayChatType.FreeCompany],
 };
+
+static void ModernStatusIdentifiesDisconnected()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(hasCharacter: false));
+    Assert(status == ModernRelayStatusKind.Disconnected, $"unexpected status: {status}");
+}
+
+static void ModernStatusIdentifiesWebhookOnly()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(hasWebhook: true));
+    Assert(status == ModernRelayStatusKind.WebhookReady, $"unexpected status: {status}");
+}
+
+static void ModernStatusIdentifiesLinkedBot()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(
+        hasWebhook: true,
+        repliesEnabled: true,
+        readerConnected: true));
+    Assert(status == ModernRelayStatusKind.Linked, $"unexpected status: {status}");
+}
+
+static void ModernStatusIdentifiesPausedWarning()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(
+        paused: true,
+        hasWebhook: true,
+        repliesEnabled: true,
+        readerConnected: true));
+    Assert(status == ModernRelayStatusKind.Paused, $"unexpected status: {status}");
+}
+
+static void ModernStatusIdentifiesReaderWarning()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(
+        hasWebhook: true,
+        repliesEnabled: true));
+    Assert(status == ModernRelayStatusKind.ReaderOffline, $"unexpected status: {status}");
+}
+
+static void ModernStatusErrorsOverrideConnections()
+{
+    var status = ModernRelayStatusPolicy.Resolve(ModernStatusInput(
+        hasWebhook: true,
+        repliesEnabled: true,
+        readerConnected: true,
+        readerError: true));
+    Assert(status == ModernRelayStatusKind.Error, $"unexpected status: {status}");
+}
+
+static ModernRelayStatusInput ModernStatusInput(
+    bool hasCharacter = true,
+    bool paused = false,
+    bool hasWebhook = false,
+    bool webhookSending = false,
+    bool webhookError = false,
+    bool repliesEnabled = false,
+    bool readerInitializing = false,
+    bool readerConnected = false,
+    bool readerError = false,
+    bool screenshotsEnabled = false,
+    bool screenshotError = false)
+    => new(
+        hasCharacter,
+        paused,
+        hasWebhook,
+        webhookSending,
+        webhookError,
+        repliesEnabled,
+        readerInitializing,
+        readerConnected,
+        readerError,
+        screenshotsEnabled,
+        screenshotError);
 
 static CharacterProfile ConfiguredScreenshotProfile() => new()
 {

@@ -1,7 +1,9 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
 using SentinelCore.UI;
 using SentinelRelay.Core;
 using SentinelRelay.Models;
@@ -22,6 +24,40 @@ public sealed class MainWindow : Window, IDisposable
     }
 
     private static readonly string[] ConfigurationThemes = ["Classic", "Sentinel Modern"];
+    private const string SwitchToClassicId = "SwitchToClassic";
+    private static readonly SentinelModernNavItem[] ModernPrimaryNavigation =
+    [
+        new(nameof(ConfigurationPage.General), null, "Connection and general status")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Link, context),
+        },
+        new(nameof(ConfigurationPage.ChatFilters), null, "Chat filters")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Filter, context),
+        },
+        new(nameof(ConfigurationPage.Keywords), null, "Keywords")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Key, context),
+        },
+        new(nameof(ConfigurationPage.DiscordWebhook), null, "Discord webhook")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.CloudUploadAlt, context),
+        },
+        new(nameof(ConfigurationPage.DiscordReplies), null, "Replies and controls")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.ExchangeAlt, context),
+        },
+        new(nameof(ConfigurationPage.Debug), null, "Diagnostics")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Bug, context),
+        },
+        new(SwitchToClassicId, null, "Switch to Classic")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Palette, context),
+        },
+    ];
+    private static readonly Vector2 ClassicMinimumWindowSize = new(620f, 520f);
+    private static readonly Vector2 ClassicMaximumWindowSize = new(1100f, 900f);
     private static readonly RelayChatType[] PublicChannels =
     [
         RelayChatType.Say,
@@ -107,6 +143,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly Func<CharacterIdentity?> getIdentity;
     private readonly Func<CharacterProfile?> getProfile;
     private readonly Func<Uri?> getWebhookEndpoint;
+    private readonly IDalamudPluginInterface pluginInterface;
     private readonly WebhookRelayClient relay;
     private readonly ChatCaptureService chatCapture;
     private readonly DiscordReplyReader replyReader;
@@ -122,9 +159,19 @@ public sealed class MainWindow : Window, IDisposable
     private readonly Action<int> setConfigurationTheme;
     private readonly Action save;
     private readonly SentinelModernStyleScope modernStyle = new();
+    private readonly SentinelModernAppShellState modernShellState = new();
     private readonly SentinelThemeState<ConfigurationPage> themeState;
-    private readonly Action drawModernNavigation;
     private readonly Action drawModernContent;
+    private readonly Action<string> selectModernPrimaryPage;
+    private readonly Action requestModernCollapse;
+    private readonly Action requestModernClose;
+    private readonly Action<SentinelModernIconDrawContext> drawModernPluginIcon;
+    private readonly Action drawWebhookUrlInput;
+    private readonly Action drawKeywordUserIdInput;
+    private readonly Action drawBotTokenInput;
+    private readonly Action drawReplyChannelIdInput;
+    private readonly Action drawAuthorizedUserIdInput;
+    private readonly ImGuiWindowFlags classicWindowFlags;
     private string webhookInput = string.Empty;
     private string? webhookFeedback;
     private bool webhookFeedbackIsError;
@@ -146,6 +193,8 @@ public sealed class MainWindow : Window, IDisposable
     private string? replyFeedback;
     private bool replyFeedbackIsError;
     private bool modernThemeActive;
+    private bool modernCollapsed;
+    private bool expandOnNextDraw;
     private CharacterIdentity? drawingIdentity;
     private CharacterProfile? drawingProfile;
 
@@ -153,6 +202,7 @@ public sealed class MainWindow : Window, IDisposable
         Func<CharacterIdentity?> getIdentity,
         Func<CharacterProfile?> getProfile,
         Func<Uri?> getWebhookEndpoint,
+        IDalamudPluginInterface pluginInterface,
         WebhookRelayClient relay,
         ChatCaptureService chatCapture,
         Func<string, WebhookConfigurationResult> saveWebhook,
@@ -172,6 +222,7 @@ public sealed class MainWindow : Window, IDisposable
         this.getIdentity = getIdentity;
         this.getProfile = getProfile;
         this.getWebhookEndpoint = getWebhookEndpoint;
+        this.pluginInterface = pluginInterface;
         this.relay = relay;
         this.chatCapture = chatCapture;
         this.replyReader = replyReader;
@@ -189,14 +240,23 @@ public sealed class MainWindow : Window, IDisposable
         themeState = new SentinelThemeState<ConfigurationPage>(
             ConfigurationPage.General,
             SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme()));
-        drawModernNavigation = DrawModernNavigation;
         drawModernContent = DrawModernContent;
+        selectModernPrimaryPage = SelectModernPrimaryPage;
+        requestModernCollapse = RequestModernCollapse;
+        requestModernClose = RequestModernClose;
+        drawModernPluginIcon = DrawModernPluginIcon;
+        drawWebhookUrlInput = DrawWebhookUrlInput;
+        drawKeywordUserIdInput = DrawKeywordUserIdInput;
+        drawBotTokenInput = DrawBotTokenInput;
+        drawReplyChannelIdInput = DrawReplyChannelIdInput;
+        drawAuthorizedUserIdInput = DrawAuthorizedUserIdInput;
+        classicWindowFlags = Flags;
         Size = new Vector2(920, 720);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(620, 520),
-            MaximumSize = new Vector2(1100, 900),
+            MinimumSize = ClassicMinimumWindowSize,
+            MaximumSize = ClassicMaximumWindowSize,
         };
     }
 
@@ -204,13 +264,46 @@ public sealed class MainWindow : Window, IDisposable
     {
         modernThemeActive = SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme())
                             == SentinelThemeKind.Modern;
+        if (expandOnNextDraw)
+        {
+            ImGui.SetNextWindowCollapsed(false, ImGuiCond.Always);
+            expandOnNextDraw = false;
+            modernCollapsed = false;
+        }
+
         if (modernThemeActive)
-            modernStyle.Push(ImGuiHelpers.GlobalScale);
+        {
+            var scale = ImGuiHelpers.GlobalScale;
+            Flags = SentinelModernWindowChrome.UseCustomHeader(classicWindowFlags);
+            modernStyle.PushAppShell(scale);
+            var shellMinimum = SentinelModernAppLayout.MinimumWindowSize(
+                scale,
+                hasSecondarySidebar: false,
+                hasActionDock: false);
+            SizeConstraints = new WindowSizeConstraints
+            {
+                MinimumSize = Vector2.Max(shellMinimum, ClassicMinimumWindowSize * scale),
+                MaximumSize = new Vector2(1400f, 1100f) * scale,
+            };
+        }
+        else
+        {
+            Flags = classicWindowFlags;
+            SizeConstraints = new WindowSizeConstraints
+            {
+                MinimumSize = ClassicMinimumWindowSize,
+                MaximumSize = ClassicMaximumWindowSize,
+            };
+        }
     }
 
     public override void PostDraw() => modernStyle.Pop();
 
-    public void Dispose() => modernStyle.Dispose();
+    public void Dispose()
+    {
+        modernStyle.Dispose();
+        modernShellState.Dispose();
+    }
 
     public override void Draw()
     {
@@ -291,70 +384,124 @@ public sealed class MainWindow : Window, IDisposable
     {
         themeState.SelectTheme(SentinelThemeKind.Modern);
         var direction = profile?.DiscordRepliesEnabled == true ? "FFXIV ↔ Discord" : "FFXIV → Discord";
-        var options = new SentinelModernShellOptions(
-            "SentinelRelay",
-            "MARSHALTITAN  /  SENTINEL",
-            "SENTINEL RELAY",
-            "Private, character-specific chat relay and authorized remote controls")
+        var options = new SentinelModernAppShellOptions(
+            "SentinelRelay.Modern2",
+            "Sentinel Relay",
+            themeState.SelectedPage.ToString())
         {
+            DrawPluginIcon = drawModernPluginIcon,
             Scale = ImGuiHelpers.GlobalScale,
             ContextLabel = $"{identity?.CharacterName ?? "No character"} · {direction}",
-            Status = GetModernStatus(profile),
-            AmbientIntensity = 0.82f,
+            Status = GetModernStatus(identity, profile),
+            DeltaTime = ImGui.GetIO().DeltaTime,
+            ReducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion,
+            AmbientIntensity = 1f,
+            SurfaceStyle = SentinelModernAppSurfaceStyle.Unified,
+            EnableWindowDragging = true,
+            RequestCollapse = requestModernCollapse,
+            RequestClose = requestModernClose,
         };
 
-        SentinelModernConfigurationShell.Draw(options, drawModernNavigation, drawModernContent);
+        SentinelModernAppShell.Draw(
+            options,
+            modernShellState,
+            ModernPrimaryNavigation,
+            selectModernPrimaryPage,
+            drawModernContent);
     }
 
-    private SentinelModernStatus GetModernStatus(CharacterProfile? profile)
+    private SentinelModernStatusPillOptions GetModernStatus(
+        CharacterIdentity? identity,
+        CharacterProfile? profile)
     {
-        if (profile?.Paused == true)
-            return new SentinelModernStatus("PAUSED", SentinelModernStatusTone.Warning);
-        if (relay.State == WebhookRelayState.Error)
-            return new SentinelModernStatus("ERROR", SentinelModernStatusTone.Warning);
-        return getWebhookEndpoint() is not null
-            ? new SentinelModernStatus("READY", SentinelModernStatusTone.Success)
-            : new SentinelModernStatus("NOT CONFIGURED", SentinelModernStatusTone.Accent);
-    }
+        var status = ModernRelayStatusPolicy.Resolve(new ModernRelayStatusInput(
+            HasCharacter: identity is not null && profile is not null,
+            Paused: profile?.Paused == true,
+            HasWebhook: getWebhookEndpoint() is not null,
+            WebhookSending: relay.State == WebhookRelayState.Sending,
+            WebhookError: relay.State == WebhookRelayState.Error,
+            RepliesEnabled: profile?.DiscordRepliesEnabled == true,
+            ReaderInitializing: replyReader.State == DiscordReplyReaderState.Initializing,
+            ReaderConnected: replyReader.State == DiscordReplyReaderState.Connected,
+            ReaderError: replyReader.State == DiscordReplyReaderState.Error,
+            ScreenshotsEnabled: profile?.RemoteScreenshotsEnabled == true,
+            ScreenshotError: remoteScreenshotService.State == RemoteScreenshotState.Error));
 
-    private void DrawModernNavigation()
-    {
-        DrawNavigationGroup("RELAY", (ConfigurationPage.General, "General"),
-            (ConfigurationPage.ChatFilters, "Chat Filters"), (ConfigurationPage.Keywords, "Keywords"));
-        ImGui.Spacing();
-        DrawNavigationGroup("DISCORD", (ConfigurationPage.DiscordWebhook, "Webhook"),
-            (ConfigurationPage.DiscordReplies, "Replies & Controls"));
-        ImGui.Spacing();
-        DrawNavigationGroup("TOOLS", (ConfigurationPage.Debug, "Diagnostics"));
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(SentinelModernPalette.Muted, "SENTINEL MODERN");
-        if (ImGui.Button("Use Classic theme", new Vector2(-1f, 0f)))
-            SelectTheme(SentinelThemeKind.Classic);
-    }
-
-    private void DrawNavigationGroup(
-        string label,
-        params (ConfigurationPage Page, string Label)[] pages)
-    {
-        SentinelModernNavigation.GroupLabel(label);
-        foreach (var item in pages)
+        return status switch
         {
-            if (SentinelModernNavigation.Item(
-                    item.Page.ToString(),
-                    item.Label,
-                    themeState.SelectedPage == item.Page,
-                    ImGuiHelpers.GlobalScale))
-                themeState.SelectPage(item.Page);
+            ModernRelayStatusKind.Paused => new SentinelModernStatusPillOptions(
+                "PAUSED",
+                SentinelModernPillTone.Warning)
+            {
+                Tooltip = "Webhook delivery, Discord replies, and remote screenshots are paused.",
+            },
+            ModernRelayStatusKind.Error => new SentinelModernStatusPillOptions(
+                "ERROR",
+                SentinelModernPillTone.Error)
+            {
+                Tooltip = "Open Diagnostics for the latest privacy-safe error.",
+            },
+            ModernRelayStatusKind.Delivering => new SentinelModernStatusPillOptions(
+                "DELIVERING",
+                SentinelModernPillTone.Running)
+            {
+                Pulse = true,
+                Tooltip = "A queued FFXIV message is being delivered to Discord.",
+            },
+            ModernRelayStatusKind.Linked => new SentinelModernStatusPillOptions(
+                "LINKED",
+                SentinelModernPillTone.Ready)
+            {
+                Tooltip = "Webhook delivery and the authorized Discord reply reader are connected.",
+            },
+            ModernRelayStatusKind.Connecting => new SentinelModernStatusPillOptions(
+                "CONNECTING",
+                SentinelModernPillTone.Running)
+            {
+                Pulse = true,
+                Tooltip = "The authorized Discord reply reader is establishing its checkpoint.",
+            },
+            ModernRelayStatusKind.ReaderOffline => new SentinelModernStatusPillOptions(
+                "READER OFFLINE",
+                SentinelModernPillTone.Warning)
+            {
+                Tooltip = "Discord replies are enabled, but the reader is not connected.",
+            },
+            ModernRelayStatusKind.WebhookReady => new SentinelModernStatusPillOptions(
+                "WEBHOOK READY",
+                SentinelModernPillTone.Ready)
+            {
+                Tooltip = "FFXIV-to-Discord webhook delivery is configured.",
+            },
+            ModernRelayStatusKind.NotConfigured => new SentinelModernStatusPillOptions(
+                "NOT CONFIGURED",
+                SentinelModernPillTone.Accent)
+            {
+                Tooltip = "Configure this character's Discord webhook to begin relaying.",
+            },
+            _ => new SentinelModernStatusPillOptions(
+                "DISCONNECTED",
+                SentinelModernPillTone.Neutral)
+            {
+                Tooltip = "Log into a character to load its private Relay profile.",
+            },
+        };
+    }
+
+    private void SelectModernPrimaryPage(string id)
+    {
+        if (string.Equals(id, SwitchToClassicId, StringComparison.Ordinal))
+        {
+            SelectTheme(SentinelThemeKind.Classic);
+            return;
         }
+
+        if (Enum.TryParse<ConfigurationPage>(id, out var page))
+            themeState.SelectPage(page);
     }
 
     private void DrawModernContent()
     {
-        using var card = SentinelModernCard.Begin($"{themeState.SelectedPage}Card");
-        if (!card.IsVisible)
-            return;
-
         switch (themeState.SelectedPage)
         {
             case ConfigurationPage.General: DrawGeneral(drawingIdentity, drawingProfile); break;
@@ -387,12 +534,33 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawGeneral(CharacterIdentity? identity, CharacterProfile? profile)
     {
-        if (!modernThemeActive)
+        if (modernThemeActive)
         {
-            DrawThemeSelector();
-            ImGui.Spacing();
+            using var card = SentinelModernGlassCard.Begin(
+                "SentinelRelay.Modern2.GeneralStatus",
+                new SentinelModernGlassCardOptions
+                {
+                    Size = new Vector2(0f, 210f),
+                    Accent = SentinelModernPalette.Accent,
+                    AccentStrength = 0.12f,
+                    Elevated = true,
+                },
+                ImGuiHelpers.GlobalScale);
+            if (card.IsVisible)
+                DrawGeneralDetails(identity, profile, includeDescription: false);
+            return;
         }
 
+        DrawThemeSelector();
+        ImGui.Spacing();
+        DrawGeneralDetails(identity, profile, includeDescription: true);
+    }
+
+    private void DrawGeneralDetails(
+        CharacterIdentity? identity,
+        CharacterProfile? profile,
+        bool includeDescription)
+    {
         ImGui.TextUnformatted($"Character: {identity?.CharacterName ?? "Not logged in"}");
         ImGui.TextUnformatted($"Home world: {identity?.HomeWorld ?? "—"}");
         ImGui.TextUnformatted($"Discord webhook: {WebhookEndpoint.Mask(getWebhookEndpoint())}");
@@ -418,8 +586,11 @@ public sealed class MainWindow : Window, IDisposable
             setPaused(true);
         }
 
-        ImGui.Spacing();
-        ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
+        if (includeDescription)
+        {
+            ImGui.Spacing();
+            ImGui.TextWrapped("Sentinel Relay sends enabled chat directly from this PC to the configured Discord webhook.");
+        }
     }
 
     private void DrawThemeSelector()
@@ -463,16 +634,46 @@ public sealed class MainWindow : Window, IDisposable
         DrawReplyChannelGroup("Linkshells and cross-world linkshells", LinkshellReplyChannels, defaultOpen: false);
         ImGui.Spacing();
         ImGui.TextUnformatted($"Discord Bot Credential: {(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken) ? "Not Configured" : "Configured (secret hidden)")}");
-        ImGui.SetNextItemWidth(-1);
-        ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
-        ImGui.TextDisabled(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
-            ? "Paste the token once. It is never displayed again."
-            : "Leave blank to keep the saved credential, or paste a replacement.");
-        ImGui.SetNextItemWidth(300);
-        ImGui.InputText("Relay Channel ID", ref replyChannelId, 24);
-        ImGui.SetNextItemWidth(300);
-        ImGui.InputText("Authorized Discord User ID", ref authorizedUserId, 24);
-        ImGui.TextDisabled("Discord Developer Mode: right-click the channel/user, then Copy ID.");
+        if (modernThemeActive)
+        {
+            var scale = ImGuiHelpers.GlobalScale;
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.BotToken",
+                "Discord bot token",
+                string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
+                    ? "Paste once; the saved credential is protected and never displayed again."
+                    : "Leave blank to retain the protected credential, or paste a replacement.",
+                drawBotTokenInput,
+                controlWidth: 260f,
+                scale: scale);
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.ReplyChannel",
+                "Relay channel ID",
+                "Only messages from this exact Discord channel are accepted.",
+                drawReplyChannelIdInput,
+                controlWidth: 220f,
+                scale: scale);
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.AuthorizedUser",
+                "Authorized Discord user ID",
+                "Only this exact Discord user may issue allowed replies or controls.",
+                drawAuthorizedUserIdInput,
+                controlWidth: 220f,
+                scale: scale);
+        }
+        else
+        {
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
+            ImGui.TextDisabled(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
+                ? "Paste the token once. It is never displayed again."
+                : "Leave blank to keep the saved credential, or paste a replacement.");
+            ImGui.SetNextItemWidth(300);
+            ImGui.InputText("Relay Channel ID", ref replyChannelId, 24);
+            ImGui.SetNextItemWidth(300);
+            ImGui.InputText("Authorized Discord User ID", ref authorizedUserId, 24);
+            ImGui.TextDisabled("Discord Developer Mode: right-click the channel/user, then Copy ID.");
+        }
 
         if (ImGui.Button("Save Reply Settings"))
         {
@@ -623,8 +824,21 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TextUnformatted(profile.LastWebhookSuccessUtc is null
             ? "Verification: not yet confirmed by Discord"
             : $"Verification: Discord accepted a delivery at {FormatTimestamp(profile.LastWebhookSuccessUtc)}");
-        ImGui.SetNextItemWidth(-1);
-        ImGui.InputText("Webhook URL", ref webhookInput, 512, ImGuiInputTextFlags.Password);
+        if (modernThemeActive)
+        {
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.WebhookUrl",
+                "Webhook URL",
+                "Character-specific Discord destination; the saved secret remains hidden.",
+                drawWebhookUrlInput,
+                controlWidth: 280f,
+                scale: ImGuiHelpers.GlobalScale);
+        }
+        else
+        {
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputText("Webhook URL", ref webhookInput, 512, ImGuiInputTextFlags.Password);
+        }
 
         var saveLabel = endpoint is null ? "Save Webhook" : "Replace Webhook";
         if (ImGui.Button(saveLabel))
@@ -690,9 +904,22 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
 
-        ImGui.SetNextItemWidth(260);
-        ImGui.InputText("Discord User ID", ref mentionUserId, 24);
-        ImGui.SameLine();
+        if (modernThemeActive)
+        {
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.KeywordUserId",
+                "Discord user ID",
+                "Optional explicit user mention for matched keyword rules.",
+                drawKeywordUserIdInput,
+                controlWidth: 220f,
+                scale: ImGuiHelpers.GlobalScale);
+        }
+        else
+        {
+            ImGui.SetNextItemWidth(260);
+            ImGui.InputText("Discord User ID", ref mentionUserId, 24);
+            ImGui.SameLine();
+        }
         if (ImGui.Button("Save User ID"))
         {
             var trimmed = mentionUserId.Trim();
@@ -857,13 +1084,103 @@ public sealed class MainWindow : Window, IDisposable
 
     private bool DrawBooleanControl(string id, string label, ref bool value)
         => modernThemeActive
-            ? SentinelModernControls.Toggle(id, label, ref value, ImGuiHelpers.GlobalScale)
+            ? SentinelModernSwitch.Draw(
+                id,
+                label,
+                ref value,
+                modernShellState.Motion,
+                ImGuiHelpers.GlobalScale)
             : ImGui.Checkbox($"{label}##{id}", ref value);
 
     private bool OpenSection(string title, ImGuiTreeNodeFlags flags)
         => modernThemeActive
             ? SentinelModernControls.CollapsingSection(title, flags)
             : ImGui.CollapsingHeader(title, flags);
+
+    public void OpenAndExpand()
+    {
+        IsOpen = true;
+        expandOnNextDraw = true;
+    }
+
+    public void ToggleFromCommand()
+    {
+        if (!IsOpen || modernCollapsed)
+        {
+            OpenAndExpand();
+            return;
+        }
+
+        IsOpen = false;
+    }
+
+    private void RequestModernCollapse()
+    {
+        modernCollapsed = true;
+        ImGui.SetWindowCollapsed("Sentinel Relay###SentinelRelayMain", true);
+    }
+
+    private void RequestModernClose()
+    {
+        modernCollapsed = false;
+        IsOpen = false;
+    }
+
+    private void DrawWebhookUrlInput()
+        => ImGui.InputText("##WebhookUrl", ref webhookInput, 512, ImGuiInputTextFlags.Password);
+
+    private void DrawKeywordUserIdInput()
+        => ImGui.InputText("##KeywordUserId", ref mentionUserId, 24);
+
+    private void DrawBotTokenInput()
+        => ImGui.InputText("##DiscordBotToken", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
+
+    private void DrawReplyChannelIdInput()
+        => ImGui.InputText("##RelayChannelId", ref replyChannelId, 24);
+
+    private void DrawAuthorizedUserIdInput()
+        => ImGui.InputText("##AuthorizedDiscordUserId", ref authorizedUserId, 24);
+
+    private static void DrawModernPluginIcon(SentinelModernIconDrawContext context)
+        => DrawFontAwesomeIcon(
+            FontAwesomeIcon.ShieldAlt,
+            context.DrawList,
+            context.Minimum,
+            context.Maximum,
+            SentinelModernPalette.Text);
+
+    private static void DrawModernNavigationIcon(
+        FontAwesomeIcon icon,
+        SentinelModernNavIconDrawContext context)
+        => DrawFontAwesomeIcon(
+            icon,
+            context.DrawList,
+            context.Minimum,
+            context.Maximum,
+            context.Colour);
+
+    private static void DrawFontAwesomeIcon(
+        FontAwesomeIcon icon,
+        ImDrawListPtr drawList,
+        Vector2 minimum,
+        Vector2 maximum,
+        Vector4 colour)
+    {
+        var glyph = icon.ToIconString();
+        ImGui.PushFont(UiBuilder.IconFont);
+        try
+        {
+            var size = ImGui.CalcTextSize(glyph);
+            drawList.AddText(
+                minimum + (((maximum - minimum) - size) * 0.5f),
+                ImGui.ColorConvertFloat4ToU32(colour),
+                glyph);
+        }
+        finally
+        {
+            ImGui.PopFont();
+        }
+    }
 
     private static string FormatTimestamp(DateTime? value) => value?.ToLocalTime().ToString("G") ?? "never";
 }

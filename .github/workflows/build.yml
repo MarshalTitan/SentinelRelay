@@ -32,6 +32,10 @@ jobs:
           Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
 
+      - name: Validate pinned Sentinel Core packages
+        shell: pwsh
+        run: ./.github/scripts/Validate-SentinelCore.ps1
+
       - name: Restore locked dependencies
         run: dotnet restore SentinelRelay.csproj --locked-mode
 

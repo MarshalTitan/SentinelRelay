@@ -4,7 +4,7 @@ Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. 
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
-The `0.5.0.2` release uses the corrected shared **Sentinel Modern** configuration layout from SentinelCore UI 0.2.1. Modern keeps grouped navigation in a dedicated left rail and opens each page directly at its functional settings without repeated headings or introductory blocks. Classic remains available and every relay, reply, reward, and screenshot behavior is unchanged.
+The `0.5.0.3` release adopts the shared **Sentinel Modern 2** application shell from SentinelCore UI 0.3.1. Modern uses one compact custom header, a slim icon rail, a unified full-bleed surface, responsive settings rows, stronger motion-aware ambience, and no repeated page headings or introductory blocks. Classic remains available and every relay, reply, reward, and screenshot behavior is unchanged.
 
 > Enabling a chat type causes its sender and text to leave the local PC and be delivered to Discord. Other people represented in that chat may not expect off-platform forwarding. Every filter starts off; enable only what you need and keep relay channels private.
 
@@ -61,7 +61,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 ## Setup
 
-Version `0.5.0.2` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
+Version `0.5.0.3` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
 
 1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
@@ -74,7 +74,7 @@ Version `0.5.0.2` is distributed through the live Sentinel catalog. Dalamud down
 
 ## Configuration appearance
 
-In Classic, open `/srelay` → **General** to select **Sentinel Modern**. In Modern, use **Use Classic theme** at the bottom of the left navigation. Existing theme selections persist. The modern presentation comes from the exact `MarshalTitan.SentinelCore.UI` 0.2.1 package; its default shell keeps navigation on the left even at the minimum supported window width and provides the non-scrolling header. Sentinel Relay does not carry a private copy of the palette, shell, cards, switches, status chips, ambient treatment, or layout calculations, and no separate Sentinel Core plugin is installed at runtime.
+In Classic, open `/srelay` → **General** to select **Sentinel Modern**. In Modern, use the Palette icon in the left rail for the single **Switch to Classic** action. Existing theme selections persist. The modern presentation comes from the exact `MarshalTitan.SentinelCore.UI` 0.3.1 package at Core tag `v0.3.1.0`. Its unified shell owns the custom header, non-stacking icon rail, motion, status pills, cards, switches, responsive rows, and reduced-motion behavior. Sentinel Relay carries no private copy of those shared components, and no separate Sentinel Core plugin is installed at runtime.
 
 The successful test message is:
 
