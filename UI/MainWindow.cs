@@ -20,11 +20,11 @@ public sealed class MainWindow : Window, IDisposable
         Keywords,
         DiscordWebhook,
         DiscordReplies,
+        Theme,
         Debug,
     }
 
     private static readonly string[] ConfigurationThemes = ["Classic", "Sentinel Modern"];
-    private const string SwitchToClassicId = "SwitchToClassic";
     private static readonly SentinelModernNavItem[] ModernPrimaryNavigation =
     [
         new(nameof(ConfigurationPage.General), null, "Connection and general status")
@@ -47,13 +47,13 @@ public sealed class MainWindow : Window, IDisposable
         {
             DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.ExchangeAlt, context),
         },
+        new(nameof(ConfigurationPage.Theme), null, "Theme")
+        {
+            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Palette, context),
+        },
         new(nameof(ConfigurationPage.Debug), null, "Diagnostics")
         {
             DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Bug, context),
-        },
-        new(SwitchToClassicId, null, "Switch to Classic")
-        {
-            DrawIcon = static context => DrawModernNavigationIcon(FontAwesomeIcon.Palette, context),
         },
     ];
     private static readonly Vector2 ClassicMinimumWindowSize = new(620f, 520f);
@@ -163,6 +163,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly SentinelModernAppShellState modernShellState = new();
     private readonly SentinelThemeState<ConfigurationPage> themeState;
     private readonly Action drawModernContent;
+    private readonly Action drawModernActionDock;
     private readonly Action<string> selectModernPrimaryPage;
     private readonly Action requestModernCollapse;
     private readonly Action requestModernClose;
@@ -244,6 +245,7 @@ public sealed class MainWindow : Window, IDisposable
             ConfigurationPage.General,
             SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme()));
         drawModernContent = DrawModernContent;
+        drawModernActionDock = DrawModernActionDock;
         selectModernPrimaryPage = SelectModernPrimaryPage;
         requestModernCollapse = RequestModernCollapse;
         requestModernClose = RequestModernClose;
@@ -422,7 +424,11 @@ public sealed class MainWindow : Window, IDisposable
             modernShellState,
             ModernPrimaryNavigation,
             selectModernPrimaryPage,
-            drawModernContent);
+            drawModernContent,
+            drawActionDock: themeState.SelectedPage == ConfigurationPage.Theme
+                            && !configuration.ModernWindowCollapsed
+                ? drawModernActionDock
+                : null);
     }
 
     private SentinelModernStatusPillOptions GetModernStatus(
@@ -505,12 +511,6 @@ public sealed class MainWindow : Window, IDisposable
 
     private void SelectModernPrimaryPage(string id)
     {
-        if (string.Equals(id, SwitchToClassicId, StringComparison.Ordinal))
-        {
-            SelectTheme(SentinelThemeKind.Classic);
-            return;
-        }
-
         if (Enum.TryParse<ConfigurationPage>(id, out var page))
             themeState.SelectPage(page);
     }
@@ -527,8 +527,21 @@ public sealed class MainWindow : Window, IDisposable
             case ConfigurationPage.Keywords: DrawKeywords(drawingIdentity, drawingProfile); break;
             case ConfigurationPage.DiscordWebhook: DrawWebhook(drawingIdentity, drawingProfile); break;
             case ConfigurationPage.DiscordReplies: DrawDiscordReplies(drawingIdentity, drawingProfile); break;
+            case ConfigurationPage.Theme: break;
             case ConfigurationPage.Debug: DrawDebug(drawingIdentity, drawingProfile); break;
         }
+    }
+
+    private void DrawModernActionDock()
+    {
+        SentinelModernActionDock.Status("Sentinel Modern 2 is active");
+        ImGui.SameLine();
+        if (SentinelModernActionDock.PrimaryButton(
+                "SentinelRelay.UseClassic",
+                "Use Classic Theme",
+                new Vector2(190f * ImGuiHelpers.GlobalScale, 0f),
+                ImGuiHelpers.GlobalScale))
+            SelectTheme(SentinelThemeKind.Classic);
     }
 
     private void DrawStatus(CharacterIdentity? identity, CharacterProfile? profile)
@@ -659,111 +672,10 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TextDisabled("/r is accepted only for 30 minutes after this character receives a Tell during the current session.");
         }
         DrawReplyChannelGroup("Linkshells and cross-world linkshells", LinkshellReplyChannels, defaultOpen: false);
-        ImGui.Spacing();
-        ImGui.TextUnformatted($"Discord Bot Credential: {(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken) ? "Not Configured" : "Configured (secret hidden)")}");
-        if (modernThemeActive)
-        {
-            var scale = ImGuiHelpers.GlobalScale;
-            SentinelModernSettingsRow.Draw(
-                "SentinelRelay.BotToken",
-                "Discord bot token",
-                string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
-                    ? "Paste once; the saved credential is protected and never displayed again."
-                    : "Leave blank to retain the protected credential, or paste a replacement.",
-                drawBotTokenInput,
-                controlWidth: 260f,
-                scale: scale);
-            SentinelModernSettingsRow.Draw(
-                "SentinelRelay.ReplyChannel",
-                "Relay channel ID",
-                "Only messages from this exact Discord channel are accepted.",
-                drawReplyChannelIdInput,
-                controlWidth: 220f,
-                scale: scale);
-            SentinelModernSettingsRow.Draw(
-                "SentinelRelay.AuthorizedUser",
-                "Authorized Discord user ID",
-                "Only this exact Discord user may issue allowed replies or controls.",
-                drawAuthorizedUserIdInput,
-                controlWidth: 220f,
-                scale: scale);
-        }
-        else
-        {
-            ImGui.SetNextItemWidth(-1);
-            ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
-            ImGui.TextDisabled(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
-                ? "Paste the token once. It is never displayed again."
-                : "Leave blank to keep the saved credential, or paste a replacement.");
-            ImGui.SetNextItemWidth(300);
-            ImGui.InputText("Relay Channel ID", ref replyChannelId, 24);
-            ImGui.SetNextItemWidth(300);
-            ImGui.InputText("Authorized Discord User ID", ref authorizedUserId, 24);
-            ImGui.TextDisabled("Discord Developer Mode: right-click the channel/user, then Copy ID.");
-        }
-
-        if (ImGui.Button("Save Reply Settings"))
-        {
-            var result = saveReplySettings(new DiscordReplyConfigurationInput(
-                repliesEnabled,
-                remoteScreenshotsEnabled,
-                botTokenInput,
-                replyChannelId,
-                authorizedUserId,
-                new HashSet<RelayChatType>(outboundChannels)));
-            replyFeedback = result.Success
-                ? "Reply settings saved. Starting the reader establishes a fresh checkpoint so old messages cannot execute."
-                : result.Error;
-            replyFeedbackIsError = !result.Success;
-            if (result.Success)
-                botTokenInput = string.Empty;
-        }
-        ImGui.SameLine();
-        var hasBotCredential = !string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken);
-        if (!hasBotCredential)
-            ImGui.BeginDisabled();
-        if (ImGui.Button("Test Discord Reader"))
-        {
-            var started = testDiscordReader();
-            replyFeedback = started
-                ? "Reader test started. The result will appear in FFXIV chat."
-                : "Save a valid bot token and channel ID before testing.";
-            replyFeedbackIsError = !started;
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Remove Bot Credential"))
-        {
-            removeDiscordBotCredential();
-            botTokenInput = string.Empty;
-            repliesEnabled = false;
-            remoteScreenshotsEnabled = false;
-            replyFeedback = "Bot credential removed; Discord replies and remote screenshots are disabled for this character.";
-            replyFeedbackIsError = false;
-        }
-        if (!hasBotCredential)
-            ImGui.EndDisabled();
-
-        if (!string.IsNullOrWhiteSpace(replyFeedback))
-        {
-            var color = replyFeedbackIsError
-                ? new Vector4(0.95f, 0.35f, 0.38f, 1f)
-                : new Vector4(0.35f, 0.85f, 1f, 1f);
-            ImGui.TextColored(color, replyFeedback);
-        }
-
         ImGui.Separator();
-        var readerStatus = profile.DiscordRepliesEnabled ? replyReader.State.ToString() : "Disabled";
-        ImGui.TextUnformatted($"Reader Status: {readerStatus}");
-        ImGui.TextUnformatted($"Last Reader Success: {FormatTimestamp(profile.LastDiscordReaderSuccessUtc)}");
-        ImGui.TextUnformatted($"Checkpoint: {(string.IsNullOrWhiteSpace(profile.LastProcessedDiscordMessageId) ? "not established" : "established")}");
-        ImGui.TextUnformatted($"Screenshot Status: {(profile.RemoteScreenshotsEnabled ? remoteScreenshotService.State.ToString() : "Disabled")}");
-        ImGui.TextUnformatted($"Last Screenshot Upload: {FormatTimestamp(profile.LastRemoteScreenshotSuccessUtc)}");
-        ImGui.TextUnformatted($"Last Screenshot Size: {remoteScreenshotService.LastDimensions ?? "never"}");
-        if (!string.IsNullOrWhiteSpace(remoteScreenshotService.LastError))
-            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Screenshot Error: {remoteScreenshotService.LastError}");
-        if (!string.IsNullOrWhiteSpace(replyReader.LastError))
-            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Reader Error: {replyReader.LastError}");
-        ImGui.TextDisabled("Sentinel Relay never prints the bot token and never treats Discord text as an arbitrary FFXIV command.");
+        if (ImGui.Button("Save Reply Permissions"))
+            SaveReplyConfiguration("Reply permissions saved.");
+        DrawReplyFeedback();
     }
 
     private void DrawReplyChannelGroup(
@@ -907,6 +819,10 @@ public sealed class MainWindow : Window, IDisposable
         }
 
         ImGui.Separator();
+        DrawKeywordUserConnection(profile);
+        ImGui.Separator();
+        DrawDiscordReaderConnection(profile);
+        ImGui.Separator();
         ImGui.TextUnformatted("Message formatting");
         var includeWorld = profile.IncludeSenderWorld;
         if (DrawBooleanControl("include-sender-world", "Include sender world when available", ref includeWorld))
@@ -923,19 +839,13 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TextDisabled("Relayed chat cannot create mentions. Only the explicit keyword-ping feature may mention its configured user ID.");
     }
 
-    private void DrawKeywords(CharacterIdentity? identity, CharacterProfile? profile)
+    private void DrawKeywordUserConnection(CharacterProfile profile)
     {
-        if (profile is null)
-        {
-            ImGui.TextUnformatted("Log into a character to edit its keyword alerts.");
-            return;
-        }
-
         if (modernThemeActive)
         {
             SentinelModernSettingsRow.Draw(
                 "SentinelRelay.KeywordUserId",
-                "Discord user ID",
+                "Keyword alert Discord user ID",
                 "Optional explicit user mention for matched keyword rules.",
                 drawKeywordUserIdInput,
                 controlWidth: 220f,
@@ -944,10 +854,11 @@ public sealed class MainWindow : Window, IDisposable
         else
         {
             ImGui.SetNextItemWidth(260);
-            ImGui.InputText("Discord User ID", ref mentionUserId, 24);
+            ImGui.InputText("Keyword Alert Discord User ID", ref mentionUserId, 24);
             ImGui.SameLine();
         }
-        if (ImGui.Button("Save User ID"))
+
+        if (ImGui.Button("Save Keyword User ID"))
         {
             var trimmed = mentionUserId.Trim();
             if (trimmed.Length == 0 || WebhookEndpoint.IsValidDiscordUserId(trimmed))
@@ -974,7 +885,128 @@ public sealed class MainWindow : Window, IDisposable
                 : new Vector4(0.35f, 0.85f, 1f, 1f);
             ImGui.TextColored(color, keywordFeedback);
         }
-        ImGui.Spacing();
+    }
+
+    private void DrawDiscordReaderConnection(CharacterProfile profile)
+    {
+        ImGui.TextUnformatted($"Discord Bot Credential: {(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken) ? "Not Configured" : "Configured (secret hidden)")}");
+        if (modernThemeActive)
+        {
+            var scale = ImGuiHelpers.GlobalScale;
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.BotToken",
+                "Discord bot token",
+                string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
+                    ? "Paste once; the saved credential is protected and never displayed again."
+                    : "Leave blank to retain the protected credential, or paste a replacement.",
+                drawBotTokenInput,
+                controlWidth: 260f,
+                scale: scale);
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.ReplyChannel",
+                "Relay channel ID",
+                "Only messages from this exact Discord channel are accepted.",
+                drawReplyChannelIdInput,
+                controlWidth: 220f,
+                scale: scale);
+            SentinelModernSettingsRow.Draw(
+                "SentinelRelay.AuthorizedUser",
+                "Authorized Discord user ID",
+                "Only this exact Discord user may issue allowed replies or controls.",
+                drawAuthorizedUserIdInput,
+                controlWidth: 220f,
+                scale: scale);
+        }
+        else
+        {
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputText("Discord Bot Token", ref botTokenInput, 256, ImGuiInputTextFlags.Password);
+            ImGui.TextDisabled(string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken)
+                ? "Paste the token once. It is never displayed again."
+                : "Leave blank to keep the saved credential, or paste a replacement.");
+            ImGui.SetNextItemWidth(300);
+            ImGui.InputText("Relay Channel ID", ref replyChannelId, 24);
+            ImGui.SetNextItemWidth(300);
+            ImGui.InputText("Authorized Discord User ID", ref authorizedUserId, 24);
+            ImGui.TextDisabled("Discord Developer Mode: right-click the channel/user, then Copy ID.");
+        }
+
+        if (ImGui.Button("Save Discord Connection"))
+            SaveReplyConfiguration("Discord connection saved. Starting the reader establishes a fresh checkpoint so old messages cannot execute.");
+        ImGui.SameLine();
+        var hasBotCredential = !string.IsNullOrWhiteSpace(profile.ProtectedDiscordBotToken);
+        if (!hasBotCredential)
+            ImGui.BeginDisabled();
+        if (ImGui.Button("Test Discord Reader"))
+        {
+            var started = testDiscordReader();
+            replyFeedback = started
+                ? "Reader test started. The result will appear in FFXIV chat."
+                : "Save a valid bot token and channel ID before testing.";
+            replyFeedbackIsError = !started;
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Remove Bot Credential"))
+        {
+            removeDiscordBotCredential();
+            botTokenInput = string.Empty;
+            repliesEnabled = false;
+            remoteScreenshotsEnabled = false;
+            replyFeedback = "Bot credential removed; Discord replies and remote screenshots are disabled for this character.";
+            replyFeedbackIsError = false;
+        }
+        if (!hasBotCredential)
+            ImGui.EndDisabled();
+
+        DrawReplyFeedback();
+        ImGui.Separator();
+        var readerStatus = profile.DiscordRepliesEnabled ? replyReader.State.ToString() : "Disabled";
+        ImGui.TextUnformatted($"Reader Status: {readerStatus}");
+        ImGui.TextUnformatted($"Last Reader Success: {FormatTimestamp(profile.LastDiscordReaderSuccessUtc)}");
+        ImGui.TextUnformatted($"Checkpoint: {(string.IsNullOrWhiteSpace(profile.LastProcessedDiscordMessageId) ? "not established" : "established")}");
+        ImGui.TextUnformatted($"Screenshot Status: {(profile.RemoteScreenshotsEnabled ? remoteScreenshotService.State.ToString() : "Disabled")}");
+        ImGui.TextUnformatted($"Last Screenshot Upload: {FormatTimestamp(profile.LastRemoteScreenshotSuccessUtc)}");
+        ImGui.TextUnformatted($"Last Screenshot Size: {remoteScreenshotService.LastDimensions ?? "never"}");
+        if (!string.IsNullOrWhiteSpace(remoteScreenshotService.LastError))
+            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Screenshot Error: {remoteScreenshotService.LastError}");
+        if (!string.IsNullOrWhiteSpace(replyReader.LastError))
+            ImGui.TextColored(new Vector4(0.95f, 0.35f, 0.38f, 1f), $"Reader Error: {replyReader.LastError}");
+        ImGui.TextDisabled("Sentinel Relay never prints the bot token and never treats Discord text as an arbitrary FFXIV command.");
+    }
+
+    private void SaveReplyConfiguration(string successMessage)
+    {
+        var result = saveReplySettings(new DiscordReplyConfigurationInput(
+            repliesEnabled,
+            remoteScreenshotsEnabled,
+            botTokenInput,
+            replyChannelId,
+            authorizedUserId,
+            new HashSet<RelayChatType>(outboundChannels)));
+        replyFeedback = result.Success ? successMessage : result.Error;
+        replyFeedbackIsError = !result.Success;
+        if (result.Success)
+            botTokenInput = string.Empty;
+    }
+
+    private void DrawReplyFeedback()
+    {
+        if (string.IsNullOrWhiteSpace(replyFeedback))
+            return;
+
+        var color = replyFeedbackIsError
+            ? new Vector4(0.95f, 0.35f, 0.38f, 1f)
+            : new Vector4(0.35f, 0.85f, 1f, 1f);
+        ImGui.TextColored(color, replyFeedback);
+    }
+
+    private void DrawKeywords(CharacterIdentity? identity, CharacterProfile? profile)
+    {
+        if (profile is null)
+        {
+            ImGui.TextUnformatted("Log into a character to edit its keyword alerts.");
+            return;
+        }
 
         ImGui.SetNextItemWidth(260);
         ImGui.InputTextWithHint("##new-keyword", "Keyword", ref newKeyword, 80);
