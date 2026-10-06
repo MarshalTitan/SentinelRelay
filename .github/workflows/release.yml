@@ -62,13 +62,24 @@ jobs:
           if ($entry.DownloadLinkInstall -ne $expectedAsset) {
             throw "repo.json release URL does not match: $expectedAsset"
           }
+          $releaseExists = $false
           gh release view $tag --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
-            throw "Release '$tag' already exists. Increment the version; published assets are immutable."
+            if ('${{ github.event_name }}' -ne 'workflow_dispatch') {
+              throw "Release '$tag' already exists. Increment the version; published assets are immutable."
+            }
+
+            $release = gh release view $tag --repo '${{ github.repository }}' --json assets | ConvertFrom-Json
+            if (@($release.assets | Where-Object name -eq 'SentinelRelay.zip').Count -ne 1) {
+              throw "Existing release '$tag' does not contain exactly one SentinelRelay.zip asset."
+            }
+
+            $releaseExists = $true
           }
           $global:LASTEXITCODE = 0
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "exists=$($releaseExists.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Restore locked dependencies
         run: dotnet restore SentinelRelay.csproj --locked-mode
@@ -91,6 +102,7 @@ jobs:
         run: Copy-Item -LiteralPath 'bin/Release/SentinelRelay/latest.zip' -Destination "$env:RUNNER_TEMP\SentinelRelay.zip" -Force
 
       - name: Publish live GitHub release
+        if: steps.version.outputs.exists != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -163,13 +175,17 @@ jobs:
       - name: Verify public central Sentinel catalog
         shell: pwsh
         run: |
-          $catalogUrl = 'https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json'
+          $catalogUrl = 'https://api.github.com/repos/MarshalTitan/Sentinel/contents/repo.json?ref=main'
           $expectedVersion = '${{ steps.version.outputs.value }}'
           $expectedAsset = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip"
 
-          for ($attempt = 1; $attempt -le 60; $attempt++) {
+          for ($attempt = 1; $attempt -le 30; $attempt++) {
             try {
-              $catalog = @(Invoke-RestMethod -Uri "$catalogUrl`?release=${{ github.run_id }}-$attempt")
+              $response = Invoke-RestMethod `
+                -Uri "$catalogUrl&release=${{ github.run_id }}-$attempt" `
+                -Headers @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'SentinelRelay-Release' }
+              $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($response.content -replace '\s', '')))
+              $catalog = @($json | ConvertFrom-Json)
               $entry = @($catalog | Where-Object InternalName -eq 'SentinelRelay')
               if ($entry.Count -eq 1 `
                   -and $entry[0].AssemblyVersion -eq $expectedVersion `
@@ -185,7 +201,7 @@ jobs:
               Write-Host "Central catalog verification attempt $attempt failed: $($_.Exception.Message)"
             }
 
-            Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 10
           }
 
           throw "The public central Sentinel catalog did not reach Sentinel Relay $expectedVersion within five minutes."
