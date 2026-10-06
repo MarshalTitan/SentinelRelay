@@ -15,6 +15,13 @@ public sealed class Configuration : IPluginConfiguration
     // migrated to Classic; users opt into Sentinel Modern from /srelay.
     public int ConfigurationTheme { get; set; } = ClassicTheme;
 
+    // Custom Modern header state. Classic keeps Dalamud's native window behavior.
+    public bool ModernWindowCollapsed { get; set; }
+
+    public float ModernExpandedWidth { get; set; }
+
+    public float ModernExpandedHeight { get; set; }
+
     public Dictionary<string, CharacterProfile> CharacterProfiles { get; set; } = new(StringComparer.Ordinal);
 
     public bool ShowPrivacyWarning { get; set; } = true;

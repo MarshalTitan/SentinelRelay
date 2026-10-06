@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.5.0.3`
+Live catalog version: `0.5.0.4`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.5.0.3` and verify the active character shown in the header.
+5. Confirm version `0.5.0.4` and verify the active character shown in the header.
 
 ## Appearance and interaction
 
@@ -24,12 +24,14 @@ Test with two independent FFXIV character profiles and two private Discord chann
 4. Confirm the slim icon rail stays on the far left and never stacks above the content, including at minimum width.
 5. Confirm each right-pane page begins directly with its functional settings, without a repeated page heading, description, or card heading.
 6. Confirm long labels and input rows wrap or stack cleanly at 100%, 125%, and 150% UI scale.
-7. Confirm the custom collapse and close controls work and `/srelay` reopens a collapsed window.
-8. Move and resize the window, close/reopen it, and confirm its position and any larger size persist.
-9. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
-10. Enable Dalamud reduced motion and confirm page/rail transitions become immediate while the ambient circles stop drifting.
-11. Confirm the header pill represents disconnected, webhook-only, linked-reader, paused/warning, and error states without exposing secrets.
-12. Use the Palette icon's **Switch to Classic** action, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
+7. Minimize the window and confirm it becomes the compact themed Sentinel header used by S Rank Sentinel, without a native title bar or settings content.
+8. Expand it again and confirm its previous width and expanded height are restored.
+9. Reload the plugin while minimized, open `/srelay`, and confirm the window safely reopens expanded with its saved position.
+10. Move and resize the window, close/reopen it, and confirm its position and any larger size persist.
+11. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
+12. Enable Dalamud reduced motion and confirm page/rail transitions become immediate while the ambient circles stop drifting.
+13. Confirm the header pill represents disconnected, webhook-only, linked-reader, paused/warning, and error states without exposing secrets.
+14. Use the Palette icon's **Switch to Classic** action, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
 
 - [ ] PASS
 

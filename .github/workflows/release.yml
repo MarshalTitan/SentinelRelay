@@ -112,7 +112,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Live Sentinel Relay Modern 2 migration pinned exactly to SentinelCore UI 0.3.1 from Core v0.3.1.0. Modern now uses the shared compact custom header, unified full-bleed surface, slim icon rail, real icons, status pills, glass cards, responsive settings rows, animated switches, stronger ambient treatment, and reduced-motion support. Classic and all existing relay, reply, reward, keyword, authorization, rate-limit, loop-protection, and screenshot behavior are preserved."
+            --notes "Sentinel Relay 0.5.0.4 keeps the Sentinel Modern custom header when minimized, matching S Rank Sentinel instead of falling back to an unthemed native title bar. The minimized state and prior expanded size are saved safely. SentinelCore UI remains pinned exactly to 0.3.1 from Core v0.3.1.0, and Classic plus all relay, reply, reward, keyword, authorization, rate-limit, loop-protection, and screenshot behavior are preserved."
 
       - name: Remove personal wording from superseded release notes
         shell: pwsh
