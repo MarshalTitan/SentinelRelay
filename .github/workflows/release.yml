@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]') || contains(github.event.head_commit.message, '[verify-live]')
     runs-on: windows-latest
 
     steps:
@@ -44,6 +44,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          VERIFY_EXISTING: ${{ contains(github.event.head_commit.message, '[verify-live]') }}
         run: |
           [xml]$project = Get-Content -LiteralPath 'SentinelRelay.csproj' -Raw
           $version = [string]$project.Project.PropertyGroup.Version
@@ -65,7 +66,7 @@ jobs:
           $releaseExists = $false
           gh release view $tag --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
-            if ('${{ github.event_name }}' -ne 'workflow_dispatch') {
+            if ('${{ github.event_name }}' -ne 'workflow_dispatch' -and $env:VERIFY_EXISTING -ne 'true') {
               throw "Release '$tag' already exists. Increment the version; published assets are immutable."
             }
 
