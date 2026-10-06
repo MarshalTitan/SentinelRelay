@@ -1,6 +1,6 @@
 # Sentinel Relay live-test checklist
 
-Live catalog version: `0.5.0.4`
+Live catalog version: `0.5.0.5`
 Test with two independent FFXIV character profiles and two private Discord channels. Record the Dalamud API, FFXIV patch, plugin commit, tester, and date.
 
 ## Install the live build
@@ -14,7 +14,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 
 3. Save and close settings.
 4. Run `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
-5. Confirm version `0.5.0.4` and verify the active character shown in the header.
+5. Confirm version `0.5.0.5` and verify the active character shown in the header.
 
 ## Appearance and interaction
 
@@ -31,7 +31,7 @@ Test with two independent FFXIV character profiles and two private Discord chann
 11. Navigate and activate controls with the usual mouse, keyboard, or controller interaction.
 12. Enable Dalamud reduced motion and confirm page/rail transitions become immediate while the ambient circles stop drifting.
 13. Confirm the header pill represents disconnected, webhook-only, linked-reader, paused/warning, and error states without exposing secrets.
-14. Use the Palette icon's **Switch to Classic** action, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
+14. Select **Theme** with the Palette icon, use the bottom **Use Classic Theme** action, reload the plugin, and confirm Classic renders normally and the selection persists; then select **Sentinel Modern** from Classic's General tab.
 
 - [ ] PASS
 
@@ -117,7 +117,7 @@ For a character that can access each chat type:
 
 ## G — Keyword highlight and optional ping
 
-1. In **Keywords**, save the intended numeric Discord User ID.
+1. In **Discord Webhook**, save the intended numeric Keyword Alert Discord User ID.
 2. Add keyword `ready`, contains mode, Free Company, and enable **Ping configured user**.
 3. From another character, send `Are you ready?` in Free Company chat.
 4. Confirm one relayed chat item includes a keyword alert and pings only the configured user.
@@ -162,9 +162,9 @@ Do not enable the second profile yet.
 
 1. Give the Sentinel Relay bot only **View Channel** and **Read Message History** in the first private relay channel.
 2. Enable the bot application's **Message Content Intent**; do not enable Presence or Server Members intents for this feature.
-3. In `/srelay` → **Discord Replies**, paste the protected bot token, first channel ID, and first authorized user ID.
-4. Enable **Allow /fc** and **Discord → FFXIV Replies**, then save.
-5. Select **Test Discord Reader** and confirm success.
+3. In `/srelay` → **Discord Webhook**, paste the protected bot token, first channel ID, and first authorized user ID; select **Save Discord Connection**.
+4. Select **Test Discord Reader** and confirm success.
+5. Open **Discord Replies**, enable **Allow /fc** and **Discord → FFXIV Replies**, then select **Save Reply Permissions**.
 6. Confirm the reader reports **Connected** and the checkpoint reports **established**.
 
 - [ ] PASS
@@ -263,8 +263,8 @@ Expected API 15 candidate RowIds are `SystemMessage` (57), `SystemError` (58), `
 
 Run this first on one character/profile. Keep the other profile's screenshot toggle off until the first route is proven.
 
-1. In `/srelay` → **Discord Replies**, confirm the bot reader test succeeds and the profile has its own webhook, relay channel ID, and authorized user ID.
-2. Enable **Allow authorized /screenshot window capture** and the master **Enable Discord → FFXIV Replies** switch, then save.
+1. In `/srelay` → **Discord Webhook**, confirm the bot reader test succeeds and the profile has its own webhook, relay channel ID, and authorized user ID.
+2. In **Discord Replies**, enable **Allow authorized /screenshot window capture** and the master **Enable Discord → FFXIV Replies** switch, then select **Save Reply Permissions**.
 3. With FFXIV restored in the normal foreground state, post the ordinary Discord message `/screenshot` from the authorized account in the configured relay channel.
 4. Confirm FFXIV immediately prints the accepted-request notice.
 5. Confirm Discord receives `【SCREENSHOT】 Character Name` plus an image of only the correct FFXIV client. Check that no desktop, taskbar, other application, or other FFXIV client is visible.
