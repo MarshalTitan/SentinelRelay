@@ -128,76 +128,60 @@ jobs:
           }
           ./.github/scripts/Validate-Package.ps1 -PackagePath $download -ExpectedVersion '${{ steps.version.outputs.value }}'
 
-      - name: Detect central catalog authorization
-        id: catalog-auth
+      - name: Trigger central Sentinel catalog reconciliation
         shell: pwsh
         env:
-          CATALOG_TOKEN: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
+          GH_TOKEN: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:CATALOG_TOKEN)) {
-            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            Write-Host '::notice::DALAMUD_CATALOG_TOKEN is not configured. The release is online, but the central catalog requires a separate update.'
-          }
-          else {
-            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            throw 'DALAMUD_CATALOG_TOKEN is required to publish Sentinel Relay to the central Sentinel catalog.'
           }
 
-      - name: Check out central catalog
-        if: steps.catalog-auth.outputs.enabled == 'true'
-        uses: actions/checkout@v7
-        with:
-          repository: MarshalTitan/Sentinel
-          ref: main
-          token: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
-          path: central-catalog
+          $payload = @{
+            event_type = 'plugin-released'
+            client_payload = @{
+              source_repository = '${{ github.repository }}'
+              source_commit = '${{ github.sha }}'
+              internal_name = 'SentinelRelay'
+              version = '${{ steps.version.outputs.value }}'
+              tag = '${{ steps.version.outputs.tag }}'
+            }
+          } | ConvertTo-Json -Depth 5
 
-      - name: Update only SentinelRelay in central catalog
-        if: steps.catalog-auth.outputs.enabled == 'true'
-        shell: pwsh
-        run: >-
-          ./.github/scripts/Upsert-CentralCatalogEntry.ps1
-          -ManifestPath 'central-catalog/repo.json'
-          -Version '${{ steps.version.outputs.value }}'
-          -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip'
-
-      - name: Validate and publish central catalog update
-        if: steps.catalog-auth.outputs.enabled == 'true'
-        shell: pwsh
-        working-directory: central-catalog
-        run: |
-          ./.github/scripts/Test-Catalog.ps1 `
-            -CatalogPath 'repo.json' `
-            -VerifyRemoteAssets `
-            -ExpectedInternalName 'SentinelRelay' `
-            -ExpectedVersion '${{ steps.version.outputs.value }}'
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- repo.json
-          git diff --cached --quiet
+          $payload | gh api `
+            --method POST `
+            'repos/MarshalTitan/Sentinel/dispatches' `
+            --input -
           if ($LASTEXITCODE -ne 0) {
-            git commit -m "Publish SentinelRelay ${{ steps.version.outputs.value }}"
-            git push origin HEAD:main
+            throw 'Failed to dispatch the central Sentinel catalog reconciliation.'
           }
 
-      - name: Verify public central catalog
-        if: steps.catalog-auth.outputs.enabled == 'true'
+      - name: Verify public central Sentinel catalog
         shell: pwsh
         run: |
           $catalogUrl = 'https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json'
-          for ($attempt = 1; $attempt -le 12; $attempt++) {
+          $expectedVersion = '${{ steps.version.outputs.value }}'
+          $expectedAsset = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip"
+
+          for ($attempt = 1; $attempt -le 60; $attempt++) {
             try {
               $catalog = @(Invoke-RestMethod -Uri "$catalogUrl`?release=${{ github.run_id }}-$attempt")
               $entry = @($catalog | Where-Object InternalName -eq 'SentinelRelay')
               if ($entry.Count -eq 1 `
-                  -and $entry[0].AssemblyVersion -eq '${{ steps.version.outputs.value }}' `
-                  -and -not [bool]$entry[0].IsTestingExclusive) {
-                Write-Host 'Verified public live SentinelRelay catalog entry.'
+                  -and $entry[0].AssemblyVersion -eq $expectedVersion `
+                  -and $entry[0].TestingAssemblyVersion -eq $expectedVersion `
+                  -and $entry[0].DownloadLinkInstall -eq $expectedAsset `
+                  -and $entry[0].DownloadLinkUpdate -eq $expectedAsset `
+                  -and $entry[0].DownloadLinkTesting -eq $expectedAsset) {
+                Write-Host "Verified Sentinel Relay $expectedVersion in the public central catalog."
                 exit 0
               }
             }
             catch {
-              if ($attempt -eq 12) { throw }
+              Write-Host "Central catalog verification attempt $attempt failed: $($_.Exception.Message)"
             }
+
             Start-Sleep -Seconds 5
           }
-          throw 'The public SentinelRelay catalog entry did not reach the expected live state.'
+
+          throw "The public central Sentinel catalog did not reach Sentinel Relay $expectedVersion within five minutes."
