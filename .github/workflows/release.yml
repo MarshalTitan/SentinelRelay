@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]') || contains(github.event.head_commit.message, '[verify-live]')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]') || contains(github.event.head_commit.message, '[verify-live]'))
     runs-on: windows-latest
 
     steps:
@@ -52,17 +52,11 @@ jobs:
             throw "Version must contain four numeric components: $version"
           }
           $tag = "v$version"
-          $entry = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json) | Select-Object -First 1
-          if ($entry.InternalName -ne 'SentinelRelay' -or $entry.AssemblyVersion -ne $version) {
-            throw 'repo.json must contain SentinelRelay at the project version before release.'
+          $entries = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json)
+          if (@($entries | Where-Object InternalName -eq 'SentinelRelay').Count -ne 1) {
+            throw 'Root repo.json must contain exactly one SentinelRelay entry.'
           }
-          if ([bool]$entry.IsTestingExclusive) {
-            throw 'Live releases must not be marked IsTestingExclusive.'
-          }
-          $expectedAsset = "https://github.com/MarshalTitan/SentinelRelay/releases/download/v$version/SentinelRelay.zip"
-          if ($entry.DownloadLinkInstall -ne $expectedAsset) {
-            throw "repo.json release URL does not match: $expectedAsset"
-          }
+          if ([bool]($entries | Where-Object InternalName -eq 'SentinelRelay').IsTestingExclusive) { throw 'Live releases must not be testing exclusive.' }
           $releaseExists = $false
           gh release view $tag --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
@@ -114,20 +108,6 @@ jobs:
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
             --notes "Sentinel Relay 0.5.0.5 groups the webhook, keyword-alert user ID, protected bot credential, relay channel ID, authorized user ID, and reader connectivity on the Discord Webhook page. Replies & Controls now focuses on explicit outbound permissions. The Modern Theme destination uses Sentinel HUD's action-dock theme switch. SentinelCore UI remains pinned exactly to 0.3.1 from Core v0.3.1.0, and all relay, reply, reward, keyword, authorization, rate-limit, loop-protection, screenshot, Classic-theme, and minimized-header behavior is preserved."
 
-      - name: Remove personal wording from superseded release notes
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view 'v0.1.0.0' --repo '${{ github.repository }}' *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release edit 'v0.1.0.0' `
-              --repo '${{ github.repository }}' `
-              --title 'Sentinel Relay 0.1.0.0 (superseded)' `
-              --notes 'Superseded by the current live Sentinel Relay release.'
-          }
-          $global:LASTEXITCODE = 0
-
       - name: Verify public release asset
         shell: pwsh
         run: |
@@ -145,64 +125,10 @@ jobs:
           }
           ./.github/scripts/Validate-Package.ps1 -PackagePath $download -ExpectedVersion '${{ steps.version.outputs.value }}'
 
-      - name: Trigger central Sentinel catalog reconciliation
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
-            throw 'DALAMUD_CATALOG_TOKEN is required to publish Sentinel Relay to the central Sentinel catalog.'
-          }
-
-          $payload = @{
-            event_type = 'plugin-released'
-            client_payload = @{
-              source_repository = '${{ github.repository }}'
-              source_commit = '${{ github.sha }}'
-              internal_name = 'SentinelRelay'
-              version = '${{ steps.version.outputs.value }}'
-              tag = '${{ steps.version.outputs.tag }}'
-            }
-          } | ConvertTo-Json -Depth 5
-
-          $payload | gh api `
-            --method POST `
-            'repos/MarshalTitan/Sentinel/dispatches' `
-            --input -
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Failed to dispatch the central Sentinel catalog reconciliation.'
-          }
-
-      - name: Verify public central Sentinel catalog
-        shell: pwsh
-        run: |
-          $catalogUrl = 'https://api.github.com/repos/MarshalTitan/Sentinel/contents/repo.json?ref=main'
-          $expectedVersion = '${{ steps.version.outputs.value }}'
-          $expectedAsset = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelRelay.zip"
-
-          for ($attempt = 1; $attempt -le 30; $attempt++) {
-            try {
-              $response = Invoke-RestMethod `
-                -Uri "$catalogUrl&release=${{ github.run_id }}-$attempt" `
-                -Headers @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'SentinelRelay-Release' }
-              $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($response.content -replace '\s', '')))
-              $catalog = @($json | ConvertFrom-Json)
-              $entry = @($catalog | Where-Object InternalName -eq 'SentinelRelay')
-              if ($entry.Count -eq 1 `
-                  -and $entry[0].AssemblyVersion -eq $expectedVersion `
-                  -and $entry[0].TestingAssemblyVersion -eq $expectedVersion `
-                  -and $entry[0].DownloadLinkInstall -eq $expectedAsset `
-                  -and $entry[0].DownloadLinkUpdate -eq $expectedAsset `
-                  -and $entry[0].DownloadLinkTesting -eq $expectedAsset) {
-                Write-Host "Verified Sentinel Relay $expectedVersion in the public central catalog."
-                exit 0
-              }
-            }
-            catch {
-              Write-Host "Central catalog verification attempt $attempt failed: $($_.Exception.Message)"
-            }
-
-            Start-Sleep -Seconds 10
-          }
-
-          throw "The public central Sentinel catalog did not reach Sentinel Relay $expectedVersion within five minutes."
+      - name: Publish authoritative child manifest and verify central catalog
+        uses: MarshalTitan/Sentinel/.github/actions/distribute@4bbc5ce50837b37c8cfaee5c39a075c4f68858ed
+        with:
+          internal-name: SentinelRelay
+          version: ${{ steps.version.outputs.value }}
+          tag: ${{ steps.version.outputs.tag }}
+          notification-token: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
