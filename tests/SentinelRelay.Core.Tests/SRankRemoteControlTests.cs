@@ -155,7 +155,9 @@ internal static class SRankRemoteControlTests
         foreach (var input in new[] { "", "{}", "not json", StatusJson().Replace("sentinel.srank.remote.v1", "wrong"),
             new string('x', 8193), StatusJson().Replace("\"Loaded\":true", "\"Loaded\":false") })
             Check(!SRankRemoteResponse.Decode(input).Success);
-        Check(!SRankRemoteResponse.Decode(StatusJson().Replace("\"Status\"}", "\"private-secret\"}")).Reason.Contains("private-secret"));
+        var rejected = SRankRemoteResponse.Decode(StatusJson().Replace("\"Reason\":\"Status\"", "\"Reason\":\"private-secret\""));
+        Check(!rejected.Success && rejected.Reason == "Unavailable" && !rejected.Reason.Contains("private-secret"));
+        Check(SRankRemoteResponse.Decode(StatusJson().Replace("\"ActiveHunt\":\"Tyger\"", "\"ActiveHunt\":null")).Success);
     }
     private static void Formatting()
     {

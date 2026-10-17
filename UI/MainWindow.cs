@@ -401,7 +401,7 @@ public sealed class MainWindow : Window, IDisposable
     private void DrawModernShell(CharacterIdentity? identity, CharacterProfile? profile)
     {
         themeState.SelectTheme(SentinelThemeKind.Modern);
-        var direction = profile?.DiscordRepliesEnabled == true ? "FFXIV ↔ Discord" : "FFXIV → Discord";
+        var direction = profile?.DiscordRepliesEnabled == true || profile?.RemoteSRankControlsEnabled == true ? "FFXIV ↔ Discord" : "FFXIV → Discord";
         var options = new SentinelModernAppShellOptions(
             "SentinelRelay.Modern2",
             "Sentinel Relay",
@@ -652,6 +652,13 @@ public sealed class MainWindow : Window, IDisposable
     }
 
     private void DrawDiscordReplies(CharacterIdentity? identity, CharacterProfile? profile)
+    {
+        if (ImGui.BeginChild("ReplyControlsScroll", Vector2.Zero, false))
+            DrawDiscordRepliesContent(identity, profile);
+        ImGui.EndChild();
+    }
+
+    private void DrawDiscordRepliesContent(CharacterIdentity? identity, CharacterProfile? profile)
     {
         if (profile is null || identity is null)
         {
@@ -960,7 +967,7 @@ public sealed class MainWindow : Window, IDisposable
             repliesEnabled = false;
             remoteScreenshotsEnabled = false;
             remoteSRankControlsEnabled = false;
-            replyFeedback = "Bot credential removed; Discord replies and remote screenshots are disabled for this character.";
+            replyFeedback = "Bot credential removed; Discord replies, screenshots and SRank controls are disabled for this character.";
             replyFeedbackIsError = false;
         }
         if (!hasBotCredential)
@@ -968,7 +975,7 @@ public sealed class MainWindow : Window, IDisposable
 
         DrawReplyFeedback();
         ImGui.Separator();
-        var readerStatus = profile.DiscordRepliesEnabled ? replyReader.State.ToString() : "Disabled";
+        var readerStatus = profile.DiscordRepliesEnabled || profile.RemoteSRankControlsEnabled ? replyReader.State.ToString() : "Disabled";
         ImGui.TextUnformatted($"Reader Status: {readerStatus}");
         ImGui.TextUnformatted($"Last Reader Success: {FormatTimestamp(profile.LastDiscordReaderSuccessUtc)}");
         ImGui.TextUnformatted($"Checkpoint: {(string.IsNullOrWhiteSpace(profile.LastProcessedDiscordMessageId) ? "not established" : "established")}");

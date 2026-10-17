@@ -745,7 +745,7 @@ public sealed partial class Plugin : IDalamudPlugin
             + $"Discord webhook: {(activeWebhookEndpoint is null ? "not configured" : "configured")}; "
             + $"relay: {relayState}; "
             + $"enabled chats: {(enabled.Length == 0 ? "none" : enabled)}; queue: {webhookRelay.QueueLength}; "
-            + $"Discord replies: {replyState}; remote screenshots: {(activeProfile?.RemoteScreenshotsEnabled == true ? "enabled" : "disabled")}.");
+            + $"Discord replies: {replyState}; remote screenshots: {(activeProfile?.RemoteScreenshotsEnabled == true ? "enabled" : "disabled")}; SRank controls: {(activeProfile?.RemoteSRankControlsEnabled == true ? "enabled" : "disabled")}; reader: {discordReplyReader.State}.");
     }
 
     private static bool IsPlausibleBotToken(string? value) =>

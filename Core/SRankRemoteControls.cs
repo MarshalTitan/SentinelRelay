@@ -49,6 +49,9 @@ public sealed class SRankRemoteControlSession
             Clear();
             return Reject("RemoteControlsDisabled");
         }
+        if (!DiscordSnowflake.IsValid(profile.DiscordRelayChannelId) ||
+            !DiscordSnowflake.IsValid(profile.AuthorizedDiscordUserId))
+            return Reject("ConfigurationInvalid");
         var checkpoint = DiscordSnowflake.Compare(highWater, checkpointBeforeBatch) > 0
             ? highWater : checkpointBeforeBatch;
         if (!DiscordReplyPolicy.TryAuthorizeSource(profile, identity, source, checkpoint,
