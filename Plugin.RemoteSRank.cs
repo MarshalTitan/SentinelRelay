@@ -34,7 +34,7 @@ public sealed partial class Plugin
             return; // No mutation without a configured result channel.
         }
 
-        var authorization = srankRemoteSession.Accept(profile, identity, source, checkpoint, DateTime.UtcNow);
+        var authorization = srankRemoteSession.Accept(profile, identity, source, checkpoint, DateTime.UtcNow, readerGeneration);
         if (!authorization.Accepted)
         {
             Diagnostic("RemoteControlRejected", authorization.Reason);
@@ -58,7 +58,9 @@ public sealed partial class Plugin
             Diagnostic("RemoteControlConfirmed", "ResetConfirmed");
         if (!profile.RemoteSRankControlsEnabled || profile.Paused ||
             !discordReplyReader.IsCurrentGeneration(readerGeneration) ||
-            characterContext.Current?.CharacterKey != identity.CharacterKey)
+            characterContext.Current?.CharacterKey != identity.CharacterKey ||
+            !DiscordReplyPolicy.TryAuthorizeSource(profile, characterContext.Current, source,
+                checkpoint, DateTime.UtcNow, out _, requireReplies: false))
         {
             srankRemoteSession.Clear();
             Diagnostic("RemoteControlRejected", "AuthorizationChangedBeforeExecution");

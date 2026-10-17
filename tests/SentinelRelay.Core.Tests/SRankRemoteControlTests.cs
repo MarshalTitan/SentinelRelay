@@ -142,6 +142,12 @@ internal static class SRankRemoteControlTests
         p.RemoteSRankControlsEnabled = true;
         Check(!Accept(s, p, Message(5, "/srank reset confirm")).Accepted);
         Check(!Accept(new(), p, Message(6, "/srank reset confirm")).Accepted);
+        var generations = new SRankRemoteControlSession();
+        Check(generations.Accept(p, Identity(), Message(7, "/srank reset"), Checkpoint, Now, 3).Accepted);
+        Check(!generations.Accept(p, Identity(), Message(8, "/srank reset confirm"), Checkpoint, Now, 4).Accepted);
+        Check(generations.Accept(p, Identity(), Message(9, "/srank reset"), Checkpoint, Now, 4).Accepted);
+        Check(!generations.Accept(p, Identity(), Message(10, "/srank reset confirm"), Checkpoint, Now, 3).Accepted);
+        Check(generations.Accept(p, Identity(), Message(11, "/srank reset confirm"), Checkpoint, Now, 4).Decision == SRankRemoteDecision.Reset);
     }
     private static string StatusJson() => JsonSerializer.Serialize(new
     {

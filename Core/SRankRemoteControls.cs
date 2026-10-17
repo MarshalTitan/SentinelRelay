@@ -34,6 +34,7 @@ public sealed class SRankRemoteControlSession
     public static readonly TimeSpan ConfirmationWindow = TimeSpan.FromSeconds(30);
     private PendingReset? pending;
     private string highWater = string.Empty;
+    private int readerEpoch;
     private sealed record PendingReset(string CharacterKey, string Channel, string User,
         string RequestId, DateTime ExpiresUtc);
 
@@ -42,8 +43,14 @@ public sealed class SRankRemoteControlSession
     public void Clear() => pending = null;
 
     public SRankRemoteAuthorization Accept(CharacterProfile profile, CharacterIdentity? identity,
-        DiscordChannelMessage source, string checkpointBeforeBatch, DateTime now)
+        DiscordChannelMessage source, string checkpointBeforeBatch, DateTime now, int readerGeneration = 0)
     {
+        if (readerGeneration < readerEpoch) return Reject("StaleReaderGeneration");
+        if (readerGeneration > readerEpoch)
+        {
+            Clear();
+            readerEpoch = readerGeneration;
+        }
         if (!profile.RemoteSRankControlsEnabled)
         {
             Clear();
