@@ -63,7 +63,7 @@ webhook, Discord IDs, raw command text or full status text is logged.
 Use Dalamud's normal plugin updater with the permanent Sentinel repository:
 `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json`.
 Keep dev copies disabled; update/reload the live plugins and confirm SRank **0.7.62.0**
-and Relay **0.5.0.6**. Do not delete config. Do not enable Elektra yet.
+and Relay **0.5.0.7**. Do not delete config. Do not enable Elektra yet.
 
 1. Log into Wrothy Minioa. In `/srelay`, retain the existing Wrothy webhook, bot
    credential, channel and authorized user. Replies & Controls → Remote Sentinel
@@ -89,7 +89,7 @@ response/last RemoteControl log lines. Do not send tokens, webhook URLs or confi
 Rollback: turn the permission OFF/save; normal hunting and Relay remain available.
 For a binary rollback, unload the new copies and use preserved prior SRank **0.7.56.0**
 and Relay **0.5.0.5** releases. Configuration is additive; no cleanup or migration is
-needed. Normal-updater distribution is authorized; it does not claim live acceptance.
+needed. Publication alone does not prove native acceptance; the scoped returned evidence is recorded below.
 
 ## Territory labels — Relay 0.5.0.7
 
