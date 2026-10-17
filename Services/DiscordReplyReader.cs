@@ -24,7 +24,8 @@ public sealed record DiscordMessageBatch(
     string CharacterKey,
     string CheckpointBeforeBatch,
     string NewCheckpoint,
-    IReadOnlyList<DiscordChannelMessage> Messages);
+    IReadOnlyList<DiscordChannelMessage> Messages,
+    int Generation = 0);
 
 public sealed record DiscordReaderTestResult(
     string CharacterKey,
@@ -224,7 +225,8 @@ public sealed class DiscordReplyReader : IDisposable
                         configuration.CharacterKey,
                         previous,
                         checkpoint,
-                        ordered));
+                        ordered,
+                        generation));
                 }
 
                 if (!cancellationToken.IsCancellationRequested)
@@ -252,6 +254,12 @@ public sealed class DiscordReplyReader : IDisposable
             lastError = null;
             lastSuccessUtc = DateTime.UtcNow;
         }
+    }
+
+    public bool IsCurrentGeneration(int generation)
+    {
+        lock (gate)
+            return !disposed && generation == activeGeneration && state == DiscordReplyReaderState.Connected;
     }
 
     private bool IsActive(int generation)

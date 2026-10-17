@@ -79,10 +79,11 @@ public static class DiscordReplyPolicy
         DiscordChannelMessage source,
         string checkpointBeforeBatch,
         DateTime utcNow,
-        out DiscordReplyRejection rejection)
+        out DiscordReplyRejection rejection,
+        bool requireReplies = true)
     {
         rejection = DiscordReplyRejection.None;
-        if (!profile.DiscordRepliesEnabled)
+        if (requireReplies && !profile.DiscordRepliesEnabled)
             return Reject(DiscordReplyRejection.Disabled, out rejection);
         if (profile.Paused)
             return Reject(DiscordReplyRejection.Paused, out rejection);

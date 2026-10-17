@@ -13,6 +13,8 @@
     <Compile Include="../../Core/DuplicateMessageFilter.cs" Link="Core/DuplicateMessageFilter.cs" />
     <Compile Include="../../Core/DiscordReplyCommandParser.cs" Link="Core/DiscordReplyCommandParser.cs" />
     <Compile Include="../../Core/DiscordControlCommandParser.cs" Link="Core/DiscordControlCommandParser.cs" />
+    <Compile Include="../../Core/SRankRemoteControls.cs" Link="Core/SRankRemoteControls.cs" />
+    <Compile Include="../../Core/SRankRemoteResponse.cs" Link="Core/SRankRemoteResponse.cs" />
     <Compile Include="../../Core/DiscordReplyPolicy.cs" Link="Core/DiscordReplyPolicy.cs" />
     <Compile Include="../../Core/DiscordSnowflake.cs" Link="Core/DiscordSnowflake.cs" />
     <Compile Include="../../Core/KeywordMatcher.cs" Link="Core/KeywordMatcher.cs" />

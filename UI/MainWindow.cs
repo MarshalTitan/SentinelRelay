@@ -191,6 +191,7 @@ public sealed class MainWindow : Window, IDisposable
     private string authorizedUserId = string.Empty;
     private bool repliesEnabled;
     private bool remoteScreenshotsEnabled;
+    private bool remoteSRankControlsEnabled;
     private readonly HashSet<RelayChatType> outboundChannels = [];
     private string? replyFeedback;
     private bool replyFeedbackIsError;
@@ -339,6 +340,7 @@ public sealed class MainWindow : Window, IDisposable
             authorizedUserId = profile?.AuthorizedDiscordUserId ?? string.Empty;
             repliesEnabled = profile?.DiscordRepliesEnabled ?? false;
             remoteScreenshotsEnabled = profile?.RemoteScreenshotsEnabled ?? false;
+            remoteSRankControlsEnabled = profile?.RemoteSRankControlsEnabled ?? false;
             outboundChannels.Clear();
             if (profile is not null)
                 outboundChannels.UnionWith(profile.EnabledOutboundChannels.Where(ChannelPolicy.ImplementedOutboundChannels.Contains));
@@ -441,7 +443,7 @@ public sealed class MainWindow : Window, IDisposable
             HasWebhook: getWebhookEndpoint() is not null,
             WebhookSending: relay.State == WebhookRelayState.Sending,
             WebhookError: relay.State == WebhookRelayState.Error,
-            RepliesEnabled: profile?.DiscordRepliesEnabled == true,
+            RepliesEnabled: profile?.DiscordRepliesEnabled == true || profile?.RemoteSRankControlsEnabled == true,
             ReaderInitializing: replyReader.State == DiscordReplyReaderState.Initializing,
             ReaderConnected: replyReader.State == DiscordReplyReaderState.Connected,
             ReaderError: replyReader.State == DiscordReplyReaderState.Error,
@@ -658,6 +660,11 @@ public sealed class MainWindow : Window, IDisposable
         }
 
         DrawBooleanControl("discord-replies-enabled", "Enable Discord → FFXIV Replies", ref repliesEnabled);
+        ImGui.Spacing();
+        ImGui.TextUnformatted("Remote Sentinel Controls");
+        DrawBooleanControl("remote-srank-controls-enabled", "Allow SRankSentinel remote controls", ref remoteSRankControlsEnabled);
+        ImGui.TextWrapped("Separate per-character permission: /srank status, /srank skip, /srank reset, /srank reset confirm. Reset needs confirmation within 30 seconds. Works without chat reply destinations.");
+        ImGui.Spacing();
         DrawBooleanControl("remote-screenshots-enabled", "Allow authorized /screenshot window capture", ref remoteScreenshotsEnabled);
         ImGui.TextDisabled("Captures only this FFXIV process's client area into memory, then uploads a bounded PNG through this character's webhook.");
         ImGui.TextDisabled("The game must not be minimized. A 15-second cooldown applies, and every accepted request prints an in-game notice.");
@@ -952,6 +959,7 @@ public sealed class MainWindow : Window, IDisposable
             botTokenInput = string.Empty;
             repliesEnabled = false;
             remoteScreenshotsEnabled = false;
+            remoteSRankControlsEnabled = false;
             replyFeedback = "Bot credential removed; Discord replies and remote screenshots are disabled for this character.";
             replyFeedbackIsError = false;
         }
@@ -982,7 +990,8 @@ public sealed class MainWindow : Window, IDisposable
             botTokenInput,
             replyChannelId,
             authorizedUserId,
-            new HashSet<RelayChatType>(outboundChannels)));
+            new HashSet<RelayChatType>(outboundChannels),
+            remoteSRankControlsEnabled));
         replyFeedback = result.Success ? successMessage : result.Error;
         replyFeedbackIsError = !result.Success;
         if (result.Success)
