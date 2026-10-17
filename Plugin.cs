@@ -19,9 +19,10 @@ public sealed record DiscordReplyConfigurationInput(
     string BotToken,
     string ChannelId,
     string AuthorizedUserId,
-    IReadOnlySet<RelayChatType> EnabledOutboundChannels);
+    IReadOnlySet<RelayChatType> EnabledOutboundChannels,
+    bool RemoteSRankControlsEnabled = false);
 
-public sealed class Plugin : IDalamudPlugin
+public sealed partial class Plugin : IDalamudPlugin
 {
     private const string CommandName = "/srelay";
     private static readonly string PluginVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "unknown";
@@ -134,6 +135,7 @@ public sealed class Plugin : IDalamudPlugin
         remoteScreenshotService.Dispose();
         mainWindow.Dispose();
         outboundQueue.Clear();
+        srankRemoteSession.Clear();
         windows.RemoveAllWindows();
     }
 
@@ -161,6 +163,8 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
+        if (discordReplyReader.State != DiscordReplyReaderState.Connected)
+            srankRemoteSession.Clear();
         var now = DateTime.UtcNow;
         if (now >= nextCharacterCheckUtc)
         {
@@ -178,6 +182,7 @@ public sealed class Plugin : IDalamudPlugin
         if (!force && identity?.CharacterKey == activeIdentity?.CharacterKey)
             return;
 
+        srankRemoteSession.Clear();
         webhookRelay.ClearQueue();
         discordReplyReader.Stop();
         remoteScreenshotService.Cancel();
@@ -225,13 +230,14 @@ public sealed class Plugin : IDalamudPlugin
 
     private void RefreshDiscordReplyReader()
     {
+        srankRemoteSession.Clear();
         discordReplyReader.Stop();
         if (activeProfile is null
             || activeIdentity is null
             || activeProfile.Paused
-            || !activeProfile.DiscordRepliesEnabled
+            || (!activeProfile.DiscordRepliesEnabled && !activeProfile.RemoteSRankControlsEnabled)
             || (!activeProfile.EnabledOutboundChannels.Overlaps(ChannelPolicy.ImplementedOutboundChannels)
-                && !activeProfile.RemoteScreenshotsEnabled))
+                && !activeProfile.RemoteScreenshotsEnabled && !activeProfile.RemoteSRankControlsEnabled))
             return;
 
         var token = secretProtector.UnprotectDiscordBotToken(activeProfile.ProtectedDiscordBotToken);
@@ -256,6 +262,7 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
+            srankRemoteSession.Clear();
             remoteScreenshotService.Cancel();
             lastAcceptedScreenshotUtc = null;
             activeProfile.ProtectedWebhookUrl = secretProtector.Protect(value.Trim());
@@ -277,6 +284,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (activeProfile is null)
             return;
+        srankRemoteSession.Clear();
         activeProfile.ProtectedWebhookUrl = string.Empty;
         activeProfile.LastWebhookSuccessUtc = null;
         activeWebhookEndpoint = null;
@@ -318,7 +326,9 @@ public sealed class Plugin : IDalamudPlugin
             return new WebhookConfigurationResult(false, "Paste the Discord bot token before saving.");
         if (input.EnabledOutboundChannels.Any(channel => !ChannelPolicy.ImplementedOutboundChannels.Contains(channel)))
             return new WebhookConfigurationResult(false, "The outbound reply list contains an unsupported destination.");
-        if (input.Enabled && input.EnabledOutboundChannels.Count == 0 && !input.RemoteScreenshotsEnabled)
+        if (input.RemoteSRankControlsEnabled && activeWebhookEndpoint is null)
+            return new WebhookConfigurationResult(false, "Configure this character's Discord webhook before enabling remote Sentinel controls.");
+        if (input.Enabled && input.EnabledOutboundChannels.Count == 0 && !input.RemoteScreenshotsEnabled && !input.RemoteSRankControlsEnabled)
             return new WebhookConfigurationResult(false, "Enable at least one reply destination or authorized remote screenshots before enabling the reader.");
 
         try
@@ -331,6 +341,7 @@ public sealed class Plugin : IDalamudPlugin
             activeProfile.AuthorizedDiscordUserId = userId;
             activeProfile.DiscordRepliesEnabled = input.Enabled;
             activeProfile.RemoteScreenshotsEnabled = input.RemoteScreenshotsEnabled;
+            activeProfile.RemoteSRankControlsEnabled = input.RemoteSRankControlsEnabled;
             activeProfile.EnabledOutboundChannels = [.. input.EnabledOutboundChannels];
             SaveConfiguration();
             RefreshDiscordReplyReader();
@@ -350,6 +361,8 @@ public sealed class Plugin : IDalamudPlugin
         activeProfile.ProtectedDiscordBotToken = string.Empty;
         activeProfile.DiscordRepliesEnabled = false;
         activeProfile.RemoteScreenshotsEnabled = false;
+        activeProfile.RemoteSRankControlsEnabled = false;
+        srankRemoteSession.Clear();
         activeProfile.LastProcessedDiscordMessageId = string.Empty;
         activeProfile.LastDiscordReaderSuccessUtc = null;
         discordReplyReader.Stop();
@@ -472,6 +485,8 @@ public sealed class Plugin : IDalamudPlugin
         if (!Configuration.CharacterProfiles.TryGetValue(batch.CharacterKey, out var profile))
             return;
 
+        var srankCheckpoint = DiscordSnowflake.Compare(profile.LastProcessedDiscordMessageId, batch.CheckpointBeforeBatch) > 0
+            ? profile.LastProcessedDiscordMessageId : batch.CheckpointBeforeBatch;
         // Commit the high-water mark before queueing any game action. A process
         // interruption can drop a command, but can never replay it after restart.
         if (DiscordSnowflake.Compare(batch.NewCheckpoint, profile.LastProcessedDiscordMessageId) > 0)
@@ -485,6 +500,12 @@ public sealed class Plugin : IDalamudPlugin
 
         foreach (var source in batch.Messages)
         {
+            if (SRankRemoteCommandParser.IsSRank(source.Content))
+            {
+                if (discordReplyReader.IsCurrentGeneration(batch.Generation))
+                    HandleSRankRemote(profile, source, srankCheckpoint, batch.Generation);
+                continue;
+            }
             if (DiscordControlCommandParser.TryParse(source.Content, out var controlCommand)
                 && controlCommand == DiscordControlCommand.Screenshot)
             {
@@ -639,6 +660,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void SetPaused(bool paused)
     {
+        srankRemoteSession.Clear();
         if (activeProfile is null)
             return;
         activeProfile.Paused = paused;
@@ -723,7 +745,7 @@ public sealed class Plugin : IDalamudPlugin
             + $"Discord webhook: {(activeWebhookEndpoint is null ? "not configured" : "configured")}; "
             + $"relay: {relayState}; "
             + $"enabled chats: {(enabled.Length == 0 ? "none" : enabled)}; queue: {webhookRelay.QueueLength}; "
-            + $"Discord replies: {replyState}; remote screenshots: {(activeProfile?.RemoteScreenshotsEnabled == true ? "enabled" : "disabled")}.");
+            + $"Discord replies: {replyState}; remote screenshots: {(activeProfile?.RemoteScreenshotsEnabled == true ? "enabled" : "disabled")}; SRank controls: {(activeProfile?.RemoteSRankControlsEnabled == true ? "enabled" : "disabled")}; reader: {discordReplyReader.State}.");
     }
 
     private static bool IsPlausibleBotToken(string? value) =>

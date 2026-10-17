@@ -21,6 +21,9 @@ public sealed class CharacterProfile
     // the same authenticated Discord reader used by chat replies.
     public bool RemoteScreenshotsEnabled { get; set; }
 
+    // Independent per-character access boundary; absent in old configs means false.
+    public bool RemoteSRankControlsEnabled { get; set; }
+
     public string DiscordRelayChannelId { get; set; } = string.Empty;
 
     public string AuthorizedDiscordUserId { get; set; } = string.Empty;

@@ -106,7 +106,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Sentinel Relay 0.5.0.5 groups the webhook, keyword-alert user ID, protected bot credential, relay channel ID, authorized user ID, and reader connectivity on the Discord Webhook page. Replies & Controls now focuses on explicit outbound permissions. The Modern Theme destination uses Sentinel HUD's action-dock theme switch. SentinelCore UI remains pinned exactly to 0.3.1 from Core v0.3.1.0, and all relay, reply, reward, keyword, authorization, rate-limit, loop-protection, screenshot, Classic-theme, and minimized-header behavior is preserved."
+            --notes "Sentinel Relay 0.5.0.6 adds separately authorized, per-character SRank status, skip and 30-second confirmed reset through fixed character-bound IPC. Remote controls default OFF; enable only the intended character after updating SRankSentinel to 0.7.62.0. Existing chat, screenshot, settings and Core UI behavior are preserved. Published at the user request through normal updates; real Discord/game acceptance remains pending."
 
       - name: Verify public release asset
         shell: pwsh

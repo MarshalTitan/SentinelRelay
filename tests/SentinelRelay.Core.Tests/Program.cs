@@ -6,6 +6,8 @@ using SentinelRelay.Core;
 using SentinelRelay.Models;
 using SentinelRelay.Services;
 
+SRankRemoteControlTests.Run();
+
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("all chat filters default off", Sync(FiltersAreOptIn)),
