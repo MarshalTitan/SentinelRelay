@@ -106,7 +106,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Sentinel Relay 0.5.0.6 adds separately authorized, per-character SRank status, skip and 30-second confirmed reset through fixed character-bound IPC. Remote controls default OFF; enable only the intended character after updating SRankSentinel to 0.7.62.0. Existing chat, screenshot, settings and Core UI behavior are preserved. Published at the user request through normal updates; real Discord/game acceptance remains pending."
+            --notes "Adds localized map names alongside territory IDs in SRank status and recovery replies, with numeric fallback when game data is unavailable. Compatible with SRankSentinel 0.7.62.0; permissions, recovery behavior and saved configuration are unchanged."
 
       - name: Verify public release asset
         shell: pwsh
