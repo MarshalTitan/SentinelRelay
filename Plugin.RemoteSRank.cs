@@ -1,3 +1,4 @@
+using Lumina.Excel.Sheets;
 using SentinelRelay.Core;
 using SentinelRelay.Models;
 using SentinelRelay.Services;
@@ -70,8 +71,24 @@ public sealed partial class Plugin
         Diagnostic(result.Success ? "RemoteControlExecuted" : "RemoteControlFailed",
             result.Reason, result.Status?.State ?? "unavailable");
         if (!webhookRelay.TryEnqueue(identity.CharacterKey, activeWebhookEndpoint,
-                [SRankRemoteResponseFormatter.Format(identity.CharacterName, authorization.Decision, result)]))
+                [SRankRemoteResponseFormatter.Format(identity.CharacterName, authorization.Decision, result,
+                    result.Status is { } status ? ResolveSRankTerritoryName(status.Territory) : null)]))
             Diagnostic("RemoteControlFailed", "ResponseQueueFull");
         // Never repeat IPC when result delivery fails: requests are at-most-once, not guaranteed delivery.
+    }
+
+    private static string? ResolveSRankTerritoryName(uint territory)
+    {
+        try
+        {
+            var sheet = DataManager.GetExcelSheet<TerritoryType>();
+            return sheet.TryGetRow(territory, out var row) && row.PlaceName.IsValid
+                ? row.PlaceName.Value.Name.ToString() : null;
+        }
+        catch
+        {
+            // A missing row/sheet must not hide an accepted recovery result or retry IPC.
+            return null;
+        }
     }
 }

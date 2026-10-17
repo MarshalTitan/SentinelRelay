@@ -21,6 +21,7 @@ internal static class SRankRemoteControlTests
             ("clear/reload/permission changes drop pending confirmation", Lifecycle),
             ("missing, malformed and incompatible IPC replies are unavailable", Response),
             ("compact replies omit timestamps and disable all mentions", Formatting),
+            ("territory names retain IDs with numeric fallback and sanitized bounded text", TerritoryFormatting),
         };
         foreach (var (name, test) in tests) { test(); Console.WriteLine("PASS SRank remote: " + name); }
         Console.WriteLine(tests.Length + "/" + tests.Length + " SRank remote control groups passed");
@@ -172,5 +173,18 @@ internal static class SRankRemoteControlTests
         Check(payload.AllowedMentions.Parse.Count == 0 && payload.Embeds!.Count == 1 &&
             payload.Embeds[0].Description.Contains("Queue: 2") && !json.Contains("\"timestamp\"") &&
             !payload.Embeds[0].Title.Contains("@everyone"));
+    }
+    private static void TerritoryFormatting()
+    {
+        var response = SRankRemoteResponse.Decode(StatusJson());
+        string Body(string? name) => SRankRemoteResponseFormatter.Format("Test Character",
+            SRankRemoteDecision.Status, response, name).Embeds![0].Description;
+        Check(Body("  地図名  ").Contains("Territory: 地図名 (1191)"));
+        foreach (var name in new string?[] { null, "", "   " })
+            Check(Body(name).EndsWith("Territory: 1191"));
+        Check(!Body("@everyone\nMap").Contains("@everyone"));
+        var bounded = Body(new string('x', 500));
+        Check(bounded.EndsWith("Territory: " + new string('x', 160) + " (1191)"));
+        Check(response.Status!.Territory == 1191 && response.Success);
     }
 }

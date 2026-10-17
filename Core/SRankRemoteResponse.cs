@@ -41,7 +41,7 @@ public sealed record SRankRemoteStatus(bool Loaded, bool Enabled, string Charact
 
 public static class SRankRemoteResponseFormatter
 {
-    public static DiscordWebhookPayload Format(string character, SRankRemoteDecision decision, SRankRemoteResponse response)
+    public static DiscordWebhookPayload Format(string character, SRankRemoteDecision decision, SRankRemoteResponse response, string? territoryName = null)
     {
         var title = "S Rank Sentinel — " + MessageSanitizer.SanitizeForDiscord(character);
         string body;
@@ -54,8 +54,13 @@ public static class SRankRemoteResponseFormatter
             _ => "Status",
         };
         if (response.Status is { } s)
+        {
+            var name = MessageSanitizer.SanitizeForDiscord(territoryName).Trim();
+            if (name.Length > 160) name = name[..160];
+            var territory = name.Length == 0 ? s.Territory.ToString() : $"{name} ({s.Territory})";
             body += $"\nVersion: {response.Version}\nEnabled: {(s.Enabled ? "Yes" : "No")}\nState: {s.State}\nStatus: {s.StatusText}\n"
-                + $"Hunt: {(s.ActiveHunt.Length == 0 ? "none" : s.ActiveHunt)}\nQueue: {s.QueueCount}\nTerritory: {s.Territory}";
+                + $"Hunt: {(s.ActiveHunt.Length == 0 ? "none" : s.ActiveHunt)}\nQueue: {s.QueueCount}\nTerritory: {territory}";
+        }
         return new(null, [new(title, body, response.Success ? 0x68B5AE : 0xCBAA72)], new([]));
     }
 

@@ -1,7 +1,8 @@
 # SRank remote controls
 
-Versions: SRank **0.7.62.0** / Relay **0.5.0.6**. The user authorized normal live-updater
-delivery on 2026-10-17 UTC with remote controls default OFF. **In-game acceptance remains pending.**
+Versions: SRank **0.7.62.0** / Relay **0.5.0.7**. The user authorized normal live-updater
+delivery on 2026-10-17 UTC with remote controls default OFF. **The user reports remote controls working; status and reset-confirmation replies are evidenced.**
+Separate skip/queue, expiry, isolation and permission-OFF scenarios are not individually evidenced.
 Baselines inspected: SRank main f853eead173ed0668641617d43cdfba0a97115a6, published 0.7.56.0;
 Relay main d9e7f6fc1662f2e26275888e5a31ea4b9574ca3e, published 0.5.0.5.
 Core latest 0.4.1 was inspected; both consumers retain exact compatible 0.3.1 UI pins.
@@ -62,7 +63,7 @@ webhook, Discord IDs, raw command text or full status text is logged.
 Use Dalamud's normal plugin updater with the permanent Sentinel repository:
 `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json`.
 Keep dev copies disabled; update/reload the live plugins and confirm SRank **0.7.62.0**
-and Relay **0.5.0.6**. Do not delete config. Do not enable Elektra yet.
+and Relay **0.5.0.7**. Do not delete config. Do not enable Elektra yet.
 
 1. Log into Wrothy Minioa. In `/srelay`, retain the existing Wrothy webhook, bot
    credential, channel and authorized user. Replies & Controls → Remote Sentinel
@@ -88,4 +89,24 @@ response/last RemoteControl log lines. Do not send tokens, webhook URLs or confi
 Rollback: turn the permission OFF/save; normal hunting and Relay remain available.
 For a binary rollback, unload the new copies and use preserved prior SRank **0.7.56.0**
 and Relay **0.5.0.5** releases. Configuration is additive; no cleanup or migration is
-needed. Normal-updater distribution is authorized; it does not claim live acceptance.
+needed. Publication alone does not prove native acceptance; the scoped returned evidence is recorded below.
+
+## Territory labels — Relay 0.5.0.7
+
+Status and recovery replies show the localized territory/map name and numeric ID, resolved
+from the TerritoryType row matching SRank's status snapshot. For example:
+`Territory: <map name> (1191)`. Missing rows/sheets/names retain the numeric ID.
+Resolution failure does not suppress the recovery result or retry an action.
+The fixed v1 IPC contract and SRank 0.7.62.0 require no change.
+
+User evidence at 2026-10-16 23:39 America/Toronto: “Everything is working great.”
+The attached status reply shows SRank 0.7.62.0, Idle, enabled, queue 0, territory 250;
+reset creates confirmation and a confirmed reset returns ResetToUldah/queue 0.
+This is scoped functional acceptance, not proof of every negative authorization case.
+
+After updating Relay through the normal Sentinel updater, send one new
+`/srank status` in the existing authorized Discord channel. Expect the current game's
+localized map name plus its ID. No repeat reset/skip or configuration changes are needed.
+Report only a wrong/missing name with territory ID, game language and Relay version.
+Rollback: disable the remote-control permission/save or restore Relay 0.5.0.6;
+retain settings.
