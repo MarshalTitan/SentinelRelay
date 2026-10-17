@@ -1,6 +1,7 @@
-# SRank remote controls — experimental pair
+# SRank remote controls
 
-Status: implemented candidate, **no in-game PASS or release**. SRank **0.7.62.0** / Relay **0.5.0.6**.
+Versions: SRank **0.7.62.0** / Relay **0.5.0.6**. The user authorized normal live-updater
+delivery on 2026-10-17 UTC with remote controls default OFF. **In-game acceptance remains pending.**
 Baselines inspected: SRank main f853eead173ed0668641617d43cdfba0a97115a6, published 0.7.56.0;
 Relay main d9e7f6fc1662f2e26275888e5a31ea4b9574ca3e, published 0.5.0.5.
 Core latest 0.4.1 was inspected; both consumers retain exact compatible 0.3.1 UI pins.
@@ -58,11 +59,10 @@ webhook, Discord IDs, raw command text or full status text is logged.
 
 ## Wrothy first — supervised test
 
-Install **only** the two exact successful experimental artifacts linked in the PRs.
-Their outer artifact ZIP contains `latest.zip`; unload the prior plugin, extract the
-inner archive into its separate dev directory, load its DLL, and keep the public and
-other dev copies disabled. Do not overwrite the stable installation or delete config.
-Confirm SRank **0.7.62.0**, Relay **0.5.0.6**. Do not enable Elektra yet.
+Use Dalamud's normal plugin updater with the permanent Sentinel repository:
+`https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json`.
+Keep dev copies disabled; update/reload the live plugins and confirm SRank **0.7.62.0**
+and Relay **0.5.0.6**. Do not delete config. Do not enable Elektra yet.
 
 1. Log into Wrothy Minioa. In `/srelay`, retain the existing Wrothy webhook, bot
    credential, channel and authorized user. Replies & Controls → Remote Sentinel
@@ -85,6 +85,7 @@ OFF. On failure only: timestamp, plugin versions, command and concise sanitized
 response/last RemoteControl log lines. Do not send tokens, webhook URLs or config.
 `/screenshot` is optional and not a prerequisite.
 
-Rollback: turn the permission OFF/save, unload both dev copies, re-enable published
-SRank **0.7.56.0** and Relay **0.5.0.5**. Configuration is additive; no cleanup or
-migration is needed. Keep both PRs unmerged/unreleased until the supervised gate passes.
+Rollback: turn the permission OFF/save; normal hunting and Relay remain available.
+For a binary rollback, unload the new copies and use preserved prior SRank **0.7.56.0**
+and Relay **0.5.0.5** releases. Configuration is additive; no cleanup or migration is
+needed. Normal-updater distribution is authorized; it does not claim live acceptance.
