@@ -96,7 +96,11 @@ public sealed class MainForm : Form
         refreshTimer.Tick += async (_, _) =>
         {
             if (busy || closing) return;
-            await WorkSafely(RefreshGames, false);
+            await WorkSafely(async () =>
+            {
+                if (!host.Running && preferences.ResumeOnLaunch && admin.Snapshot().Enabled) await Connect(true);
+                await RefreshGames();
+            }, false);
         };
         Shown += async (_, _) =>
         {
@@ -183,7 +187,7 @@ public sealed class MainForm : Form
         if (generation != accessGeneration || closing) return;
         if (resume && (current.Host != preferences.Host || current.Login != preferences.Login))
             throw new SetupException("Your Tailscale account or PC address changed. Click Connect securely to review the new connection.");
-        await tailscale.EnsureServe(current);
+        await tailscale.EnsureServe(current, configure: !resume);
         if (generation != accessGeneration || closing) return;
         if (host.Running && identity != current)
         {
@@ -214,7 +218,17 @@ public sealed class MainForm : Form
         if (detected.Length > 0)
             games.SelectedIndex = Math.Max(0, Array.FindIndex(detected, g => g.Binding.ProcessId == selectedPid));
         games.EndUpdate();
-        Populate(admin.Snapshot());
+        var snapshot = admin.Snapshot();
+        Populate(snapshot);
+        if (!snapshot.Enabled && host.Running)
+        {
+            preferences = preferences with { ResumeOnLaunch = false };
+            preferences.Save(directory);
+            await host.DisposeAsync();
+            identity = null;
+            status.Text = "All remote access disabled. Click Connect securely to enable it again.";
+            return;
+        }
         if (detected.Length == 0 && !host.Running)
             status.Text = "Log into FFXIV and enable mobile features in Relay, then refresh games.";
         if (host.Running && ++refreshCount % 3 == 0)

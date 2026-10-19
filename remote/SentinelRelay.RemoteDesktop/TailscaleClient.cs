@@ -48,13 +48,14 @@ public sealed class TailscaleClient
         try { return DesktopSetupPolicy.ReadIdentity(result.Output.Trim()); }
         catch { throw new SetupException("Tailscale is not connected with a personal login. Open Tailscale, connect, then try again."); }
     }
-    public async Task EnsureServe(TailnetIdentity identity)
+    public async Task EnsureServe(TailnetIdentity identity, bool configure = true)
     {
         var before = await Run("serve", "status", "--json");
         if (before.ExitCode != 0) throw new SetupException("Tailscale could not read its Serve configuration. Open Tailscale and try again.");
         var state = DesktopSetupPolicy.ServeState(before.Output.Trim(), identity.Host);
         if (state == "conflict") throw new SetupException("This PC already has another Serve route or Funnel configured. Keep that setup unchanged and review it before connecting Sentinel Remote.");
         if (state == "ready") return;
+        if (!configure) throw new SetupException("Private Serve needs setup. Click Connect securely to finish it.");
         var result = await Run("serve", "--bg", "32179");
         var consent = Regex.Match(result.Output + "\n" + result.Error, @"https://login\.tailscale\.com/f/serve\?[^\s]+").Value.TrimEnd('.', ')', '"');
         if (consent.Length > 0)
