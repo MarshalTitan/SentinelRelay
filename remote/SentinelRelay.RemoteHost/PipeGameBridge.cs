@@ -64,7 +64,7 @@ public sealed class PipeGameBridge : IGameBridge
     }
     private static RemoteGameStatus Project(BridgeSnapshot? s, bool processAlive, bool connected) => new(
         processAlive ? "running" : "exited", connected ? "connected" : "unavailable", s?.Character, s?.World,
-        s?.Territory, s?.Map, s?.HeartbeatUtc, s?.SRank, ControlAllowed: connected ? s?.ControlAllowed : null,
+        s?.Territory, s?.Map, s?.HeartbeatUtc, s?.SRank, Vnavmesh: connected ? s?.Vnavmesh : null, ControlAllowed: connected ? s?.ControlAllowed : null,
         ScreenshotAllowed: connected ? s?.ScreenshotAllowed : null);
     public Reply Status(GameBinding binding)
     {

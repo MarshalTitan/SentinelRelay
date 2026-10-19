@@ -52,7 +52,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             var id = Guid.NewGuid().ToString("N");
             state.Devices.Add(new(id, invitation.Label, Protocol.Hash(token), invitation.Instances, invitation.Control));
             Record("device_paired", id);
-            return (new Reply(true, "paired", new DeviceCredential(id, token)), true);
+            return (new Reply(true, "paired", new DeviceCredential(id, token, state.HostId)), true);
         });
     }
 
@@ -148,7 +148,8 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
           });
           if (reply.Data is not GameIntent intent) return reply;
           if (intent.Binding is null || gameBridge is null) return new(false, "bridge_unavailable");
-          bool StillAllowed() => !cancellation.IsCancellationRequested && store.Access(state =>
+          bool StillAllowed() => !cancellation.IsCancellationRequested &&
+            time.GetElapsedTime(intent.Session.Started) < SessionLife && store.Access(state =>
           {
               var device = state.Devices.FirstOrDefault(d => d.Id == intent.DeviceId && !d.Revoked);
               return (state.Enabled && state.Epoch == intent.Epoch && device is not null &&

@@ -25,7 +25,7 @@ try
             Console.WriteLine("Sentinel Remote listening on loopback. Only locally bound, opted-in game clients are available.");
             await app.RunAsync(); return;
         default:
-            Console.WriteLine("SentinelRemoteHost status | enable | disable | add-instance LABEL | pair LABEL view|control INSTANCE_ID[,ID] | revoke DEVICE_ID | serve HOST.ts.net TAILSCALE_LOGIN");
+            Console.WriteLine("SentinelRemoteHost status | enable | disable | add-instance LABEL | bind INSTANCE_ID GAME_PID | pair LABEL view|control INSTANCE_ID[,ID] | revoke DEVICE_ID | serve HOST.ts.net TAILSCALE_LOGIN[,LOGIN]");
             return;
     }
     Console.WriteLine(JsonSerializer.Serialize(result, Protocol.Json));

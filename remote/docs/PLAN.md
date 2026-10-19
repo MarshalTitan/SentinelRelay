@@ -1,6 +1,6 @@
 # Sentinel Remote implementation and acceptance plan
 
-Phase 0 is documented in the architecture audit. This change implements only the software-only Phase 1 authority/transport host. It does not claim Milestone A or ask for an in-game test yet.
+Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone A Android/bridge software are implemented as candidates. Milestone A remains unproven on real devices until the [consolidated checklist](MILESTONE_A.md) passes. The original staged work table below describes each gate, not a claim that every later phase is implemented.
 
 | Stage | Software work | Acceptance gate |
 |---|---|---|
@@ -13,7 +13,7 @@ Phase 0 is documented in the architecture audit. This change implements only the
 
 ## Next software tasks before Milestone A
 
-1. Create `MarshalTitan/SentinelRemote` and permit the connected GitHub app to access it. No connected repository-creation tool is available. Keep PC host source in SentinelRelay; no additional backend repo is needed.
+1. `MarshalTitan/SentinelRemote` now exists and is accessible, with the Android Flutter application. PC code remains in SentinelRelay.
 2. Build the Android protocol client against the v1 host. Pin Flutter/package versions only after maintenance/license review. Require HTTPS; store device credential securely; sessions only in memory. Use explicit pending confirmations, last-seen state and clear per-PC/client selection.
 3. Implement current-user-only named-pipe bridge with kernel client-PID checks, local trusted installation enrollment, new process/game epochs and framework-thread SRank dispatch. Invalidate pending intent at logout, character switch, bridge loss and reconnect. Add bridge-loss/late-message/PID-reuse/routing tests before real game actions.
 4. Expose only supported status fields. Profiles/current map/vnavmesh may be unknown. Never scrape plugin configuration files or infer profile application from a display label.
@@ -39,4 +39,4 @@ iOS: building/signing requires the Apple/Xcode toolchain. Apple's free Personal 
 
 ## Known unimplemented capabilities
 
-No mobile app/repository yet; no game bridge, live status fields, process monitoring, automatic startup, input ownership/watchdog, driver, streaming, launcher launch, manual authentication, lobby/character assistant or incident capture/export. These are staged implementation work. Phase 1 is reviewable infrastructure, not an installed rescue tool or a passed real-device milestone.
+Android pairing/status/rescue UI, private local bridge, process lifetime/character binding, optional vnavmesh readiness and last-known status are implemented candidates. Automatic startup, tray emergency UI, Profiles IPC, automatic rebinding, input ownership/watchdog, driver, streaming, launcher launch, manual authentication, lobby/character assistant and incident collection/export remain unimplemented. CI alone does not establish real-device acceptance.

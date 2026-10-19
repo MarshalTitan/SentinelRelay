@@ -12,6 +12,7 @@ internal sealed class MobilePipeServer : IDisposable
     private readonly Task worker;
     public string CharacterKey { get; }
     public string GameEpoch { get; } = Guid.NewGuid().ToString("N");
+    internal int PendingCount => jobs.Count;
     private sealed record Job(BridgeRequest Request, TaskCompletionSource<BridgeReply> Completion, CancellationToken Token, bool ValidateOnly);
     public MobilePipeServer(string characterKey) { CharacterKey = characterKey; worker = Task.Run(Run); }
     public void Pump(Func<BridgeRequest, bool, BridgeReply> execute)

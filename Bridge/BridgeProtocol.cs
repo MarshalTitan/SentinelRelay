@@ -6,9 +6,11 @@ namespace SentinelRelay.Bridge;
 
 public sealed record BridgeRequest(int Version, string Operation, string? CharacterKey = null, string? GameEpoch = null);
 public sealed record BridgeSnapshot(string CharacterKey, string GameEpoch, string Character, string? World,
-    uint Territory, string? Map, DateTimeOffset HeartbeatUtc, JsonElement? SRank, bool ControlAllowed, bool ScreenshotAllowed);
-public sealed record BridgeReply(bool Success, string Code, BridgeSnapshot? Snapshot = null, string? PngBase64 = null,
-    [property: JsonIgnore] nint CaptureWindow = default);
+    uint Territory, string? Map, DateTimeOffset HeartbeatUtc, JsonElement? SRank, bool ControlAllowed, bool ScreenshotAllowed, bool? Vnavmesh = null);
+public sealed record BridgeReply(bool Success, string Code, BridgeSnapshot? Snapshot = null, string? PngBase64 = null)
+{
+    [JsonIgnore] public nint CaptureWindow { get; init; }
+}
 
 public static class BridgeWire
 {

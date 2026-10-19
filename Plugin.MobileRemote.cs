@@ -31,10 +31,12 @@ public sealed partial class Plugin
         uint territory = ClientState.TerritoryType;
         string? world = null;
         try { world = PlayerState.CurrentWorld.Value.Name.ToString(); } catch { }
+        bool? vnavmesh = null;
+        try { vnavmesh = PluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.IsReady").InvokeFunc(); } catch { }
         var snapshot = new BridgeSnapshot(identity.CharacterKey, mobilePipe.GameEpoch, identity.CharacterName, world,
             territory, ResolveSRankTerritoryName(territory), DateTimeOffset.UtcNow,
             status.Status is null ? null : JsonSerializer.SerializeToElement(status.Status, BridgeWire.Json),
-            activeProfile.MobileRemoteControlEnabled, activeProfile.MobileRemoteScreenshotsEnabled);
+            activeProfile.MobileRemoteControlEnabled, activeProfile.MobileRemoteScreenshotsEnabled, vnavmesh);
         var rejection = BridgeWire.Reject(request, snapshot);
         if (rejection is not null) return new(false, rejection);
         if (validateOnly || request.Operation is "hello" or "srank.status") return new(true, "status", snapshot);
@@ -47,9 +49,10 @@ public sealed partial class Plugin
             if (window == 0) return new(false, "capture_failed");
             hasMobileScreenshot = true; lastMobileScreenshot = now;
             ChatGui.Print("[Sentinel Relay] Authorized mobile screenshot requested.");
-            return new(true, "capture", snapshot, CaptureWindow: window);
+            return new(true, "capture", snapshot) { CaptureWindow = window };
         }
         // Reuse exactly the same existing SRank IPC endpoints; never send game chat or arbitrary commands.
+        ChatGui.Print("[Sentinel Relay] Authorized mobile SRank rescue requested.");
         var result = new SRankRemoteClient(PluginInterface).Invoke(request.Operation == "srank.skip"
             ? SRankRemoteDecision.Skip : SRankRemoteDecision.Reset, identity.CharacterKey);
         Log.Information("Sentinel mobile rescue {Operation} completed: {Success}.", request.Operation, result.Success);

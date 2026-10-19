@@ -26,7 +26,7 @@ public sealed record Enrollment(int Version, string Invitation);
 public sealed record SessionRequest(int Version, string DeviceId);
 public sealed record RemoteRequest(int Version, long Sequence, string Operation, string? InstanceId = null, string? Confirmation = null);
 public sealed record Reply(bool Success, string Code, object? Data = null);
-public sealed record DeviceCredential(string DeviceId, string DeviceToken);
+public sealed record DeviceCredential(string DeviceId, string DeviceToken, string HostId = "");
 public sealed record SessionCredential(string SessionToken, DateTimeOffset Expires, int ProtocolVersion = Protocol.Version);
 public sealed record InstanceInfo(string InstanceId, string Label, string RelayStatus = "bridge_unavailable");
 
