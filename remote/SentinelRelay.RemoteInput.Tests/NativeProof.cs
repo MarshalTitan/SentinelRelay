@@ -21,7 +21,12 @@ static class NativeProof
             var readyText = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15));
             using var ready = JsonDocument.Parse(readyText ?? "{}");
             if (!ready.RootElement.TryGetProperty("ready", out var flag) || !flag.GetBoolean())
-                throw new IOException("worker readiness failed: " + readyText);
+            {
+                var code = ready.RootElement.TryGetProperty("code", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+                var allowed = new[] { "backend_attach_failed", "backend_request_rejected", "backend_readiness", "backend_version",
+                    "backend_exited_before_ready", "backend_hash_mismatch", "backend_endpoint_owner_changed", "backend_did_not_exit", "worker_stopped" };
+                throw new InputBackendException(code is not null && allowed.Contains(code) ? code : "worker_unavailable");
+            }
             var pid = ready.RootElement.GetProperty("backendPid").GetInt32();
             var apiPort = ready.RootElement.GetProperty("apiPort").GetInt32();
             var usbPort = ready.RootElement.GetProperty("usbPort").GetInt32();
@@ -51,7 +56,7 @@ static class NativeProof
                     try
                     {
                         if (OperatingSystem.IsWindows())
-                            check(await LoopbackOnly(pid, apiPort, usbPort), "worker backend listens only on IPv4 loopback");
+                            check(BackendEndpointOwnership.Matches(pid, apiPort, usbPort), "worker backend listens only on IPv4 loopback");
                     }
                     finally { warmupStop.Cancel(); await warmup; }
                 }
@@ -150,23 +155,6 @@ static class NativeProof
         var now = Stopwatch.GetTimestamp();
         while (!condition() && Stopwatch.GetElapsedTime(now) < deadline) await Task.Delay(20);
     }
-    private static async Task<bool> LoopbackOnly(int pid, int api, int usb)
-    {
-        // CI-only inspection. Fixed numeric IDs/ports, no user-provided script or shell command.
-        var start = new ProcessStartInfo("powershell.exe")
-        {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-        };
-        start.ArgumentList.Add("-NoProfile"); start.ArgumentList.Add("-NonInteractive"); start.ArgumentList.Add("-Command");
-        start.ArgumentList.Add("$listeners = @(Get-NetTCPConnection -State Listen -OwningProcess " + pid +
-            " -ErrorAction Stop); if ($listeners.Count -eq 2 -and @($listeners | Where-Object { $_.LocalAddress -ne '127.0.0.1' }).Count -eq 0" +
-            " -and @($listeners | Where-Object { $_.LocalPort -eq " + api + " }).Count -eq 1" +
-            " -and @($listeners | Where-Object { $_.LocalPort -eq " + usb + " }).Count -eq 1) { exit 0 } else { exit 1 }");
-        using var process = Process.Start(start) ?? throw new IOException("listener inspection");
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        return process.ExitCode == 0;
-    }
-
     [StructLayout(LayoutKind.Sequential)]
     private struct Gamepad
     {

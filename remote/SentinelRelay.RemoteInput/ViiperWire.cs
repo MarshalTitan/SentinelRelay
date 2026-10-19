@@ -47,8 +47,10 @@ public static class ViiperWire
         var result = JsonDocument.Parse(bytes.ToArray(), new JsonDocumentOptions { MaxDepth = 8 });
         if (result.RootElement.TryGetProperty("status", out _))
         {
+            var attachment = result.RootElement.TryGetProperty("detail", out var detail) &&
+                detail.ValueKind == JsonValueKind.String && detail.GetString()?.Contains("auto-attach", StringComparison.OrdinalIgnoreCase) == true;
             result.Dispose();
-            throw new InputBackendException("backend_request_rejected");
+            throw new InputBackendException(attachment ? "backend_attach_failed" : "backend_request_rejected");
         }
         return result;
     }

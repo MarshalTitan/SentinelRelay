@@ -116,9 +116,9 @@ sealed class CheckWindow : Form
             var worker = Path.Combine(AppContext.BaseDirectory, "worker", "SentinelRelay.RemoteInput.exe");
             await Task.Run(() => NativeProof.Run(backend, worker, true, (ok, name) =>
             {
+                Add((ok ? "PASS " : "FAIL ") + name);
                 if (!ok) throw new InvalidOperationException("native_check_failed");
                 Interlocked.Increment(ref passed);
-                Add("PASS " + name);
             }, GamesClosed));
             report.Add("Result: PASS");
             status.Text = "Gamepad support check passed";
@@ -131,6 +131,7 @@ sealed class CheckWindow : Form
             report.Add("Phase: " + phase);
             report.Add("Completed checks: " + passed);
             report.Add("Error kind: " + error.GetType().Name);
+            if (error is InputBackendException failure) report.Add("Code: " + failure.Code);
             status.Text = "Gamepad support is not verified yet";
             status.ForeColor = Color.FromArgb(158, 74, 28);
             report.Add("Copy this result into the setup conversation. If you just installed the driver and it requested a restart, restart Windows before checking again.");
