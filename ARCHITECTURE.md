@@ -1,17 +1,19 @@
 # Sentinel Relay architecture
 
+The optional [Sentinel Remote design and host foundation](remote/docs/ARCHITECTURE.md) lives outside the Dalamud plugin. The current released plugin flows below remain the production Discord architecture; there is no game bridge to the new host yet.
+
 ## Scope
 
 Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
 
 ```text
-FFXIV chat → local Sentinel Relay policy → Discord incoming webhook
+FFXIV chat  local Sentinel Relay policy  Discord incoming webhook
 ```
 
 The `0.5.0.5` revision retains the separately optional REST-polling path:
 
 ```text
-one private Discord channel → authenticated REST poll → local authorization → fixed chat submission
+one private Discord channel  authenticated REST poll  local authorization  fixed chat submission
 ```
 
 There is still no hosted Sentinel backend, listening port, WebSocket, Discord Gateway client, or arbitrary command executor. The webhook sender and reply reader are independent.
@@ -20,7 +22,7 @@ There is still no hosted Sentinel backend, listening port, WebSocket, Discord Ga
 
 Sentinel Relay references the exact `MarshalTitan.SentinelCore.UI` 0.3.1 release package from Core tag `v0.3.1.0` and commit `300703b360a58fb4b73bf7675d31fe8cab4614cd`. The vendored UI package SHA-256 is `e1a9ce4e1ce36042c0fcd53f4c23874d918640be10eef16c21f1cd436c6ba747`, enforced before every build and release. Classic and Sentinel Modern are explicit user choices stored in Relay's own configuration. Existing theme selections and all other configuration values persist; unknown values fail back to Classic.
 
-The modern window uses Core's canonical custom-header policy, full-bleed style scope, unified application shell, retained Font Awesome icon callbacks, glass cards, status pills, animated switches, responsive settings rows, non-stacking layout, and procedural ambient background. Relay supplies only its page structure, functional content, and semantic delivery states. The icon rail flows directly into the selected content page; Relay has no unnecessary secondary sidebar or navigation inside the content. Reduced motion comes from Dalamud every frame. The window retains a 620×520 logical-pixel minimum, saved position, and saved larger size. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
+The modern window uses Core's canonical custom-header policy, full-bleed style scope, unified application shell, retained Font Awesome icon callbacks, glass cards, status pills, animated switches, responsive settings rows, non-stacking layout, and procedural ambient background. Relay supplies only its page structure, functional content, and semantic delivery states. The icon rail flows directly into the selected content page; Relay has no unnecessary secondary sidebar or navigation inside the content. Reduced motion comes from Dalamud every frame. The window retains a 620�520 logical-pixel minimum, saved position, and saved larger size. There is no runtime dependency on an installed Sentinel Core plugin; the pinned library assemblies ship inside Sentinel Relay's own package.
 
 ## Runtime flow
 
@@ -42,7 +44,7 @@ No HTTP, cryptography, disk, or retry delay runs inside the FFXIV chat callback.
 1. `ChatCaptureService` checks sanitized chat text for the narrow hunt-credit, obtained-reward, and capped-currency patterns.
 2. A line is classified as `RewardsHuntResults` only when its API 15 `XivChatType` RowId is one of `SystemMessage` (57), `SystemError` (58), `ErrorMessage` (60), `LootNotice` (62), or `Progress` (64). Player chat can never impersonate this inbound channel.
 3. The per-character Rewards / Hunt Results filter must be enabled; it defaults off and is absent from every outbound allowlist and parser.
-4. Consecutive lines are accumulated for a 1.25-second quiet window, capped at 20 lines/four seconds, then emitted in original order as one compact `【REWARD】` embed. An intervening ordinary chat message flushes the pending reward batch first.
+4. Consecutive lines are accumulated for a 1.25-second quiet window, capped at 20 lines/four seconds, then emitted in original order as one compact `?REWARD?` embed. An intervening ordinary chat message flushes the pending reward batch first.
 5. The embed has no sender header, timestamp, or timestamp footer. Discord's native message timestamp remains available.
 6. Optional per-character diagnostics observe raw `IChatGui.LogMessage` IDs in memory and correlate them with reward-pattern `ChatMessage` observations. They never invoke `FormatLogMessageForDebugging`, never write message bodies to logs, and clear on character switch or reload.
 
@@ -53,7 +55,7 @@ No HTTP, cryptography, disk, or retry delay runs inside the FFXIV chat callback.
 3. `DiscordRestMessageClient` performs outbound `GET /channels/{id}/messages` requests on a background task and honors Discord `429` delays.
 4. New messages are sorted by snowflake and their high-water mark is persisted before any game action is queued.
 5. `DiscordReplyPolicy` rejects disabled, paused, wrong-character, wrong-channel, wrong-user, bot, webhook, stale, duplicate, empty, unknown, and non-allowlisted inputs.
-6. `DiscordReplyCommandParser` recognizes only fixed ordinary-message prefixes for Say, Yell, Shout, FC, Party, Alliance, PvP Team, Novice Network, LS1–8, CWLS1–8, and recent Tell reply.
+6. `DiscordReplyCommandParser` recognizes only fixed ordinary-message prefixes for Say, Yell, Shout, FC, Party, Alliance, PvP Team, Novice Network, LS1-8, CWLS1-8, and recent Tell reply.
 7. A five-item queue and local five-per-30-second rate limit protect the client. Sends are spaced by at least 1.5 seconds.
 8. On Dalamud's framework thread, `GameChatSender` constructs the appropriate fixed chat prefix plus the sanitized message and passes it through FFXIV's chat shell.
 9. `/r` maps only to FFXIV's `/reply` and requires an incoming Tell observed for the active character within the previous 30 minutes. Arbitrary `/tell` targets are never accepted.
@@ -67,8 +69,8 @@ The checkpoint advances before submission. A crash can therefore drop an individ
 2. `RemoteScreenshotPolicy` applies the same enabled, pause, active-character, channel, user, bot/webhook, snowflake, freshness, and replay checks as chat replies, plus the per-character screenshot toggle and a 15-second cooldown.
 3. The processing checkpoint is persisted before capture begins, so a restart cannot repeat an old capture.
 4. `GameWindowCapture` accepts only a visible top-level window owned by the current FFXIV process. It captures that HWND's client area into a memory DIB; it never selects another process, screen region, or desktop framebuffer.
-5. Capture, resize, PNG encoding, and HTTPS upload run outside the framework thread. The output is at most 1280×720 and 7.5 MB, and no persistent file is created.
-6. `ScreenshotWebhookSender` uploads a mention-safe `【SCREENSHOT】 Character Name` message and PNG attachment through the active character's already-validated webhook, with redirects disabled and bounded `429`/5xx retries.
+5. Capture, resize, PNG encoding, and HTTPS upload run outside the framework thread. The output is at most 1280�720 and 7.5 MB, and no persistent file is created.
+6. `ScreenshotWebhookSender` uploads a mention-safe `?SCREENSHOT? Character Name` message and PNG attachment through the active character's already-validated webhook, with redirects disabled and bounded `429`/5xx retries.
 7. Character switch, pause, or plugin shutdown cancels the active upload. A completion notice and sanitized status are returned to the framework thread.
 
 Windows window capture cannot obtain a current frame from a minimized window, so minimized requests fail closed. A blank-frame check also rejects unusable Direct3D captures rather than uploading an empty image or falling back to the desktop.
@@ -117,7 +119,7 @@ The request adds `wait=true` so Discord confirms creation rather than returning 
 Compact mode:
 
 ```text
-【FC】 Player Name @ World: Anyone want roulettes?
+?FC? Player Name @ World: Anyone want roulettes?
 ```
 
 Embed mode uses a small channel-specific color, sender/channel title, and message description. It deliberately omits an embed timestamp and footer so Discord's native message timestamp is the only timestamp shown. Long content is split on Unicode rune boundaries so surrogate pairs are not broken.
@@ -130,8 +132,9 @@ Every payload has an empty `allowed_mentions.parse` array. Raw FFXIV text also h
 
 Registered Discord slash commands are intentionally absent. `/fc hi`, `/party hi`, `/r hi`, `/screenshot`, and the other supported prefixes are ordinary channel messages, not application commands. A Gateway connection is unnecessary: each FFXIV client performs authenticated REST reads against only its configured channel and accepts only its configured user ID.
 
-All configuration lives in the `/srelay` UI. The bot remains unnecessary for FFXIV → Discord webhook delivery and is contacted only when that character explicitly enables Discord replies.
+All configuration lives in the `/srelay` UI. The bot remains unnecessary for FFXIV  Discord webhook delivery and is contacted only when that character explicitly enables Discord replies.
 
 ## Reference and licensing
 
 `reiichi001/Dalamud.DiscordBridge` was reviewed as behavioral proof for structured chat capture, mapping, queueing, duplicate suppression, and Discord delivery. That project is AGPL-3.0. Sentinel Relay remains MIT and uses an independently written implementation; no substantial source was copied.
+

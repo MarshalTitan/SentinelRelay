@@ -10,12 +10,14 @@ public static class RemoteWeb
 {
     public static WebApplication Create(RemoteAuthority authority, string tailnetHost, string tailnetUser, int port = 32179)
     {
+        var allowedUsers = tailnetUser.Split(',').ToHashSet(StringComparer.Ordinal);
         if (!Uri.CheckHostName(tailnetHost).Equals(UriHostNameType.Dns) || !tailnetHost.EndsWith(".ts.net", StringComparison.Ordinal) ||
             tailnetHost.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '.' or '-')) ||
-            string.IsNullOrWhiteSpace(tailnetUser) || tailnetUser.Length > 254 || tailnetUser.Any(char.IsControl))
+            allowedUsers.Count is < 1 or > 8 || allowedUsers.Any(user => string.IsNullOrWhiteSpace(user) || user.Length > 254 || user.Any(c => char.IsControl(c) || char.IsWhiteSpace(c))))
             throw new InvalidOperationException("invalid_tailnet_configuration");
         // Do not inherit URL bindings, forwarded headers, request logs, or command-line config.
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [], EnvironmentName = "Production" });
+        builder.Configuration.Sources.Clear();
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -44,11 +46,13 @@ public static class RemoteWeb
             // Serve terminates HTTPS on the same PC and supplies the verified login header.
             // Loopback is the explicit trusted proxy boundary; local user processes are trusted.
             if (context.Connection.RemoteIpAddress is not { } ip || !IPAddress.IsLoopback(ip) ||
-                request.Host.Value != tailnetHost || request.Headers["Tailscale-User-Login"].ToString() != tailnetUser ||
+                request.Host.Value != tailnetHost || !allowedUsers.Contains(request.Headers["Tailscale-User-Login"].ToString()) ||
                 (request.Headers.Origin.Count > 0 && request.Headers.Origin.ToString() != "https://" + tailnetHost))
             { context.Response.StatusCode = 403; return; }
             if (request.QueryString.HasValue || request.Method != "POST" || !request.HasJsonContentType())
             { context.Response.StatusCode = 400; return; }
+            if (request.ContentLength > 4096)
+            { context.Response.StatusCode = 413; return; }
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
             timeout.CancelAfter(TimeSpan.FromSeconds(5));
             context.RequestAborted = timeout.Token;
@@ -57,8 +61,9 @@ public static class RemoteWeb
             {
                 if (!context.Response.HasStarted)
                 {
-                    context.Response.StatusCode = e is IOException ? 503 : 400;
-                    await context.Response.WriteAsJsonAsync(new Reply(false, e is IOException ? "state_unavailable" : "invalid_request"), Protocol.Json, CancellationToken.None);
+                    var stateFailure = e is IOException and not BadHttpRequestException and not InvalidDataException;
+                    context.Response.StatusCode = e is BadHttpRequestException bad ? bad.StatusCode : stateFailure ? 503 : 400;
+                    await context.Response.WriteAsJsonAsync(new Reply(false, stateFailure ? "state_unavailable" : "invalid_request"), Protocol.Json, CancellationToken.None);
                 }
             }
         });

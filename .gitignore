@@ -1,6 +1,8 @@
 bin/
 obj/
+remote-candidate/
 .vs/
 .idea/
 *.user
 .packages/SentinelCore/v0.2.1.0/
+

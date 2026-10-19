@@ -9,16 +9,18 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
     private readonly Queue<AuditEvent> audit = new();
     private static readonly TimeSpan SessionLife = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan IdleLimit = TimeSpan.FromSeconds(60);
-    private sealed class Session(string deviceId, string epoch, DateTimeOffset now)
+    private sealed class Session(string deviceId, string epoch, DateTimeOffset now, long timestamp)
     {
         public string DeviceId = deviceId;
         public string Epoch = epoch;
         public DateTimeOffset Expires = now + SessionLife;
-        public DateTimeOffset LastSeen = now;
+        public long Started = timestamp;
+        public long LastSeen = timestamp;
         public long Sequence;
         public string? ResetHash;
         public string? ResetInstance;
         public DateTimeOffset ResetExpires;
+        public long ResetStarted;
     }
     private DateTimeOffset Now => time.GetUtcNow();
     private void Record(string code, string? device = null, string? instance = null)
@@ -27,7 +29,12 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
         audit.Enqueue(new(Now, code, device, instance));
     }
     public AuditEvent[] AuditSnapshot() { lock (gate) return audit.ToArray(); }
-    private void Prune() { foreach (var key in sessions.Where(p => Now >= p.Value.Expires || Now - p.Value.LastSeen >= IdleLimit).Select(p => p.Key).ToArray()) sessions.Remove(key); }
+    private void Prune()
+    {
+        var stamp = time.GetTimestamp();
+        foreach (var key in sessions.Where(p => time.GetElapsedTime(p.Value.Started, stamp) >= SessionLife ||
+            time.GetElapsedTime(p.Value.LastSeen, stamp) >= IdleLimit).Select(p => p.Key).ToArray()) sessions.Remove(key);
+    }
 
     public Reply Enroll(Enrollment request)
     {
@@ -36,7 +43,8 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (request.Version != Protocol.Version) return (new Reply(false, "protocol_mismatch"), false);
             if (!state.Enabled) return (new Reply(false, "remote_disabled"), false);
             var invitation = state.Invitations.FirstOrDefault(i => Protocol.Matches(i.Hash, request.Invitation));
-            if (invitation is null || Now >= invitation.Expires) return (new Reply(false, "pairing_rejected"), false);
+            if (invitation is null || Now >= invitation.Expires || invitation.Expires - Now > TimeSpan.FromMinutes(2))
+                return (new Reply(false, "pairing_rejected"), false);
             state.Invitations.Remove(invitation); // Persist consumption before returning any credential.
             if (state.Devices.Count >= 32) return (new Reply(false, "device_limit"), true);
             var token = Protocol.Secret();
@@ -60,7 +68,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             foreach (var key in sessions.Where(p => p.Value.DeviceId == device.Id).Select(p => p.Key).ToArray()) sessions.Remove(key);
             if (sessions.Count >= 32) return (new Reply(false, "session_limit"), false);
             var token = Protocol.Secret();
-            var session = new Session(device.Id, state.Epoch, Now);
+            var session = new Session(device.Id, state.Epoch, Now, time.GetTimestamp());
             sessions.Add(Protocol.Hash(token), session);
             Record("session_opened", device.Id);
             return (new Reply(true, "session_opened", new SessionCredential(token, session.Expires)), false);
@@ -86,7 +94,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (request.Sequence <= session.Sequence || request.Sequence <= 0)
                 return (new Reply(false, "replay_rejected"), false);
             session.Sequence = request.Sequence;
-            session.LastSeen = Now;
+            session.LastSeen = time.GetTimestamp();
             Reply End(bool success, string code, object? data = null)
             {
                 Record(code, device.Id, state.Instances.Any(i => i.InstanceId == request.InstanceId) ? request.InstanceId : null);
@@ -112,12 +120,13 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
                 session.ResetHash = Protocol.Hash(nonce);
                 session.ResetInstance = request.InstanceId;
                 session.ResetExpires = Now.AddSeconds(30);
+                session.ResetStarted = time.GetTimestamp();
                 return (End(true, "confirmation_required", new { Confirmation = nonce, Expires = session.ResetExpires }), false);
             }
             if (request.Operation == "srank.reset.confirm")
             {
                 var valid = session.ResetHash is not null && session.ResetInstance == request.InstanceId &&
-                    Now < session.ResetExpires && Protocol.Matches(session.ResetHash, request.Confirmation);
+                    time.GetElapsedTime(session.ResetStarted) < TimeSpan.FromSeconds(30) && Protocol.Matches(session.ResetHash, request.Confirmation);
                 session.ResetHash = null;
                 session.ResetInstance = null;
                 if (!valid) return (End(false, "confirmation_rejected"), false);

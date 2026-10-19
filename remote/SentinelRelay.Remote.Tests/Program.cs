@@ -75,6 +75,10 @@ for (int i = 1; i <= 5; i++)
 }
 clock.Advance(TimeSpan.FromSeconds(50));
 Code(authority.Handle(absolute.SessionToken, new(1, 6, "session.ping")), "unauthorized", "absolute lifetime cannot be extended");
+var wallClockSession = Open(controller);
+clock.Advance(TimeSpan.FromSeconds(60));
+clock.MoveWallClock(TimeSpan.FromHours(-2));
+Code(authority.Handle(wallClockSession.SessionToken, new(1, 1, "session.ping")), "unauthorized", "wall-clock rollback cannot extend session");
 var expiredInvite = admin.Invite("expired", [a.InstanceId], false);
 clock.Advance(TimeSpan.FromMinutes(2));
 Code(authority.Enroll(new(1, expiredInvite)), "pairing_rejected", "invitation expiry boundary");
@@ -164,7 +168,11 @@ sealed class TestClock : TimeProvider
 {
     private DateTimeOffset now = new(2026, 10, 19, 0, 0, 0, TimeSpan.Zero);
     public override DateTimeOffset GetUtcNow() => now;
-    public void Advance(TimeSpan duration) => now += duration;
+    private long timestamp;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    public override long GetTimestamp() => timestamp;
+    public void Advance(TimeSpan duration) { now += duration; timestamp += duration.Ticks; }
+    public void MoveWallClock(TimeSpan duration) => now += duration;
 }
 sealed class MemoryStore : IStateStore
 {
