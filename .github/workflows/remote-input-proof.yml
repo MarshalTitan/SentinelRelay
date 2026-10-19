@@ -1,0 +1,79 @@
+name: Remote input backend proof
+on:
+  push:
+    branches: [main, 'feature/sentinel-remote-*']
+    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
+  pull_request:
+    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
+permissions:
+  contents: read
+jobs:
+  protocol:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify bounded wire and worker contracts
+        run: dotnet run --project remote/SentinelRelay.RemoteInput.Tests -c Release
+      - name: Download pinned upstream backend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $suffix = if ($IsWindows) { 'windows-amd64.exe' } else { 'linux-amd64' }
+          $expected = if ($IsWindows) { '142c144f6abee8b8a5f6a1abbc7018683444de71d2e45102cde6aaab9b2223e6' } else { '9221f840da46029641712ee7c51d4e33d1f60444c6814fa013b859b4b91c5f07' }
+          Invoke-WebRequest "https://github.com/Alia5/VIIPER/releases/download/v0.9.0/viiper-$suffix" -OutFile ./viiper-backend
+          if ((Get-FileHash ./viiper-backend -Algorithm SHA256).Hash -ne $expected) { throw 'Backend hash mismatch' }
+          if ($IsWindows) {
+            Move-Item -LiteralPath ./viiper-backend -Destination ./viiper-backend.exe
+            if ((Get-AuthenticodeSignature ./viiper-backend.exe).Status -ne 'Valid') { throw 'Backend signature invalid' }
+          } else {
+            chmod +x ./viiper-backend
+          }
+      - name: Exercise actual backend and worker cleanup without a driver
+        shell: pwsh
+        run: |
+          $backend = if ($IsWindows) { './viiper-backend.exe' } else { './viiper-backend' }
+          dotnet run --project remote/SentinelRelay.RemoteInput.Tests -c Release --no-build -- --protocol $backend ./remote/SentinelRelay.RemoteInput/bin/Release/net10.0/SentinelRelay.RemoteInput.dll
+
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download and verify pinned official binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest 'https://github.com/Alia5/VIIPER/releases/download/v0.9.0/viiper-windows-amd64.exe' -OutFile ./viiper-backend.exe
+          if ((Get-FileHash ./viiper-backend.exe -Algorithm SHA256).Hash -ne '142c144f6abee8b8a5f6a1abbc7018683444de71d2e45102cde6aaab9b2223e6') { throw 'Backend hash mismatch' }
+          if ((Get-AuthenticodeSignature ./viiper-backend.exe).Status -ne 'Valid') { throw 'Backend signature invalid' }
+          Invoke-WebRequest 'https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.8.1/USBip-0.9.8.1-x64.exe' -OutFile ./usbip-setup.exe
+          if ((Get-FileHash ./usbip-setup.exe -Algorithm SHA256).Hash -ne '38cad6d4432b52d5bb9409d9ad03b72fdffc4ada4cd3a48fbeca1a2752a8518a') { throw 'Driver installer hash mismatch' }
+          if ((Get-AuthenticodeSignature ./usbip-setup.exe).Status -ne 'Valid') { throw 'Driver installer signature invalid' }
+      - name: Install signed USB-IP driver on disposable CI runner
+        shell: pwsh
+        run: |
+          $installer = Start-Process -FilePath ./usbip-setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/LOG=usbip-install.log') -WindowStyle Hidden -Wait -PassThru
+          if ($installer.ExitCode -ne 0) { throw "Driver install did not finish ready without reboot: $($installer.ExitCode)" }
+      - name: Build worker and native proof
+        run: dotnet build remote/SentinelRelay.RemoteInput.Tests -c Release
+      - name: Read actual Windows XInput and verify failure release
+        shell: pwsh
+        run: |
+          dotnet run --project remote/SentinelRelay.RemoteInput.Tests -c Release --no-build -- --native ./viiper-backend.exe ./remote/SentinelRelay.RemoteInput/bin/Release/net10.0/SentinelRelay.RemoteInput.dll
+      - name: Show sanitized installer outcome on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath ./usbip-install.log) {
+            Get-Content -LiteralPath ./usbip-install.log | Select-String -Pattern 'error|failed|restart|reboot' | Select-Object -Last 12
+          }
