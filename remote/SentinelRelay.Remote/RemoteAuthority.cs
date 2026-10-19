@@ -7,6 +7,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
     private readonly object gate = new();
     private readonly Dictionary<string, Session> sessions = [];
     private readonly Queue<AuditEvent> audit = new();
+    private readonly Dictionary<string, Queue<long>> mutationTimes = [];
     private static readonly TimeSpan SessionLife = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan IdleLimit = TimeSpan.FromSeconds(60);
     private sealed class Session(string deviceId, string epoch, DateTimeOffset now, long timestamp)
@@ -118,6 +119,13 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
                 return (End(false, "instance_not_authorized"), false);
             if (request.Operation is "srank.skip" or "srank.reset.request" or "srank.reset.confirm" && !device.Control)
                 return (End(false, "control_not_authorized"), false);
+            if (request.Operation is "srank.skip" or "srank.reset.confirm")
+            {
+                if (!mutationTimes.TryGetValue(device.Id, out var recent)) mutationTimes[device.Id] = recent = new();
+                while (recent.TryPeek(out var stamp) && time.GetElapsedTime(stamp) >= TimeSpan.FromSeconds(30)) recent.Dequeue();
+                if (recent.Count >= 5) return (End(false, "cooldown"), false);
+                recent.Enqueue(time.GetTimestamp()); // Per-device budget survives session reconnects.
+            }
             string? expectedGameEpoch = null;
             if (gameBridge is not null && request.Operation == "srank.reset.request")
                 return (End(true, "internal_game_intent", new GameIntent(device.Id, state.Epoch,

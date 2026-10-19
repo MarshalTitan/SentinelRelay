@@ -57,6 +57,11 @@ static class BridgeTests
         var newSession = ((SessionCredential)authority.OpenSession(newDevice.DeviceToken, new(1, newDevice.DeviceId)).Data!).SessionToken;
         admin.Bind(binding with { StartedUtcTicks = 999 });
         check(authority.Handle(newSession, new(1, 1, "srank.skip", first.InstanceId)).Code == "unauthorized", "local process rebind invalidates existing sessions");
+        var limitedSession = ((SessionCredential)authority.OpenSession(newDevice.DeviceToken, new(1, newDevice.DeviceId)).Data!).SessionToken;
+        fake.BeforeExecute = null;
+        for (var n = 1; n <= 5; n++) authority.Handle(limitedSession, new(1, n, "srank.skip", first.InstanceId));
+        var reconnect = ((SessionCredential)authority.OpenSession(newDevice.DeviceToken, new(1, newDevice.DeviceId)).Data!).SessionToken;
+        check(authority.Handle(reconnect, new(1, 1, "srank.skip", first.InstanceId)).Code == "cooldown", "mutation budget cannot be reset by reconnect");
     }
     private sealed class FakeBridge : IGameBridge
     {

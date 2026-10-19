@@ -65,7 +65,11 @@ internal sealed class MobilePipeServer : IDisposable
     }
     private static async Task ObserveDisconnect(Stream pipe, CancellationTokenSource cancellation)
     {
-        try { await pipe.ReadAsync(new byte[1], cancellation.Token); }
+        try
+        {
+            if (await pipe.ReadAsync(new byte[1], cancellation.Token) != 0)
+                throw new InvalidDataException("extra_frame_data");
+        }
         catch { }
         finally { cancellation.Cancel(); }
     }
