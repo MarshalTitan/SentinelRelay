@@ -1,6 +1,6 @@
 # Sentinel Remote PC foundation
 
-Status: Milestone A software candidate. The Android app and opt-in local game bridge now provide status, screenshots and existing SRank rescue operations. This optional host remains independent of Discord. Manual input, live video and launcher recovery are later stages. Start with the [single installation and acceptance checklist](docs/MILESTONE_A.md); the development notes below retain the original foundation setup.
+Status: Milestone A software candidate. The Android app and opt-in local game bridge now provide status, screenshots and existing SRank rescue operations. This optional host remains independent of Discord. Manual input, live video and launcher recovery are later stages. For the Windows installer and terminal-free setup candidate, start with [Desktop setup](docs/DESKTOP_SETUP.md). The [Milestone A checklist](docs/MILESTONE_A.md) retains the original console setup and full acceptance matrix.
 
 - [Architecture and live-source audit](docs/ARCHITECTURE.md)
 - [Security and protocol](docs/SECURITY.md)
@@ -20,7 +20,7 @@ The `Remote foundation` GitHub workflow runs authority, real HTTP, persistence, 
 
 ## PC setup for a developer/proving session
 
-Do not run the host as Administrator or LocalSystem. Run under the Windows user running FFXIV. Phase 1 runs in a console; a tray app and explicit startup registration will follow before unattended use. This console host survives game exit, but does not restart itself after a Windows logout/reboot.
+Do not run the host as Administrator or LocalSystem. Run under the Windows user running FFXIV. The console host remains available for development; the desktop candidate adds a tray and explicit per-user Windows startup registration. This console host survives game exit, but does not restart itself after a Windows logout/reboot.
 
 Install/sign into the official Tailscale client on the PC and proving phone. Use **Serve**, restricted to the intended tailnet account, with HTTPS enabled. Do not configure Funnel, LAN listeners, router port forwarding, or a public reverse proxy. Installing/configuring Tailscale and any phone app is a later user/device step; this source change installs nothing on either PC.
 
