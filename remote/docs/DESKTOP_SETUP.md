@@ -28,7 +28,9 @@ Before production, verify on a real PC: ordinary-user install, browser consent, 
 
 ## Reported Milestone A results
 
-The user verified Android pairing and actual character status, selected-game screenshot capture, and Stop + Reset returning the character to Ul'dah. Skip + Keep Queue and the rest of the acceptance matrix remain unverified. Desktop install/reconnection still require field acceptance. These reports do not mark the complete Milestone A matrix as passed.
+The user reported successful Android pairing, actual character/world/map/territory/heartbeat status, selected-game screenshot capture, and Stop + Reset returning the character to Ul'dah. Desktop normal Start launch, retained pairing, and continued tray operation after closing the window were confirmed. After closing FFXIV, Android showed it unavailable; reopening and logging into the same character automatically restored the correct connected status. S Rank now displays Idle with desktop 0.1.2. A selected-game screenshot also succeeded over mobile data with Tailscale connected.
+
+The user reports the other rescue buttons worked and requested moving on. The specific **Skip + Keep Queue queue-preservation test is deferred, not passed**, because two sufficiently close S Rank spawns are unavailable. Do not require waiting for that spawn sequence before independent development. Two-client routing, local emergency/revoke, Windows reboot/startup, remaining interruption cases and iOS remain unverified on real devices. These reports do not mark the complete Milestone A matrix as passed.
 
 ## Windows startup correction in desktop 0.1.1
 
