@@ -37,7 +37,7 @@ Use `MarshalTitan/SentinelRemote` for the Android-first mobile application when 
 
 The phone may connect to more than one PC host. Each host owns a random stable HostId; each locally registered installation owns a random stable InstanceId. The full remote target is `(HostId, InstanceId)`, independent of character names and window order. Tests use sample character labels only; runtime names are configurable.
 
-## Stable game identity and bridge design - next stage
+## Stable game identity and bridge design — next stage
 
 The host must bind a locally enrolled slot to a kernel-observed process ID **and start time**, selected HWND ownership and an ephemeral launch epoch. The plugin sends its current ContentId on an authenticated local channel. Use a current-user-only named pipe and kernel client-PID verification; match the expected executable and lifetime locally. The phone cannot supply a PID, HWND, executable path, content ID or pipe name. Validate the binding again before every action/capture. Reject duplicate/ambiguous bindings, PID reuse, logout/switch, HWND replacement, stale heartbeat and concurrent claims. A reconnect must mint a fresh game epoch and invalidate old intents.
 
@@ -60,7 +60,7 @@ Bridge payloads will be versioned and bounded; no free-text execution field. Reu
 
 For controller proof, begin with one remotely controlled instance per PC; other local FFXIV clients must demonstrably receive **no** input. If game/device routing cannot guarantee that, disable input whenever multiple clients are present and bring that limitation back as a product decision. Do not implement system-wide keyboard injection as a silent substitute. Capture/status/Discord functionality remains useful while this gate is unresolved.
 
-## Recovery and incident design - planned
+## Recovery and incident design — planned
 
 Separate host unreachable, process exited, process alive/plugin stale, character logged out/disconnected with positive evidence, and healthy. Missing heartbeat alone means plugin unavailable, not a proven disconnect/crash. Readiness and profile values may be unknown. Track monotonic heartbeat receipt and last-known timestamps; preserve world/territory/SRank as last known after loss.
 

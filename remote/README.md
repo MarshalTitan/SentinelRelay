@@ -46,6 +46,8 @@ tailscale serve status
 
 The host accepts only `127.0.0.1:32179`, the exact configured tailnet Host header, and the exact configured Tailscale login header. Tailscale Serve terminates HTTPS on the same PC and forwards to loopback. Keep the phone's normal certificate validation enabled. The app must use the **HTTPS tailnet URL**, never the loopback HTTP URL or a certificate-bypass mode. This requires a real-device transport check; CI exercises the proxy boundary, not a deployed tailnet. Unrestricted tailnet defaults should be narrowed to the intended devices/users before proving.
 
+For two distinct tailnet accounts, the final `serve` argument accepts a comma-separated list of exact authorized login values, with no spaces. Each phone still needs its own local invitation and device grants.
+
 ## Local emergency control and revocation
 
 ```powershell

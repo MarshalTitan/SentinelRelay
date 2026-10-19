@@ -61,7 +61,7 @@ public static class RemoteWeb
             {
                 if (!context.Response.HasStarted)
                 {
-                    var stateFailure = e is IOException and not BadHttpRequestException and not InvalidDataException;
+                    var stateFailure = e is IOException and not BadHttpRequestException;
                     context.Response.StatusCode = e is BadHttpRequestException bad ? bad.StatusCode : stateFailure ? 503 : 400;
                     await context.Response.WriteAsJsonAsync(new Reply(false, stateFailure ? "state_unavailable" : "invalid_request"), Protocol.Json, CancellationToken.None);
                 }

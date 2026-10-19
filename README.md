@@ -1,6 +1,6 @@
 # Sentinel Relay
 
-Sentinel Relay is a privacy-first **FFXIV  Discord** chat relay for Dalamud. It sends only the chat types a player explicitly enables to that character's private Discord webhook. Its optional reply reader accepts only individually allowed chat destinations from one authorized Discord user.
+Sentinel Relay is a privacy-first **FFXIV ↔ Discord** chat relay for Dalamud. It sends only the chat types a player explicitly enables to that character's private Discord webhook. Its optional reply reader accepts only individually allowed chat destinations from one authorized Discord user.
 
 Sentinel Relay sends directly to Discord and does not require a separately hosted relay service.
 
@@ -12,11 +12,11 @@ The `0.5.0.5` release uses the shared **Sentinel Modern 2** application shell fr
 
 ```text
 Dalamud structured chat event
-   local per-character filter
-   safe text conversion and mention neutralization
-   bounded background queue
-   character's Discord webhook
-   private relay channel
+  → local per-character filter
+  → safe text conversion and mention neutralization
+  → bounded background queue
+  → character's Discord webhook
+  → private relay channel
 ```
 
 Dalamud identifies the active character by content ID. Each character profile independently retains its protected webhook, filters, formatting, keywords, and pause state.
@@ -28,7 +28,7 @@ When Discord replies are enabled, the same profile also owns its protected bot c
 - Say, Yell, Shout, Free Company
 - Party and Cross-world Party
 - Alliance and PvP Team
-- Linkshell 1-8 and Cross-world Linkshell 1-8
+- Linkshell 1–8 and Cross-world Linkshell 1–8
 - Incoming Tell and Outgoing Tell as separate choices
 - Novice Network
 - Standard Emotes and Custom Emotes
@@ -40,7 +40,7 @@ The reward filter currently recognizes the English client lines for hunt contrib
 
 ## Safety and privacy
 
-- All chat filters-including Free Company-default off.
+- All chat filters—including Free Company—default off.
 - Disabled chat is discarded locally before any network request.
 - Discord webhook URLs are stored per character and protected with Windows DPAPI.
 - The UI never reveals a saved URL, and status/debug output never prints it.
@@ -63,7 +63,7 @@ See [SECURITY.md](SECURITY.md) for the complete review.
 
 Version `0.5.0.5` is distributed through the live Sentinel catalog. Dalamud downloads and updates the plugin; there is no ZIP to extract, standalone program to launch, or hosted relay service to operate. The optional reply/control reader remains off until configured per character.
 
-1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings  Experimental  Custom Plugin Repositories** and save.
+1. Add `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json` under **Dalamud Settings → Experimental → Custom Plugin Repositories** and save.
 2. Open `/xlplugins`, find **Sentinel Relay** under available plugins, and choose **Install**.
 3. Create one private Discord relay channel per FFXIV character.
 4. Create a separate incoming webhook in each channel by following [DISCORD_SETUP.md](DISCORD_SETUP.md).
@@ -74,7 +74,7 @@ Version `0.5.0.5` is distributed through the live Sentinel catalog. Dalamud down
 
 ## Configuration appearance
 
-In Classic, open `/srelay`  **General** to select **Sentinel Modern**. In Modern, select **Theme** with the Palette icon in the left rail, then use the bottom **Use Classic Theme** action. Existing theme selections persist. The modern presentation comes from the exact `MarshalTitan.SentinelCore.UI` 0.3.1 package at Core tag `v0.3.1.0`. Its unified shell owns the custom header, non-stacking icon rail, motion, status pills, cards, switches, responsive rows, and reduced-motion behavior. Sentinel Relay carries no private copy of those shared components, and no separate Sentinel Core plugin is installed at runtime.
+In Classic, open `/srelay` → **General** to select **Sentinel Modern**. In Modern, select **Theme** with the Palette icon in the left rail, then use the bottom **Use Classic Theme** action. Existing theme selections persist. The modern presentation comes from the exact `MarshalTitan.SentinelCore.UI` 0.3.1 package at Core tag `v0.3.1.0`. Its unified shell owns the custom header, non-stacking icon rail, motion, status pills, cards, switches, responsive rows, and reduced-motion behavior. Sentinel Relay carries no private copy of those shared components, and no separate Sentinel Core plugin is installed at runtime.
 
 The successful test message is:
 
@@ -98,7 +98,7 @@ A match can be highlighted in the relay channel and optionally ping one explicit
 | `/srelay resume` | Resume enabled webhook delivery and restart enabled reply polling at a fresh checkpoint |
 | `/srelay debug` | Show non-secret queue and delivery diagnostics |
 
-There are no registered Discord application commands. `/fc hello`, `/party hello`, `/screenshot`, and the other supported prefixes are ordinary text messages read through Discord's authenticated REST API. Each client polls only its configured channel, and all routing, author, freshness, and feature-permission checks must pass. The FFXIV  Discord webhook relay does not depend on the bot reader.
+There are no registered Discord application commands. `/fc hello`, `/party hello`, `/screenshot`, and the other supported prefixes are ordinary text messages read through Discord's authenticated REST API. Each client polls only its configured channel, and all routing, author, freshness, and feature-permission checks must pass. The FFXIV → Discord webhook relay does not depend on the bot reader.
 
 ## Discord replies
 
@@ -107,7 +107,7 @@ Do not enable this until the channel-specific bot permissions and IDs are config
 1. Run `/srelay` and open **Discord Webhook**.
 2. Paste the bot token, Relay Channel ID, and one Authorized Discord User ID, choose **Save Discord Connection**, and run **Test Discord Reader**.
 3. Open **Discord Replies**, enable only the desired reply destinations, and select **Save Reply Permissions**. These permissions are deliberately separate from the inbound **Chat Filters**.
-4. Check **Enable Discord  FFXIV Replies** and save the reply permissions.
+4. Check **Enable Discord → FFXIV Replies** and save the reply permissions.
 5. Post the ordinary Discord message `/fc hi` in that exact channel from that exact user.
 6. Verify on a second FFXIV client that the active character really sent `hi` in Free Company chat.
 
@@ -125,13 +125,13 @@ Starting, resuming, reconnecting, or switching characters first advances to Disc
 
 ## Remote screenshot
 
-`/screenshot` is a Sentinel Relay control command, not an FFXIV chat command. In `/srelay`  **Discord Replies**, enable **Allow authorized /screenshot window capture**, keep the master reader enabled, and select **Save Reply Permissions**. A fresh ordinary Discord message containing exactly `/screenshot` then:
+`/screenshot` is a Sentinel Relay control command, not an FFXIV chat command. In `/srelay` → **Discord Replies**, enable **Allow authorized /screenshot window capture**, keep the master reader enabled, and select **Save Reply Permissions**. A fresh ordinary Discord message containing exactly `/screenshot` then:
 
 1. passes the same active-character, channel, user, bot/webhook, freshness, and replay checks as a chat reply;
 2. selects only the current FFXIV process's verified game window;
 3. captures the game client area into memory on a background task;
-4. resizes it to at most 1280�720 and encodes an in-memory PNG; and
-5. uploads it through that character's configured webhook as `?SCREENSHOT? Character Name`.
+4. resizes it to at most 1280×720 and encodes an in-memory PNG; and
+5. uploads it through that character's configured webhook as `【SCREENSHOT】 Character Name`.
 
 The command never enters `DiscordReplyCommandParser` or `GameChatSender`, cannot select another process or filesystem path, and cannot capture the desktop. A local FFXIV notice appears whenever a request is accepted. Requests have a 15-second cooldown. Minimized windows are deliberately rejected because Windows does not provide a current capturable window frame in that state; restore the game and try again. Background and borderless/windowed behavior can vary with each PC and graphics-driver configuration.
 
@@ -159,7 +159,7 @@ The installable package is written to `bin/Release/SentinelRelay/latest.zip`. Gi
 
 Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamud catalog. It is not affiliated with or endorsed by Square Enix, Discord, Dalamud, or XIVLauncher.
 
-# Sentinel Remote foundation
+## Sentinel Remote foundation
 
 The optional [Sentinel Remote PC foundation](remote/README.md) is a separate external-host project for an Android-first game-rescue companion. It is not part of the released Dalamud plugin. Its game bridge, app, input, streaming and recovery stages remain pending; existing Discord functionality continues to work independently.
 
