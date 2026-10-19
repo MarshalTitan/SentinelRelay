@@ -100,6 +100,7 @@ static class NativeProof
                     // Silence leaves the pipe OPEN. The independent worker watchdog must act.
                 }
                 await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3));
+                await Wait(() => !IsAlive(pid), TimeSpan.FromMilliseconds(500));
                 check(!IsAlive(pid), "backend exits after worker " + failure);
                 if (native)
                 {

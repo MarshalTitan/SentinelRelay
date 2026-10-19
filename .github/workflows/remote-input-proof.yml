@@ -70,6 +70,14 @@ jobs:
         shell: pwsh
         run: |
           dotnet run --project remote/SentinelRelay.RemoteInput.Tests -c Release --no-build -- --native ./viiper-backend.exe ./remote/SentinelRelay.RemoteInput/bin/Release/net10.0/SentinelRelay.RemoteInput.dll
+      - name: Inspect native driver availability on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version
+          Get-Process -Id $PID | Select-Object SessionId
+          Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPDeviceID -match 'VID_045E&PID_028E|USBIP|USBIP2' -or $_.Name -match 'Xbox|USB.IP' } | Select-Object Name, Status, ConfigManagerErrorCode, PNPDeviceID
+          @('xusb22.sys', 'xinputhid.sys', 'usbip2_ude.sys') | ForEach-Object { [PSCustomObject]@{ Driver = $_; Present = Test-Path -LiteralPath (Join-Path $env:WINDIR "System32/drivers/$_") } }
       - name: Show sanitized installer outcome on failure
         if: failure()
         shell: pwsh

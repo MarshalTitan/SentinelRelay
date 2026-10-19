@@ -12,7 +12,6 @@ ViiperBackend? backend = null;
 try
 {
     backend = await ViiperBackend.Start(args[1], args.Length != 3);
-    using var cancel = new CancellationTokenSource();
     using var stop = new ManualResetEventSlim();
     long lastFrame = Stopwatch.GetTimestamp();
     var watcher = new Thread(() =>
@@ -21,7 +20,6 @@ try
         {
             if (Stopwatch.GetElapsedTime(Interlocked.Read(ref lastFrame)) < ControllerLease.FrameTimeout) continue;
             backend.Abort();
-            cancel.Cancel();
             Environment.Exit(2); // Console pipe reads are not reliably cancellable on every platform.
         }
     }) { IsBackground = true, Name = "Sentinel input fail-safe" };
@@ -38,7 +36,7 @@ try
         long sequence = 0;
         while (true)
         {
-            var packet = await WorkerWire.Read(input, cancel.Token);
+            var packet = await WorkerWire.Read(input, CancellationToken.None);
             var now = Stopwatch.GetTimestamp();
             if (!WorkerWire.Accept(packet, sequence, now)) throw new InvalidDataException("worker_frame_rejected");
             sequence = packet.Sequence;
@@ -48,8 +46,7 @@ try
     }
     finally { stop.Set(); watcher.Join(1000); }
 }
-catch (Exception error) when (error is IOException or OperationCanceledException or JsonException or
-    System.ComponentModel.Win32Exception or TimeoutException or InvalidOperationException or UnauthorizedAccessException)
+catch (Exception error)
 {
     // Stable outcome only. Never forward backend logs, command text, paths, frames, or exceptions.
     Console.WriteLine(JsonSerializer.Serialize(new { ready = false,

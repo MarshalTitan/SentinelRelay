@@ -181,9 +181,12 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         try { controller?.Dispose(); }
         finally
         {
-            job?.Dispose(); // Kernel-enforced process teardown on Windows; also runs on worker force-kill.
-            try { if (!process.HasExited) process.Kill(true); }
-            catch (InvalidOperationException) { }
+            if (job is not null) job.Dispose(); // Windows kills the owned backend without waiting for managed callbacks.
+            else
+            {
+                try { if (!process.HasExited) process.Kill(true); }
+                catch (InvalidOperationException) { }
+            }
         }
     }
     public void Dispose()
