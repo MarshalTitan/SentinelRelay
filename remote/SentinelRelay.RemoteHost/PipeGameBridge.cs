@@ -32,6 +32,18 @@ public sealed class PipeGameBridge : IGameBridge
         }
         catch { return false; }
     }
+    private static string ProcessState(GameBinding binding)
+    {
+        if (!OperatingSystem.IsWindows()) return "unknown";
+        try
+        {
+            using var process = Process.GetProcessById(binding.ProcessId);
+            if (process.HasExited || process.StartTime.ToUniversalTime().Ticks != binding.StartedUtcTicks) return "exited";
+            return Alive(binding) ? "running" : "unknown";
+        }
+        catch (ArgumentException) { return "exited"; }
+        catch { return "unknown"; }
+    }
     private static BridgeReply Call(GameBinding binding, BridgeRequest request, CancellationToken cancellation)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -70,13 +82,15 @@ public sealed class PipeGameBridge : IGameBridge
     {
         var snapshot = Read(binding);
         lastKnown.TryGetValue(binding.InstanceId, out var previous);
-        return new(true, "status", Project(snapshot ?? previous, Alive(binding), snapshot is not null));
+        if (previous?.CharacterKey != binding.CharacterKey) previous = null;
+        var status = Project(snapshot ?? previous, snapshot is not null, snapshot is not null) with { ProcessStatus = ProcessState(binding) };
+        return new(true, "status", status);
     }
     public Reply Execute(GameBinding binding, string operation, string? expectedGameEpoch, Func<bool> authorized, CancellationToken cancellation)
     {
         if (operation is not ("srank.skip" or "srank.reset.confirm" or "screenshot")) return new(false, "operation_not_allowed");
         var snapshot = Read(binding);
-        if (snapshot is null) return new(false, Alive(binding) ? "bridge_unavailable" : "process_exited");
+        if (snapshot is null) return new(false, ProcessState(binding) == "exited" ? "process_exited" : "bridge_unavailable");
         if (expectedGameEpoch is not null && expectedGameEpoch != snapshot.GameEpoch) return new(false, "character_changed");
         using var requestLife = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         var watch = Task.Run(async () =>

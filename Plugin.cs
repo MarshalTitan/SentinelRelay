@@ -107,7 +107,7 @@ public sealed partial class Plugin : IDalamudPlugin
         windows.AddWindow(mainWindow);
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open Sentinel Relay. Options: status, pause, resume, debug",
+            HelpMessage = "Open Sentinel Relay. Options: status, pause, resume, debug, mobile",
         });
         PluginInterface.UiBuilder.Draw += windows.Draw;
         PluginInterface.UiBuilder.OpenMainUi += OpenMainWindow;
@@ -728,7 +728,7 @@ public sealed partial class Plugin : IDalamudPlugin
                     + $"screenshotError={lastRemoteScreenshotError ?? remoteScreenshotService.LastError ?? "none"}");
                 break;
             default:
-                ChatGui.PrintError("[Sentinel Relay] Use /srelay, status, pause, resume, or debug.");
+                ChatGui.PrintError("[Sentinel Relay] Use /srelay, status, pause, resume, debug, or mobile.");
                 break;
         }
     }
