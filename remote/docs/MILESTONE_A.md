@@ -77,7 +77,11 @@ For a second game on the same PC, register and bind a second slot, then grant th
 
 Stop if any request acts on the wrong character or captures another window. Do not test account/character deletion or other destructive operations. Record candidate versions, which topology was tested (separate PCs/same-PC clients), check results and sanitized error codes only. No secrets, raw authority state or login information in reports.
 
-## Current limitations
+## Reported field evidence and deferred check
+
+See the current [reported results](DESKTOP_SETUP.md#reported-milestone-a-results) for desktop 0.1.2, Relay 0.6.0.1 and Android 0.1.0. The user confirmed game exit/restart reconnection and selected-game screenshots over mobile data. The specific Skip + Keep Queue queue-preservation observation is **deferred, not passed**, until suitable spawns occur. Independent Milestone B preparation continues without waiting for that event. The remaining checklist remains open.
+
+## Current limitations (original console candidate)
 
 This build is status and bounded rescue commands, not manual game control or unattended login recovery. There are no sticks/buttons, live video, launcher actions, Profiles IPC, incident uploads, automatic host startup or tray emergency button. Keep the host console open. The CLI provides local emergency disable; a visible tray/watchdog stage is required before real input is added.
 

@@ -1,6 +1,6 @@
 # Sentinel Remote implementation and acceptance plan
 
-Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone A Android/bridge software are implemented as candidates. Milestone A remains unproven on real devices until the [consolidated checklist](MILESTONE_A.md) passes. The original staged work table below describes each gate, not a claim that every later phase is implemented.
+Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone A Android/bridge software are implemented as candidates. Milestone A has partial real-device evidence recorded in [Desktop setup](DESKTOP_SETUP.md); the full [consolidated checklist](MILESTONE_A.md) is still open. Skip + Keep Queue queue preservation is explicitly deferred because consecutive S Rank spawns are unavailable; it does not block independent development. The original staged work table below describes each gate, not a claim that every later phase is implemented.
 
 | Stage | Software work | Acceptance gate |
 |---|---|---|
@@ -17,14 +17,14 @@ Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone 
 2. Implemented: Flutter Android client, pinned SDK and locked dependencies, HTTPS-only transport, OS-backed credentials, memory-only sessions/confirmation, per-PC/client selection, background cancellation and no automatic mutation retry.
 3. Implemented: current-user-only local pipe, kernel server-PID verification, explicit local process lifetime/character binding, new game epochs, framework-only fixed SRank dispatch and screenshot capture with a second identity check. Real pipe disconnect/expiry and bridge routing/epoch tests pass on Windows and Linux.
 4. Implemented: observed process/Relay health, character/world/territory/map, SRank, heartbeat and nullable vnavmesh readiness. Last-known state is explicitly marked. Profiles stays unknown; no config scraping is used.
-5. Local CLI emergency disable/revoke is implemented. A user-session tray and startup opt-in remain deferred, and are required before enabling manual input in Milestone B. No administration privilege is required for the current host.
+5. Local GUI/tray and CLI emergency disable/revoke, per-user installation, optional Windows startup, and verified same-character automatic rebinding are implemented. Reported field checks include normal Start launch, retained pairing, tray continuation, game exit/restart reconnection, and screenshots over mobile data. Windows reboot/startup, two-client isolation and emergency/revoke field acceptance remain open.
 6. Matched Android debug APK, Windows plugin and self-contained host candidates are available through the [validated download/checklist page](MILESTONE_A.md). Stable private Android release signing remains a later packaging task. The current production Discord catalog is unchanged pending supervised acceptance.
 
 ## Automated verification scope
 
 Current tests cover disabled default; pair once/expiry; invalid credentials; device grant filtering; wrong-client/view-only mutation denial; unknown operations; request/session protocol mismatch; sequential and concurrent replays; reset instance/device binding/expiry/consumption; reconnect invalidation; idle/absolute timeout; local revoke/disable; safe status/audit; bounded audit; real state restart/consumption/revocation and corruption; real Kestrel identity/origin/schema/query/admin-route/authentication/replay/body/rate-limit behavior. Existing Relay policy tests and plugin build run independently.
 
-Future gates add host/plugin transport authentication, binding ambiguity, process loss/reuse, heartbeat freshness, controller ownership/release/watchdog, window ownership/capture limits, reconnect state machines and secret-redacted local incidents. No destructive account/character operation belongs in automated or manual testing.
+Bridge/process/binding checks and the backend-independent controller lease/watchdog now have automated coverage. Future gates add a real controller backend and its independent failure watchdog, live authorization wiring, single-client enforcement, window ownership/capture limits, reconnect state machines and secret-redacted local incidents. No destructive account/character operation belongs in automated or manual testing.
 
 CI cannot certify Tailscale deployment, Android secure storage/lifecycle, game controller routing, native capture, launcher account behavior or physical character choice. Those are explicitly supervised gates; no labels or simulated status substitute for them.
 
@@ -39,4 +39,4 @@ iOS: building/signing requires the Apple/Xcode toolchain. Apple's free Personal 
 
 ## Known unimplemented capabilities
 
-Android pairing/status/rescue UI, private local bridge, process lifetime/character binding, optional vnavmesh readiness and last-known status are implemented candidates. Automatic startup, tray emergency UI, Profiles IPC, automatic rebinding, input ownership/watchdog, driver, streaming, launcher launch, manual authentication, lobby/character assistant and incident collection/export remain unimplemented. CI alone does not establish real-device acceptance.
+Android pairing/status/rescue UI, private local bridge, process lifetime/character binding, optional vnavmesh readiness and last-known status are implemented candidates. The desktop/tray, startup opt-in and verified same-character rebinding are implemented. Milestone B has an isolated lease/watchdog core; it is not connected to network requests or OS input. The first gamepad version is limited to exactly one running FFXIV client per PC, as approved by the user. See [manual input research and integration gate](MILESTONE_B.md). Profiles IPC, the live input backend/authorization/device routing, streaming, launcher launch, manual authentication, lobby/character assistant and incident collection/export remain unimplemented. CI alone does not establish real-device acceptance.
