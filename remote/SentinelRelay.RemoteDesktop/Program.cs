@@ -8,13 +8,19 @@ internal static class Program
     private static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        if (args is ["--smoke-test", var output])
-            return DesktopSmoke.Run(output);
-        if (new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+        var smokeIndex = Array.IndexOf(args, "--smoke-test");
+        try
         {
-            MessageBox.Show("Open Sentinel Remote normally, without Run as administrator, using the Windows account that runs FFXIV.", "Sentinel Remote");
+            if (WindowsLaunch.RedirectIfNeeded(args)) return 0;
+        }
+        catch
+        {
+            if (smokeIndex < 0)
+                MessageBox.Show("Sentinel Remote could not open in your Windows user session. Please report startup_launch_failed.", "Sentinel Remote");
             return 1;
         }
+        if (smokeIndex >= 0 && smokeIndex + 1 < args.Length)
+            return DesktopSmoke.Run(args[smokeIndex + 1]);
         using var mutex = new Mutex(true, "Local\\SentinelRemoteDesktop-" + WindowsIdentity.GetCurrent().User!.Value, out var first);
         if (!first)
         {
