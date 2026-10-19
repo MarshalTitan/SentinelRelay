@@ -43,6 +43,16 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
         state.Enabled, state.HostId, state.Instances,
         Devices = state.Devices.Select(d => new { d.Id, d.Label, d.Instances, d.Control, d.Revoked }).ToArray(),
     }, false));
+    public void Bind(GameBinding binding) => store.Access(state =>
+    {
+        if (!state.Instances.Any(i => i.InstanceId == binding.InstanceId)) throw new InvalidOperationException("unknown_instance");
+        if (state.Bindings.Any(b => b.InstanceId != binding.InstanceId && b.ProcessId == binding.ProcessId && b.StartedUtcTicks == binding.StartedUtcTicks))
+            throw new InvalidOperationException("process_already_bound");
+        state.Bindings.RemoveAll(b => b.InstanceId == binding.InstanceId);
+        state.Bindings.Add(binding);
+        state.Epoch = Guid.NewGuid().ToString("N"); // Rebinding invalidates all old sessions/reset intent.
+        return (true, true);
+    });
     private static void ValidateLabel(string label)
     {
         if (string.IsNullOrWhiteSpace(label) || label.Length > 64 || label.Any(char.IsControl))

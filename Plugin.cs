@@ -33,6 +33,7 @@ public sealed partial class Plugin : IDalamudPlugin
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private readonly WindowSystem windows = new("SentinelRelay");
@@ -125,6 +126,7 @@ public sealed partial class Plugin : IDalamudPlugin
         if (disposed)
             return;
         disposed = true;
+        StopMobileBridge();
         Framework.Update -= OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw -= windows.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= OpenMainWindow;
@@ -174,6 +176,7 @@ public sealed partial class Plugin : IDalamudPlugin
         }
 
         ProcessOutboundQueue(now);
+        UpdateMobileBridge();
         QueueCapturedChat(rewardBatcher.FlushIfDue(now));
     }
 
@@ -680,6 +683,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private void OnCommand(string _, string arguments)
     {
+        if (MobileCommand(arguments)) return;
         var option = arguments.Trim().ToLowerInvariant();
         switch (option)
         {
@@ -755,3 +759,4 @@ public sealed partial class Plugin : IDalamudPlugin
 
     private void OpenMainWindow() => mainWindow.OpenAndExpand();
 }
+

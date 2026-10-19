@@ -2,9 +2,9 @@ name: Remote foundation
 on:
   push:
     branches: [main, 'feature/sentinel-remote-*']
-    paths: ['remote/**', '.github/workflows/remote-foundation.yml']
+    paths: ['remote/**', 'Bridge/**', '.github/workflows/remote-foundation.yml']
   pull_request:
-    paths: ['remote/**', '.github/workflows/remote-foundation.yml', 'SentinelRelay.csproj']
+    paths: ['remote/**', 'Bridge/**', '.github/workflows/remote-foundation.yml', 'SentinelRelay.csproj']
 permissions:
   contents: read
 jobs:

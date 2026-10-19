@@ -1,7 +1,7 @@
 namespace SentinelRelay.Remote;
 
 /// <summary>Serializes authorization and one-shot intent. No game, shell, filesystem, or input dispatcher.</summary>
-public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null)
+public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null, IGameBridge? gameBridge = null)
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
     private readonly object gate = new();
@@ -21,6 +21,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
         public string? ResetInstance;
         public DateTimeOffset ResetExpires;
         public long ResetStarted;
+        public string? ResetGameEpoch;
     }
     private DateTimeOffset Now => time.GetUtcNow();
     private void Record(string code, string? device = null, string? instance = null)
@@ -75,10 +76,13 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
         });
     }
 
-    public Reply Handle(string? sessionToken, RemoteRequest request)
+    private sealed record GameIntent(string DeviceId, string Epoch, GameBinding? Binding, string Operation, string? ExpectedGameEpoch, Session Session);
+    public Reply Handle(string? sessionToken, RemoteRequest request, CancellationToken cancellation = default)
     {
-        lock (gate) return store.Access(state =>
+        lock (gate)
         {
+          var reply = store.Access(state =>
+          {
             Prune();
             if (!state.Enabled) { sessions.Clear(); return (new Reply(false, "remote_disabled"), false); }
             if (!Protocol.IsSecret(sessionToken) || !sessions.TryGetValue(Protocol.Hash(sessionToken!), out var session))
@@ -114,6 +118,10 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
                 return (End(false, "instance_not_authorized"), false);
             if (request.Operation is "srank.skip" or "srank.reset.request" or "srank.reset.confirm" && !device.Control)
                 return (End(false, "control_not_authorized"), false);
+            string? expectedGameEpoch = null;
+            if (gameBridge is not null && request.Operation == "srank.reset.request")
+                return (End(true, "internal_game_intent", new GameIntent(device.Id, state.Epoch,
+                    state.Bindings.FirstOrDefault(b => b.InstanceId == request.InstanceId), request.Operation, null, session)), false);
             if (request.Operation == "srank.reset.request")
             {
                 var nonce = Protocol.Secret();
@@ -127,12 +135,48 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             {
                 var valid = session.ResetHash is not null && session.ResetInstance == request.InstanceId &&
                     time.GetElapsedTime(session.ResetStarted) < TimeSpan.FromSeconds(30) && Protocol.Matches(session.ResetHash, request.Confirmation);
+                expectedGameEpoch = session.ResetGameEpoch;
                 session.ResetHash = null;
+                session.ResetGameEpoch = null;
                 session.ResetInstance = null;
                 if (!valid) return (End(false, "confirmation_rejected"), false);
             }
-            // Phase 1 intentionally has no OS/game dispatch. Do not imply execution succeeded.
+            if (gameBridge is not null)
+                return (End(true, "internal_game_intent", new GameIntent(device.Id, state.Epoch,
+                    state.Bindings.FirstOrDefault(b => b.InstanceId == request.InstanceId), request.Operation, expectedGameEpoch, session)), false);
             return (End(false, "bridge_unavailable"), false);
-        });
+          });
+          if (reply.Data is not GameIntent intent) return reply;
+          if (intent.Binding is null || gameBridge is null) return new(false, "bridge_unavailable");
+          bool StillAllowed() => !cancellation.IsCancellationRequested && store.Access(state =>
+          {
+              var device = state.Devices.FirstOrDefault(d => d.Id == intent.DeviceId && !d.Revoked);
+              return (state.Enabled && state.Epoch == intent.Epoch && device is not null &&
+                  device.Instances.Contains(intent.Binding.InstanceId) && state.Bindings.Contains(intent.Binding) &&
+                  (intent.Operation is "srank.status" or "screenshot" || device.Control), false);
+          });
+          if (!StillAllowed()) return new(false, "unauthorized");
+          if (intent.Operation == "srank.reset.request")
+          {
+              intent.Session.ResetHash = null;
+              var snapshot = gameBridge.Read(intent.Binding);
+              if (snapshot is null) return new(false, "bridge_unavailable");
+              if (!snapshot.ControlAllowed) return new(false, "control_not_authorized");
+              if (!StillAllowed()) return new(false, "unauthorized");
+              var nonce = Protocol.Secret();
+              intent.Session.ResetHash = Protocol.Hash(nonce);
+              intent.Session.ResetInstance = intent.Binding.InstanceId;
+              intent.Session.ResetGameEpoch = snapshot.GameEpoch;
+              intent.Session.ResetStarted = time.GetTimestamp();
+              intent.Session.ResetExpires = Now.AddSeconds(30);
+              Record("confirmation_required", intent.DeviceId, intent.Binding.InstanceId);
+              return new(true, "confirmation_required", new { Confirmation = nonce, Expires = intent.Session.ResetExpires });
+          }
+          var result = intent.Operation == "srank.status" ? gameBridge.Status(intent.Binding)
+              : gameBridge.Execute(intent.Binding, intent.Operation, intent.ExpectedGameEpoch, StillAllowed, cancellation);
+          if (!StillAllowed()) return new(false, "unauthorized"); // Also suppress state/frames after revocation.
+          Record(result.Code, intent.DeviceId, intent.Binding.InstanceId);
+          return result;
+        }
     }
 }

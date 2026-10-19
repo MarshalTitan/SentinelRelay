@@ -23,6 +23,9 @@ public sealed class CharacterProfile
 
     // Independent per-character access boundary; absent in old configs means false.
     public bool RemoteSRankControlsEnabled { get; set; }
+    public bool MobileRemoteEnabled { get; set; }
+    public bool MobileRemoteControlEnabled { get; set; }
+    public bool MobileRemoteScreenshotsEnabled { get; set; }
 
     public string DiscordRelayChannelId { get; set; } = string.Empty;
 
@@ -58,3 +61,4 @@ public sealed class CharacterProfile
 
     public DateTime? LastRemoteScreenshotSuccessUtc { get; set; }
 }
+

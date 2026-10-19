@@ -9,6 +9,7 @@ public sealed class FileStateStore : IStateStore
 {
     private readonly string directory;
     private readonly string path;
+    private readonly object gate = new();
     public FileStateStore(string directory)
     {
         this.directory = Path.GetFullPath(directory);
@@ -27,6 +28,10 @@ public sealed class FileStateStore : IStateStore
         Access(_ => (true, true));
     }
     public T Access<T>(Func<RemoteState, (T Result, bool Save)> action)
+    {
+        lock (gate) return AccessCore(action);
+    }
+    private T AccessCore<T>(Func<RemoteState, (T Result, bool Save)> action)
     {
         var lockPath = Path.Combine(directory, "authority.lock");
         RejectLink(lockPath);

@@ -39,6 +39,7 @@ public sealed class RemoteState
     public List<InstanceInfo> Instances { get; set; } = [];
     public List<Device> Devices { get; set; } = [];
     public List<Invitation> Invitations { get; set; } = [];
+    public List<GameBinding> Bindings { get; set; } = [];
 }
 public sealed record Device(string Id, string Label, string TokenHash, string[] Instances, bool Control, bool Revoked = false);
 public sealed record Invitation(string Hash, DateTimeOffset Expires, string Label, string[] Instances, bool Control);
