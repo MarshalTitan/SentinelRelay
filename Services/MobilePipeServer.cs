@@ -38,29 +38,46 @@ internal sealed class MobilePipeServer : IDisposable
             {
                 using var pipe = new NamedPipeServerStream(BridgeWire.PipeName(Environment.ProcessId), PipeDirection.InOut, 1,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                await pipe.WaitForConnectionAsync(lifetime.Token);
-                using var requestLife = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-                requestLife.CancelAfter(TimeSpan.FromSeconds(4));
-                var request = await BridgeWire.Read<BridgeRequest>(pipe, 4096, requestLife.Token);
-                if (!BridgeWire.Allowed(request.Operation)) continue;
-                // A closed local connection cancels work still waiting for the next game tick.
-                var disconnected = ObserveDisconnect(pipe, requestLife);
-                var reply = await Submit(request, requestLife.Token);
-                if (reply.CaptureWindow != 0)
+                // Retain one listener across clients; close/recreate can lose a fast reconnect on Unix.
+                while (!lifetime.IsCancellationRequested)
                 {
-                    var capture = GameWindowCapture.CapturePng(reply.CaptureWindow);
-                    requestLife.Token.ThrowIfCancellationRequested();
-                    var validation = await Submit(request, requestLife.Token, validateOnly: true);
-                    reply = !validation.Success ? validation : capture.Success && capture.PngBytes is not null
-                        ? new(true, "screenshot", validation.Snapshot, Convert.ToBase64String(capture.PngBytes))
-                        : new(false, "capture_failed");
+                    await pipe.WaitForConnectionAsync(lifetime.Token);
+                    try { await ServeOne(pipe); }
+                    catch (OperationCanceledException) { }
+                    catch { }
+                    finally { if (pipe.IsConnected) pipe.Disconnect(); }
                 }
-                await BridgeWire.Write(pipe, reply, 10_100_000, requestLife.Token);
-                requestLife.Cancel();
-                try { await disconnected; } catch { /* closed/cancelled by design */ }
             }
             catch (OperationCanceledException) { }
             catch { try { await Task.Delay(100, lifetime.Token); } catch (OperationCanceledException) { } }
+        }
+    }
+    private async Task ServeOne(Stream pipe)
+    {
+        using var requestLife = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        requestLife.CancelAfter(TimeSpan.FromSeconds(4));
+        Task? disconnected = null;
+        try
+        {
+            var request = await BridgeWire.Read<BridgeRequest>(pipe, 4096, requestLife.Token);
+            if (!BridgeWire.Allowed(request.Operation)) return;
+            disconnected = ObserveDisconnect(pipe, requestLife);
+            var reply = await Submit(request, requestLife.Token);
+            if (reply.CaptureWindow != 0)
+            {
+                var capture = GameWindowCapture.CapturePng(reply.CaptureWindow);
+                requestLife.Token.ThrowIfCancellationRequested();
+                var validation = await Submit(request, requestLife.Token, validateOnly: true);
+                reply = !validation.Success ? validation : capture.Success && capture.PngBytes is not null
+                    ? new(true, "screenshot", validation.Snapshot, Convert.ToBase64String(capture.PngBytes))
+                    : new(false, "capture_failed");
+            }
+            await BridgeWire.Write(pipe, reply, 10_100_000, requestLife.Token);
+        }
+        finally
+        {
+            requestLife.Cancel();
+            if (disconnected is not null) { try { await disconnected; } catch { } }
         }
     }
     private static async Task ObserveDisconnect(Stream pipe, CancellationTokenSource cancellation)
