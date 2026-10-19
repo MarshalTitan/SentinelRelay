@@ -36,7 +36,7 @@ public sealed class MainForm : Form
         preferences = DesktopPreferences.Load(directory);
         Text = "Sentinel Remote";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(860, 850);
+        ClientSize = new Size(860, 700);
         MinimumSize = new Size(720, 640);
         Font = new Font("Segoe UI", 10);
         BackColor = Color.FromArgb(245, 243, 251);

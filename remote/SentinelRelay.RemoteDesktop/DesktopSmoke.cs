@@ -15,7 +15,7 @@ internal static class DesktopSmoke
             form.Show();
             Application.DoEvents();
             Directory.CreateDirectory(output);
-            Capture(form, Path.Combine(output, "desktop-wide.png"), new Size(860, 850));
+            Capture(form, Path.Combine(output, "desktop-wide.png"), new Size(860, 700));
             Capture(form, Path.Combine(output, "desktop-narrow.png"), new Size(720, 640));
             using var pair = new PairingForm("https://example.test.ts.net", new string('A', 64));
             pair.Show();
