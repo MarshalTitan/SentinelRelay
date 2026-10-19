@@ -91,7 +91,7 @@ public static class RemoteWeb
         app.MapPost("/remote/v1/session", async (HttpRequest request) => Respond(authority.OpenSession(Bearer(request),
             await request.ReadFromJsonAsync<SessionRequest>(Protocol.Json, request.HttpContext.RequestAborted) ?? throw new JsonException())));
         app.MapPost("/remote/v1/request", async (HttpRequest request) => Respond(authority.Handle(Bearer(request),
-            await request.ReadFromJsonAsync<RemoteRequest>(Protocol.Json, request.HttpContext.RequestAborted) ?? throw new JsonException())));
+            await request.ReadFromJsonAsync<RemoteRequest>(Protocol.Json, request.HttpContext.RequestAborted) ?? throw new JsonException(), request.HttpContext.RequestAborted)));
         return app;
     }
 }

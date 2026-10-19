@@ -1,5 +1,20 @@
 # Remote foundation security and protocol v1
 
+## Milestone A implementation update
+
+The host now supports explicitly bound game clients through a default-off per-character local pipe server in the Relay plugin. The Android app exists in SentinelRemote. Earlier Phase 1 statements below are the historical foundation boundary; these additions apply to the 0.6.0.0 candidate:
+
+- Local `bind INSTANCE_ID GAME_PID` verifies FFXIV executable, PID/start time and Windows-reported named-pipe server PID, then stores the expected character key. The phone cannot submit a PID/path/window handle. Rebinding rotates the host epoch and invalidates sessions. Process restart requires explicit local rebinding in this candidate.
+- The plugin owns a current-Windows-user-only named pipe, not an external network listener. The host is the client and verifies the server PID; this reverses the proposed pipe direction while preserving the same trusted-local-user boundary. No remote pipe name or target path is accepted. Same-user malicious processes remain outside the security boundary.
+- Frames are length-prefixed and bounded (4 KiB request, about 10 MB maximum response); schema/operations/version are strict. Each connection carries one operation. A bounded queue submits only to the framework thread. Closing the connection or four-second expiry cancels work not yet dispatched. The host does not retry uncertain mutations.
+- Every game request includes the expected character key and live plugin epoch. Logout, pause, disable, permission change and plugin reload stop the bridge or retire its epoch. Reset intent is additionally bound to the observed game epoch. The plugin rechecks current player identity and its independent per-character view/control/screenshot opt-ins on execution.
+- Host grants/revocation/disable are rechecked outside the state-file transaction before sending and while awaiting the operation. A local disable/revoke cancels pending IPC; an operation already submitted to the game may finish and cannot be undone. Replies/frames are suppressed if authorization was revoked while waiting.
+- Existing SRank IPC functions execute fixed status/skip/reset operations; screenshots reuse the verified current-process game-window capture, cooldown and in-memory PNG path. Capture runs off the framework thread and a second framework identity/permission check precedes delivery. No desktop fallback, generic input or new launcher operation exists.
+- Status reports observed process/Relay health with clearly marked last-known game data after loss. Profiles remains unknown; a failed vnavmesh probe remains unknown. A normal process exit is not asserted to be a crash.
+- Android uses OS-backed secure storage for device credentials, memory-only sessions/confirmations, no backups/cleartext/redirects, and the secure-window flag. Backgrounding closes network requests and invalidates queued work; refresh never reissues a mutation.
+
+The [Milestone A checklist](MILESTONE_A.md) is the real-device acceptance gate. Manual game input remains unavailable, so the later exclusive-controller/watchdog/tray requirements remain gated.
+
 Scope: private game-rescue companion for explicitly paired devices. The external host is optional and default disabled. Phase 1 does not execute OS input, launch processes, inspect files remotely, connect to the game, or collect incidents. The live Discord plugin's existing security policy remains independent.
 
 ## Trust boundaries

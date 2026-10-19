@@ -1,6 +1,6 @@
 # Sentinel Remote PC foundation
 
-Status: Phase 0 audit and software-only Phase 1 candidate. This is an optional external host, independent of the shipped Dalamud plugin. No phone app, game bridge, process monitor, video, input driver, launcher integration, or unattended-recovery capability is included yet. Existing Discord functionality remains the production path.
+Status: Milestone A software candidate. The Android app and opt-in local game bridge now provide status, screenshots and existing SRank rescue operations. This optional host remains independent of Discord. Manual input, live video and launcher recovery are later stages. Start with the [single installation and acceptance checklist](docs/MILESTONE_A.md); the development notes below retain the original foundation setup.
 
 - [Architecture and live-source audit](docs/ARCHITECTURE.md)
 - [Security and protocol](docs/SECURITY.md)
@@ -60,7 +60,7 @@ Disable clears pending invitations and changes the authorization epoch. Every su
 
 ## Android and iOS
 
-Neither app exists yet. Recommended next repository: `MarshalTitan/SentinelRemote`, containing a Flutter application, shared protocol client, secure credential storage, tests and platform packaging. Android is first; use a signed private APK with the signing key kept outside source. Do not present this host artifact as an APK. iOS remains deferred until Android/control/view are proven; signing and distribution require a separate Apple setup. See the plan for the current distribution research.
+The Android app now lives in `MarshalTitan/SentinelRemote`; use its matched signed debug proving APK with the Relay 0.6.0.0 candidate and host. A stable private release signing key remains a later packaging task. iOS stays deferred until Android/control/view are proven. See the milestone checklist and distribution plan.
 
 ## Reconnect and troubleshooting
 
@@ -70,7 +70,7 @@ Neither app exists yet. Recommended next repository: `MarshalTitan/SentinelRemot
 - `400`: protocol/schema/sequence/confirmation error. Unknown JSON fields and null required values are rejected.
 - `429`: request budget exhausted. Back off; do not run a rapid retry loop.
 - `503 state_unavailable`: state is locked, unreadable or corrupt. Stop the host and inspect locally; there is no permissive fallback. Preserve the file for local repair; do not post it publicly.
-- `503 bridge_unavailable`: expected in this candidate. No game action was executed. Continue using the existing Discord Relay controls.
-- Game offline/online, crash reasons, Profiles and vnavmesh readiness are not observed by this candidate. Do not interpret host availability or an inventory label as game health.
+- `503 bridge_unavailable`: the slot is unbound, the character changed, the plugin is unavailable or mobile access is disabled. Check the local binding and Relay opt-in. Commands are never automatically retried.
+- Process lifetime, Relay availability, character/world/map, SRank and optional vnavmesh readiness are observed through the bound bridge. Profiles stays unknown. Missing Relay preserves clearly marked last-known state; disappearance is not a crash diagnosis. A registry label alone is never health evidence.
 
 State is stored under the current user's local application data, `Sentinel/Remote`, with owner-only permissions. It contains hashes and local grants, not Discord tokens, Square Enix passwords, OTP values or authenticator secrets. No diagnostic upload runs automatically.
