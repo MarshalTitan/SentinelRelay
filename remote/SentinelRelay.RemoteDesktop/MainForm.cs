@@ -80,8 +80,17 @@ public sealed class MainForm : Form
         Add(page, devices);
         emergency = new Button { Text = "Disable all remote access", AutoSize = true, BackColor = Color.FromArgb(176, 42, 65), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Padding = new Padding(8) };
         emergency.Click += async (_, _) => await Disable();
-        Add(page, Row(Work("Revoke selected phone", Revoke), emergency));
-        Add(page, TextLabel("Closing this window keeps the host in the tray beside the Windows clock. Right-click its icon to disable access or exit."));
+        Add(page, Row(Work("Revoke selected phone", Revoke)));
+        Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));
+        // Keep emergency access reachable even on short laptop displays and while the page scrolls.
+        var safetyBar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true,
+            Padding = new Padding(16, 6, 16, 6), BackColor = Color.White,
+        };
+        safetyBar.Controls.Add(emergency);
+        safetyBar.Controls.Add(new Label { Text = "Closing the window keeps the host running in the tray.", AutoSize = true, Padding = new Padding(10, 12, 0, 0) });
+        Controls.Add(safetyBar);
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open Sentinel Remote", null, (_, _) => Restore());
