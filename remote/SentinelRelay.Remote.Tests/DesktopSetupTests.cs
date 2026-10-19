@@ -3,8 +3,16 @@ using SentinelRelay.Remote;
 
 internal static class DesktopSetupTests
 {
-    public static void Run(Action<bool, string> check)
+    public static async Task Run(Action<bool, string> check)
     {
+        var stopped = false;
+        var nextWrite = false;
+        var saved = await LocalEmergencyStop.Run(() => { stopped = true; return Task.CompletedTask; },
+            () => throw new IOException("locked"), () => nextWrite = true);
+        check(stopped && nextWrite && !saved, "desktop emergency stop closes listener even when a state write fails");
+        stopped = false;
+        saved = await LocalEmergencyStop.Run(() => { stopped = true; return Task.CompletedTask; }, () => { });
+        check(stopped && saved, "desktop emergency stop reports successfully persisted disable");
         var json = """{"BackendState":"Running","Self":{"DNSName":"main.test.ts.net.","UserID":7},"User":{"7":{"LoginName":"owner@example.com"},"9":{"LoginName":"peer@example.com"}}}""";
         var identity = DesktopSetupPolicy.ReadIdentity(json);
         check(identity.Host == "main.test.ts.net" && identity.Login == "owner@example.com", "desktop uses the local node and its exact owner login");

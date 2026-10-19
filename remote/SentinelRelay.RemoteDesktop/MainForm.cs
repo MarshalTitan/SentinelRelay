@@ -305,18 +305,29 @@ public sealed class MainForm : Form
     private async Task Disable()
     {
         accessGeneration++;
-        // The emergency control is always usable, even while discovery or setup is busy.
+        // Memory is disabled first so an in-progress connection or a later timer cannot resume it.
+        preferences = preferences with { ResumeOnLaunch = false };
         try
         {
-            admin.SetEnabled(false);
-            preferences = preferences with { ResumeOnLaunch = false };
-            preferences.Save(directory);
-            await host.DisposeAsync();
+            var saved = await LocalEmergencyStop.Run(
+                () => host.DisposeAsync().AsTask(),
+                () => admin.SetEnabled(false),
+                () => preferences.Save(directory));
             identity = null;
             address.Clear();
-            status.Text = "All remote access disabled. Click Connect securely to enable it again.";
+            status.Text = saved
+                ? "All remote access disabled. Click Connect securely to enable it again."
+                : "This host is stopped, but Windows could not save the disabled setting. Exit the app and resolve local settings before restarting.";
         }
-        catch { ShowError("Could not save the disable setting. Exit Sentinel Remote to stop this host."); }
+        catch
+        {
+            // If stopping the listener itself fails, terminate this app rather than leave it available.
+            exiting = true;
+            closing = true;
+            refreshTimer.Stop();
+            tray.Visible = false;
+            Close();
+        }
     }
     private void Restore() { Show(); WindowState = FormWindowState.Normal; Activate(); }
     private async Task Exit()
