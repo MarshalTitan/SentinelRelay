@@ -21,7 +21,7 @@ Official sources checked 2026-10-19; no third-party controller source or binary 
 
 | Option | Finding | Gate |
 |---|---|---|
-| Microsoft InputInjector virtual gamepad | Windows-provided API; the documented creation path requires restricted `inputInjectionBrokered` package capability. Gamepad methods publish input to the system, with no per-PID target argument. | Preferred next feasibility experiment, not selected for production. Prove ordinary-user packaging/capability and supported Windows compatibility without developer mode, elevation or OS security changes; prove device disposal/worker crash releases, FFXIV compatibility, latency and physical-controller behavior. |
+| Microsoft InputInjector virtual gamepad | Windows-provided API; creation requires restricted `inputInjectionBrokered` package capability. Microsoft's desktop input guidance categorizes InputInjector as UWP-only, while capability guidance describes same-App-Container delivery. Gamepad methods have no per-PID target argument. | Not a supported drop-in backend for the current WinForms host. A separate feasibility design would have to resolve desktop/game delivery and ordinary-user distribution before relying on this route; MSIX identity alone must not be assumed sufficient. No developer mode, elevation or OS security changes. |
 | ViGEmBus | Official repository is archived and identifies the project as retired. | Do not add it automatically as a maintained default. |
 | Nefarius VirtualPad | Official documentation describes a commercial framework supplied to business partners. | Obtain appropriate terms only after a separate product/licensing decision; no purchase/contact is authorized by this research. |
 | Brunner vJoy 2.2.2.0 | Official release has an EV-signed installer/driver and Microsoft attestation for Windows 10/11. MIT source; README explicitly describes limited maintenance resources. A signed release alone does not establish an actively maintained suitable backend. | Do not auto-install or silently waive the maintained-backend gate. FFXIV joystick mapping, supported Windows versions, compatibility and failure release remain unproven. Never follow old test-signing/Secure Boot workarounds. |
@@ -31,7 +31,7 @@ A reported InputInjector initialization hang/crash on Windows 11 25H2 exists in 
 
 ## Integration gate before a phone-control candidate
 
-1. Prove a legally usable maintained backend and ordinary-user distribution. Prefer a driverless Microsoft prototype if its documented deployment requirements can be met. No automatic installation or consent/security-setting changes.
+1. Resolve the backend product/distribution gate. No reviewed option yet satisfies all maintained-backend, ordinary-user host, game compatibility and failure-release requirements. The Microsoft route has documented desktop/App-Container constraints; commercial VirtualPad needs terms; signed vJoy would require explicitly accepting its limited-maintenance tradeoff. Do not silently substitute archived ViGEm or implement a new kernel driver. No automatic installation or consent/security-setting changes.
 2. Put native output in the external interactive-user host/worker, never Dalamud. Prove forced worker/host termination cannot leave held controls. Native watchdog remains independent of HTTP and game capture.
 3. Wire a separate explicit acquire/frame/release protocol to live session/grant/permission/process checks. A new manual-input opt-in is required; today's rescue-control permission must not silently grant analog movement. Show a local active-control indication and integrate tray disable, revoke, session close, app background, target switch and reconnect release.
 4. Enforce exactly one locally observed FFXIV process, including clients outside saved bindings. Validate saved executable/PID/start time/current character/game epoch; unknown/stale observation vetoes input. Stop if a second process appears. Focus alone is not an isolation guarantee.
@@ -43,6 +43,8 @@ The consolidated real-device session must verify selected character movement/cam
 ## Primary references
 
 - [Microsoft InputInjector creation/capability](https://learn.microsoft.com/en-us/uwp/api/windows.ui.input.preview.injection.inputinjector.trycreate)
+- [Microsoft desktop input support restrictions](https://learn.microsoft.com/en-us/windows/apps/develop/input/)
+- [Microsoft package capability and App-Container restrictions](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/app-capability-declarations)
 - [Microsoft virtual gamepad initialization](https://learn.microsoft.com/en-us/uwp/api/windows.ui.input.preview.injection.inputinjector.initializegamepadinjection)
 - [Microsoft issue #10860 and comments](https://github.com/microsoft/microsoft-ui-xaml/issues/10860)
 - [ViGEmBus retirement](https://github.com/nefarius/ViGEmBus)
