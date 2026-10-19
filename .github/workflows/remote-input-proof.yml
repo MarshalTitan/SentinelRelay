@@ -2,9 +2,9 @@ name: Remote input backend proof
 on:
   push:
     branches: [main, 'feature/sentinel-remote-*']
-    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
+    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.RemoteInputCheck/**', 'remote/installer/SentinelGamepadCheck.iss', 'remote/docs/GAMEPAD_CHECK.md', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
   pull_request:
-    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
+    paths: ['remote/SentinelRelay.RemoteInput/**', 'remote/SentinelRelay.RemoteInput.Tests/**', 'remote/SentinelRelay.RemoteInputCheck/**', 'remote/installer/SentinelGamepadCheck.iss', 'remote/docs/GAMEPAD_CHECK.md', 'remote/SentinelRelay.Remote/ControllerLease.cs', '.github/workflows/remote-input-proof.yml']
 permissions:
   contents: read
 jobs:
@@ -74,10 +74,12 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version
-          Get-Process -Id $PID | Select-Object SessionId
-          Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPDeviceID -match 'VID_045E&PID_028E|USBIP|USBIP2' -or $_.Name -match 'Xbox|USB.IP' } | Select-Object Name, Status, ConfigManagerErrorCode, PNPDeviceID
-          @('xusb22.sys', 'xinputhid.sys', 'usbip2_ude.sys') | ForEach-Object { [PSCustomObject]@{ Driver = $_; Present = Test-Path -LiteralPath (Join-Path $env:WINDIR "System32/drivers/$_") } }
+          [PSCustomObject]@{
+            OS = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version
+            Session = (Get-Process -Id $PID).SessionId
+            Devices = @(Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPDeviceID -match 'VID_045E&PID_028E|USBIP|USBIP2' -or $_.Name -match 'Xbox|USB.IP' } | Select-Object Name, Status, ConfigManagerErrorCode, PNPDeviceID)
+            Drivers = @(@('xusb22.sys', 'xinputhid.sys', 'usbip2_ude.sys') | ForEach-Object { [PSCustomObject]@{ Driver = $_; Present = Test-Path -LiteralPath (Join-Path $env:WINDIR "System32/drivers/$_") } })
+          } | ConvertTo-Json -Depth 5
       - name: Show sanitized installer outcome on failure
         if: failure()
         shell: pwsh
@@ -85,3 +87,59 @@ jobs:
           if (Test-Path -LiteralPath ./usbip-install.log) {
             Get-Content -LiteralPath ./usbip-install.log | Select-String -Pattern 'error|failed|restart|reboot' | Select-Object -Last 12
           }
+
+  support-check-installer:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish self-contained support check and worker
+        shell: pwsh
+        run: |
+          dotnet publish remote/SentinelRelay.RemoteInputCheck -c Release -r win-x64 --self-contained true -o inputcheck-candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish remote/SentinelRelay.RemoteInput -c Release -r win-x64 --self-contained true -o inputcheck-candidate/worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify runtime signature validation against pinned upstream binary
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://github.com/Alia5/VIIPER/releases/download/v0.9.0/viiper-windows-amd64.exe' -OutFile ./viiper-check.exe
+          $verify = Start-Process -FilePath ./inputcheck-candidate/SentinelGamepadCheck.exe -ArgumentList @('--verify-backend', (Join-Path $PWD 'viiper-check.exe')) -WindowStyle Hidden -Wait -PassThru
+          if ($verify.ExitCode -ne 0) { throw 'Runtime signature/hash validation failed' }
+      - name: Build per-user support-check installer
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath ./remote/docs/GAMEPAD_CHECK.md -Destination ./inputcheck-candidate/README.md
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' ./remote/installer/SentinelGamepadCheck.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install, exercise normal startup/rendering, and uninstall helper
+        shell: pwsh
+        run: |
+          $setup = Start-Process -FilePath ./inputcheck-installer/SentinelRemote-Gamepad-Check-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-') -WindowStyle Hidden -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw 'Support-check install failed' }
+          $installed = Join-Path $env:LOCALAPPDATA 'Programs/SentinelGamepadCheck'
+          try {
+            $preview = Join-Path $PWD 'inputcheck-preview'
+            $app = Start-Process -FilePath (Join-Path $installed 'SentinelGamepadCheck.exe') -ArgumentList @('--smoke-test', $preview) -WindowStyle Hidden -Wait -PassThru
+            if ($app.ExitCode -ne 0) { throw 'Installed support-check startup/render failed' }
+          } finally {
+            $uninstall = Start-Process -FilePath (Join-Path $installed 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -WindowStyle Hidden -Wait -PassThru
+            if ($uninstall.ExitCode -ne 0) { throw 'Support-check uninstall failed' }
+          }
+          Get-ChildItem -LiteralPath ./inputcheck-preview -Filter *.png | ForEach-Object { Write-Output ('SENTINEL_INPUT_UI:' + $_.Name + ':' + [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))) }
+          Copy-Item -LiteralPath ./remote/docs/GAMEPAD_CHECK.md -Destination ./inputcheck-installer/README.md
+          $file = Get-Item -LiteralPath ./inputcheck-installer/SentinelRemote-Gamepad-Check-Setup.exe
+          ((Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file.Name) | Set-Content -LiteralPath ./inputcheck-installer/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SentinelRemote-Gamepad-Check-candidate
+          path: inputcheck-installer/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SentinelRemote-Gamepad-Check-previews
+          path: inputcheck-preview/
+          if-no-files-found: error

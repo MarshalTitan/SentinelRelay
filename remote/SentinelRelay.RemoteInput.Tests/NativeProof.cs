@@ -6,16 +6,17 @@ using SentinelRelay.RemoteInput;
 
 static class NativeProof
 {
-    public static async Task Run(string backend, string worker, bool native, Action<bool, string> check)
+    public static async Task Run(string backend, string worker, bool native, Action<bool, string> check, Func<bool>? stillSafe = null)
     {
         if (native && !OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
         var baseline = native ? Enumerable.Range(0, 4).Where(i => Read(i) is not null).ToHashSet() : [];
-        check(!native || baseline.Count == 0, "native proof runner has no preexisting XInput controller");
+        check(!native || baseline.Count < 4, "a free XInput slot is available; existing controllers are excluded");
         // No hardware proof is claimed by --protocol. It explicitly disables USB auto-attach.
         var failures = OperatingSystem.IsWindows() ? new[] { "eof", "silence", "kill", "stale", "replay" } :
             new[] { "eof", "silence", "stale", "replay" }; // Windows job semantics are tested on Windows only.
         foreach (var failure in failures)
         {
+            if (stillSafe is not null && !stillSafe()) throw new InvalidOperationException("game_opened");
             using var process = Start(worker, backend, !native);
             var readyText = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15));
             using var ready = JsonDocument.Parse(readyText ?? "{}");
@@ -27,8 +28,11 @@ static class NativeProof
             try
             {
                 long sequence = 0;
-                async Task Send(ControllerFrame value) =>
+                async Task Send(ControllerFrame value)
+                {
+                    if (stillSafe is not null && !stillSafe()) throw new InvalidOperationException("game_opened");
                     await WorkerWire.Write(process.StandardInput.BaseStream, WorkerPacket.Create(Interlocked.Increment(ref sequence), value));
+                }
                 using (var warmupStop = new CancellationTokenSource())
                 {
                     await Send(ControllerFrame.Neutral);
@@ -107,6 +111,7 @@ static class NativeProof
                     await Wait(() => Read(slot) is null, TimeSpan.FromSeconds(2));
                     check(Read(slot) is null, "native held controller disconnected after worker " + failure);
                     Console.WriteLine("NATIVE_RELEASE " + failure + " " + (int)Stopwatch.GetElapsedTime(started).TotalMilliseconds + "ms");
+                    check(baseline.All(i => Read(i) is not null), "preexisting physical controller slots remain connected");
                 }
                 using var server = new System.Net.Sockets.TcpClient();
                 try { await server.ConnectAsync(System.Net.IPAddress.Loopback, apiPort); check(false, "orphan listener removed"); }
