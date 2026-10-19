@@ -63,7 +63,7 @@ jobs:
         shell: pwsh
         run: |
           $installer = Start-Process -FilePath ./usbip-setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/LOG=usbip-install.log') -WindowStyle Hidden -Wait -PassThru
-          if ($installer.ExitCode -ne 0) { throw "Driver install did not finish ready without reboot: $($installer.ExitCode)" }
+          if ($installer.ExitCode -ne 0) { throw "Driver installer failed: $($installer.ExitCode)" }
       - name: Build worker and native proof
         run: dotnet build remote/SentinelRelay.RemoteInput.Tests -c Release
       - name: Read actual Windows XInput and verify failure release

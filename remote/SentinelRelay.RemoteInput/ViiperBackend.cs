@@ -70,8 +70,8 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         start.Environment["AppData"] = directory;
         start.Environment["XDG_CONFIG_HOME"] = directory;
         // Explicit flags outrank all config sources. No auto-update, tray, raw logs, shell, or remote listener.
-        foreach (var arg in new[] { "--config=" + config, "--update-notify=none", "--log.level=error",
-            "server", "--no-tray", "--api.addr=127.0.0.1:" + apiPort, "--usb.addr=127.0.0.1:" + usbPort,
+        foreach (var arg in new[] { "server", "--config=" + config, "--update-notify=none", "--log.level=error",
+            "--no-tray", "--api.addr=127.0.0.1:" + apiPort, "--usb.addr=127.0.0.1:" + usbPort,
             "--api.auto-attach-local-client=" + (attach ? "true" : "false"),
             "--api.device-handler-connect-timeout=5s", "--connection-timeout=2s" })
             start.ArgumentList.Add(arg);
@@ -79,16 +79,16 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         try
         {
             if (OperatingSystem.IsWindows()) job = new WindowsChildJob();
-            process = Process.Start(start) ?? throw new IOException("backend_start");
+            process = Process.Start(start) ?? throw new InputBackendException("backend_start");
             if (job is not null) job.Add(process); // Before creating a device. Worker death closes this handle.
             _ = Drain(process.StandardOutput);
             _ = Drain(process.StandardError); // Never forward passwords, arbitrary logs, or input values.
             backend = new(process, job, directory, apiPort, usbPort);
             await backend.WaitReady(cancellation);
-            using var busReply = await ViiperWire.Request(apiPort, "bus/create", cancellation);
+            using var busReply = await ViiperWire.Request(apiPort, "bus/create", cancellation, backend.OwnsEndpoints);
             var bus = busReply.RootElement.GetProperty("busId").GetUInt32();
             if (bus == 0) throw new InvalidDataException("backend_bus");
-            using var added = await ViiperWire.Request(apiPort, "bus/" + bus + "/add {\"type\":\"xbox360\"}", cancellation);
+            using var added = await ViiperWire.Request(apiPort, "bus/" + bus + "/add {\"type\":\"xbox360\"}", cancellation, backend.OwnsEndpoints);
             var id = added.RootElement.GetProperty("devId").GetString();
             if (id is null || id.Length is < 1 or > 10 || !uint.TryParse(id, out var device) || device == 0 ||
                 added.RootElement.GetProperty("busId").GetUInt32() != bus ||
@@ -99,6 +99,7 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             timeout.CancelAfter(TimeSpan.FromSeconds(2));
             await tcp.ConnectAsync(IPAddress.Loopback, apiPort, timeout.Token);
+            if (!backend.OwnsEndpoints()) throw new InputBackendException("backend_endpoint_owner_changed");
             await tcp.GetStream().WriteAsync(System.Text.Encoding.ASCII.GetBytes("bus/" + bus + "/" + id + "\0"), timeout.Token);
             backend.Neutralize();
             _ = DrainFeedback(tcp.GetStream());
@@ -121,15 +122,18 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         }
     }
 
+    private bool OwnsEndpoints() => !process.HasExited && BackendEndpointOwnership.Matches(process.Id, ApiPort, UsbPort);
+
     private async Task WaitReady(CancellationToken cancellation)
     {
         var started = Stopwatch.GetTimestamp();
         while (Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(5))
         {
-            if (process.HasExited) throw new IOException("backend_exited_before_ready");
+            if (process.HasExited) throw new InputBackendException("backend_exited_before_ready");
             try
             {
-                using var ping = await ViiperWire.Request(ApiPort, "ping", cancellation);
+                if (!OwnsEndpoints()) { await Task.Delay(50, cancellation); continue; }
+                using var ping = await ViiperWire.Request(ApiPort, "ping", cancellation, OwnsEndpoints);
                 var version = ping.RootElement.GetProperty("version").GetString();
                 if (ping.RootElement.GetProperty("server").GetString() != "VIIPER" || version is not ("0.9.0" or "v0.9.0"))
                     throw new InvalidDataException("backend_version");
@@ -137,7 +141,7 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
             }
             catch (SocketException) { await Task.Delay(50, cancellation); } // Readiness only; never retry a device/input mutation.
         }
-        throw new TimeoutException("backend_readiness");
+        throw new InputBackendException("backend_readiness");
     }
 
     private static int FreePort()
@@ -165,7 +169,7 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         lock (sendGate)
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-            (controller ?? throw new IOException("backend_stream_missing")).GetStream().Write(bytes);
+            (controller ?? throw new InputBackendException("backend_stream_missing")).GetStream().Write(bytes);
         }
     }
     public void Neutralize() => Send(ControllerFrame.Neutral);
@@ -186,7 +190,7 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
     {
         Abort();
         if (Interlocked.Exchange(ref finalized, 1) != 0) return;
-        if (!process.WaitForExit(1500)) throw new IOException("backend_did_not_exit");
+        if (!process.WaitForExit(1500)) throw new InputBackendException("backend_did_not_exit");
         process.Dispose();
         try { Directory.Delete(directory, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }

@@ -73,6 +73,18 @@ foreach (var oversized in new[] { false, true })
     }
     finally { listener.Stop(); }
 }
+var firstListener = new TcpListener(IPAddress.Loopback, 0);
+var secondListener = new TcpListener(IPAddress.Loopback, 0);
+firstListener.Start(); secondListener.Start();
+try
+{
+    var firstPort = ((IPEndPoint)firstListener.LocalEndpoint).Port;
+    var secondPort = ((IPEndPoint)secondListener.LocalEndpoint).Port;
+    Check(BackendEndpointOwnership.Matches(Environment.ProcessId, firstPort, secondPort), "kernel endpoint ownership identifies own two loopback listeners");
+    Check(!BackendEndpointOwnership.Matches(int.MaxValue, firstPort, secondPort) &&
+        !BackendEndpointOwnership.Matches(Environment.ProcessId, firstPort, firstPort), "wrong process and ambiguous endpoint ownership denied");
+}
+finally { firstListener.Stop(); secondListener.Stop(); }
 var temp = Path.Combine(Path.GetTempPath(), "SentinelInputHash-" + Guid.NewGuid().ToString("N"));
 File.WriteAllText(temp, "This is not executable code.");
 try

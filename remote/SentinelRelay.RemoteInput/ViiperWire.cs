@@ -26,13 +26,14 @@ public static class ViiperWire
     private static short Axis(double value) => (short)Math.Round(value * (value < 0 ? 32768 : 32767), MidpointRounding.AwayFromZero);
 
     // Internal only: no phone-selected address, request text, profile, bus or device.
-    internal static async Task<JsonDocument> Request(int port, string command, CancellationToken cancellation)
+    internal static async Task<JsonDocument> Request(int port, string command, CancellationToken cancellation, Func<bool>? owned = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
         using var tcp = new TcpClient(AddressFamily.InterNetwork);
         await tcp.ConnectAsync(IPAddress.Loopback, port, timeout.Token);
         var stream = tcp.GetStream();
+        if (owned is not null && !owned()) throw new InputBackendException("backend_endpoint_owner_changed");
         await stream.WriteAsync(Encoding.UTF8.GetBytes(command + "\0"), timeout.Token);
         using var bytes = new MemoryStream();
         var buffer = new byte[512];
@@ -47,7 +48,7 @@ public static class ViiperWire
         if (result.RootElement.TryGetProperty("status", out _))
         {
             result.Dispose();
-            throw new IOException("backend_request_rejected");
+            throw new InputBackendException("backend_request_rejected");
         }
         return result;
     }

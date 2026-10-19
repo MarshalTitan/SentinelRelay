@@ -22,7 +22,7 @@ try
             if (Stopwatch.GetElapsedTime(Interlocked.Read(ref lastFrame)) < ControllerLease.FrameTimeout) continue;
             backend.Abort();
             cancel.Cancel();
-            return;
+            Environment.Exit(2); // Console pipe reads are not reliably cancellable on every platform.
         }
     }) { IsBackground = true, Name = "Sentinel input fail-safe" };
     // Start the independent watchdog before announcing readiness.
@@ -52,7 +52,8 @@ catch (Exception error) when (error is IOException or OperationCanceledException
     System.ComponentModel.Win32Exception or TimeoutException or InvalidOperationException or UnauthorizedAccessException)
 {
     // Stable outcome only. Never forward backend logs, command text, paths, frames, or exceptions.
-    Console.WriteLine("{\"ready\":false,\"code\":\"worker_stopped\"}");
+    Console.WriteLine(JsonSerializer.Serialize(new { ready = false,
+        code = error is InputBackendException failure ? failure.Code : "worker_stopped", kind = error.GetType().Name }));
     return 2;
 }
 finally { backend?.Dispose(); }
