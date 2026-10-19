@@ -2,7 +2,7 @@ name: Remote foundation
 on:
   push:
     branches: [main, 'feature/sentinel-remote-*']
-    paths: ['remote/**', 'Bridge/**', '.github/workflows/remote-foundation.yml']
+    paths: ['remote/**', 'Bridge/**', 'Plugin.MobileRemote.cs', 'UI/MainWindow.cs', '.github/workflows/remote-foundation.yml']
   pull_request:
     paths: ['remote/**', 'Bridge/**', '.github/workflows/remote-foundation.yml', 'SentinelRelay.csproj']
 permissions:
@@ -30,4 +30,53 @@ jobs:
         with:
           name: SentinelRemoteHost-foundation-candidate
           path: remote-candidate/
+          if-no-files-found: error
+
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish Windows desktop candidate
+        run: dotnet publish remote/SentinelRelay.RemoteDesktop -c Release -r win-x64 --self-contained true -o desktop-candidate
+      - name: Render desktop at wide and narrow sizes
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath './desktop-candidate/SentinelRemote.exe' -ArgumentList '--smoke-test', 'desktop-preview' -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Desktop render smoke failed' }
+          if (!(Test-Path 'desktop-preview/desktop-wide.png')) { throw 'Desktop preview missing' }
+      - name: Build per-user Windows installer
+        shell: pwsh
+        run: |
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler not found on runner' }
+          & $compiler 'remote/installer/SentinelRemote.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Verify installer installs and uninstalls
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'SentinelRemote-install-check'
+          $installer = Get-Item 'desktop-installer/SentinelRemote-0.1.0-Windows-Setup.exe'
+          $installed = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -WindowStyle Hidden -Wait -PassThru
+          if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe")) { throw 'Installer verification failed' }
+          $uninstalled = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
+          if ($uninstalled.ExitCode -ne 0) { throw 'Uninstall verification failed' }
+      - name: Write installer checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem desktop-installer/*.exe | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            "$hash  $($_.Name)" | Out-File desktop-installer/SHA256SUMS -Append -Encoding utf8
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SentinelRemote-Windows-Setup-candidate
+          path: desktop-installer/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SentinelRemote-Windows-UI-preview
+          path: desktop-preview/
           if-no-files-found: error

@@ -159,6 +159,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly Action<int> setConfigurationTheme;
     private readonly Configuration configuration;
     private readonly Action save;
+    private readonly Action<bool, bool, bool> setMobilePermissions;
     private readonly SentinelModernStyleScope modernStyle = new();
     private readonly SentinelModernAppShellState modernShellState = new();
     private readonly SentinelThemeState<ConfigurationPage> themeState;
@@ -220,7 +221,8 @@ public sealed class MainWindow : Window, IDisposable
         Func<int> getConfigurationTheme,
         Action<int> setConfigurationTheme,
         Configuration configuration,
-        Action save)
+        Action save,
+        Action<bool, bool, bool> setMobilePermissions)
         : base("Sentinel Relay###SentinelRelayMain")
     {
         this.getIdentity = getIdentity;
@@ -242,6 +244,7 @@ public sealed class MainWindow : Window, IDisposable
         this.setConfigurationTheme = setConfigurationTheme;
         this.configuration = configuration;
         this.save = save;
+        this.setMobilePermissions = setMobilePermissions;
         themeState = new SentinelThemeState<ConfigurationPage>(
             ConfigurationPage.General,
             SentinelThemeState<ConfigurationPage>.NormalizeTheme(getConfigurationTheme()));
@@ -606,6 +609,17 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.TextWrapped("Log into a character before configuring Sentinel Relay.");
             return;
         }
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Sentinel Remote - phone access");
+        ImGui.TextWrapped("Allow your paired phone to view status, take game screenshots, and use SRank rescue controls. Saved for this character across restarts.");
+        ImGui.TextUnformatted($"Mobile: {(profile.MobileRemoteEnabled ? "On" : "Off")} | Controls: {(profile.MobileRemoteControlEnabled ? "On" : "Off")} | Screenshots: {(profile.MobileRemoteScreenshotsEnabled ? "On" : "Off")}");
+        if (ImGui.Button("Enable all mobile features"))
+            setMobilePermissions(true, true, true);
+        if (ImGui.Button("Disable all mobile features"))
+            setMobilePermissions(false, false, false);
+        ImGui.TextWrapped("Open Sentinel Remote on your PC to select this character and pair your phone.");
+        ImGui.Separator();
 
         if (profile.Paused)
         {
