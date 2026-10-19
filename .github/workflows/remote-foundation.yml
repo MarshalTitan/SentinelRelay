@@ -46,7 +46,9 @@ jobs:
         run: |
           $process = Start-Process -FilePath './desktop-candidate/SentinelRemote.exe' -ArgumentList '--smoke-test', 'desktop-preview' -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Desktop render smoke failed' }
-          if (!(Test-Path 'desktop-preview/desktop-wide.png')) { throw 'Desktop preview missing' }
+          $deadline = [DateTime]::UtcNow.AddSeconds(30)
+          while (!(Test-Path 'desktop-preview/pairing.png') -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+          if (!(Test-Path 'desktop-preview/pairing.png')) { throw 'Desktop preview missing after normal user launch' }
       - name: Emit isolated UI previews for review
         shell: pwsh
         run: |
@@ -64,9 +66,16 @@ jobs:
         shell: pwsh
         run: |
           $destination = Join-Path $env:RUNNER_TEMP 'SentinelRemote-install-check'
-          $installer = Get-Item 'desktop-installer/SentinelRemote-0.1.0-Windows-Setup.exe'
+          $installer = Get-Item 'desktop-installer/SentinelRemote-0.1.1-Windows-Setup.exe'
           $installed = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -WindowStyle Hidden -Wait -PassThru
           if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe")) { throw 'Installer verification failed' }
+          # Exercise the installed executable's real startup/token path too.
+          $preview = Join-Path $env:RUNNER_TEMP 'SentinelRemote-installed-preview'
+          $opened = Start-Process -FilePath "$destination/SentinelRemote.exe" -ArgumentList '--smoke-test', $preview -WindowStyle Hidden -Wait -PassThru
+          if ($opened.ExitCode -ne 0) { throw 'Installed desktop could not open in the Windows user session' }
+          $deadline = [DateTime]::UtcNow.AddSeconds(30)
+          while (!(Test-Path "$preview/pairing.png") -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+          if (!(Test-Path "$preview/pairing.png")) { throw 'Installed desktop did not render after launch' }
           $uninstalled = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
           if ($uninstalled.ExitCode -ne 0) { throw 'Uninstall verification failed' }
       - name: Write installer checksums

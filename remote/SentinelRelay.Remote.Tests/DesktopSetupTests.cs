@@ -5,6 +5,15 @@ internal static class DesktopSetupTests
 {
     public static async Task Run(Action<bool, string> check)
     {
+        check(!DesktopLaunchPolicy.RequiresStandardToken(1, false, false), "desktop accepts normal Windows sessions without a linked token, including administrator-enabled accounts");
+        check(!DesktopLaunchPolicy.RequiresStandardToken(3, false, false), "desktop accepts a standard filtered user token");
+        check(DesktopLaunchPolicy.RequiresStandardToken(2, false, false), "desktop redirects an elevated split token to its standard counterpart");
+        Throws(() => DesktopLaunchPolicy.RequiresStandardToken(2, false, true), check, "desktop standard-user relaunch cannot loop");
+        Throws(() => DesktopLaunchPolicy.RequiresStandardToken(1, true, false), check, "desktop refuses service accounts");
+        Throws(() => DesktopLaunchPolicy.RequiresStandardToken(0, false, false), check, "desktop fails closed for an unknown token type");
+        check(DesktopLaunchPolicy.QuoteArgument("C:\\Program Files\\SentinelRemote.exe") == "\"C:\\Program Files\\SentinelRemote.exe\"", "desktop quotes executable paths containing spaces");
+        check(DesktopLaunchPolicy.QuoteArgument("a\"b") == "\"a\\\"b\"", "desktop quotes literal quote characters");
+        check(DesktopLaunchPolicy.QuoteArgument("C:\\test\\") == "\"C:\\test\\\\\"", "desktop quotes trailing backslashes");
         var stopped = false;
         var nextWrite = false;
         var saved = await LocalEmergencyStop.Run(() => { stopped = true; return Task.CompletedTask; },
