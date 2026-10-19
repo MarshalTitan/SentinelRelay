@@ -1,5 +1,7 @@
 # No backend deployment required
 
+This document describes the released Discord plugin. The optional [Sentinel Remote PC host foundation](remote/README.md) is a new, independent project for future mobile rescue functionality; it does not restore the retired hosted backend or add a dependency for existing Relay users.
+
 Sentinel Relay no longer has or requires a backend service.
 
 ## Production architecture
@@ -63,3 +65,4 @@ Plugin updates are delivered through the normal Sentinel Dalamud custom reposito
 If Discord is temporarily unavailable, FFXIV remains unaffected. The plugin retries current transient/rate-limited requests in order, maintains a bounded queue, and drops stale messages rather than dumping hours of old chat later.
 
 For channel/webhook creation, follow [DISCORD_SETUP.md](DISCORD_SETUP.md).
+

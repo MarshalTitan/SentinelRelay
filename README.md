@@ -158,3 +158,8 @@ The installable package is written to `bin/Release/SentinelRelay/latest.zip`. Gi
 - [Live-test checklist](LIVE_TEST_CHECKLIST.md)
 
 Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamud catalog. It is not affiliated with or endorsed by Square Enix, Discord, Dalamud, or XIVLauncher.
+
+## Sentinel Remote foundation
+
+The optional [Sentinel Remote PC foundation](remote/README.md) is a separate external-host project for an Android-first game-rescue companion. It is not part of the released Dalamud plugin. Its game bridge, app, input, streaming and recovery stages remain pending; existing Discord functionality continues to work independently.
+

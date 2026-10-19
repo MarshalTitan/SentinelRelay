@@ -1,5 +1,7 @@
 # Sentinel Relay architecture
 
+The optional [Sentinel Remote design and host foundation](remote/docs/ARCHITECTURE.md) lives outside the Dalamud plugin. The current released plugin flows below remain the production Discord architecture; there is no game bridge to the new host yet.
+
 ## Scope
 
 Sentinel Relay's primary path is a direct-webhook Dalamud plugin:
@@ -135,3 +137,4 @@ All configuration lives in the `/srelay` UI. The bot remains unnecessary for FFX
 ## Reference and licensing
 
 `reiichi001/Dalamud.DiscordBridge` was reviewed as behavioral proof for structured chat capture, mapping, queueing, duplicate suppression, and Discord delivery. That project is AGPL-3.0. Sentinel Relay remains MIT and uses an independently written implementation; no substantial source was copied.
+
