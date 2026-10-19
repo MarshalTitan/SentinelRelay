@@ -197,8 +197,9 @@ public sealed class MainForm : Form
         if (generation != accessGeneration || closing) return;
         await host.Start(current, store);
         if (generation != accessGeneration || closing) { await host.DisposeAsync(); return; }
-        // Enabling is local and explicit, or resumes the user's prior enabled configuration.
-        if (!admin.Snapshot().Enabled) admin.SetEnabled(true);
+        // Automatic resume never enables authority. A disable from another local tool must win too.
+        if (resume && !admin.Snapshot().Enabled) { await host.DisposeAsync(); return; }
+        if (!resume && !admin.Snapshot().Enabled) admin.SetEnabled(true);
         identity = current;
         preferences = new(current.Host, current.Login, true);
         preferences.Save(directory);
