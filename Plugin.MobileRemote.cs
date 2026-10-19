@@ -58,6 +58,17 @@ public sealed partial class Plugin
         Log.Information("Sentinel mobile rescue {Operation} completed: {Success}.", request.Operation, result.Success);
         return new(result.Success, result.Success ? "completed" : "operation_failed", snapshot);
     }
+    private void SetMobilePermissions(bool enabled, bool control, bool screenshots)
+    {
+        var key = characterContext.Current?.CharacterKey;
+        if (activeProfile is null || key != activeProfile.CharacterKey) return;
+        activeProfile.MobileRemoteEnabled = enabled;
+        activeProfile.MobileRemoteControlEnabled = control;
+        activeProfile.MobileRemoteScreenshotsEnabled = screenshots;
+        StopMobileBridge();
+        SaveConfiguration();
+        // The next framework update starts the bridge. UI never pumps game IPC.
+    }
     private bool MobileCommand(string arguments)
     {
         var parts = arguments.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -66,18 +77,24 @@ public sealed partial class Plugin
         { ChatGui.PrintError("[Sentinel Relay] Log into the intended character first."); return true; }
         switch (parts)
         {
-            case ["mobile", "on"]: activeProfile.MobileRemoteEnabled = true; break;
+            case ["mobile", "all", "on"]:
+                activeProfile.MobileRemoteEnabled = true;
+                activeProfile.MobileRemoteControlEnabled = true;
+                activeProfile.MobileRemoteScreenshotsEnabled = true;
+                break;
+            case ["mobile", "all", "off"]:
             case ["mobile", "off"]:
                 activeProfile.MobileRemoteEnabled = false;
                 activeProfile.MobileRemoteControlEnabled = false;
                 activeProfile.MobileRemoteScreenshotsEnabled = false;
                 break;
+            case ["mobile", "on"]: activeProfile.MobileRemoteEnabled = true; break;
             case ["mobile", "control", "on"]: activeProfile.MobileRemoteControlEnabled = true; break;
             case ["mobile", "control", "off"]: activeProfile.MobileRemoteControlEnabled = false; break;
             case ["mobile", "screenshots", "on"]: activeProfile.MobileRemoteScreenshotsEnabled = true; break;
             case ["mobile", "screenshots", "off"]: activeProfile.MobileRemoteScreenshotsEnabled = false; break;
             default:
-                ChatGui.Print("[Sentinel Relay] /srelay mobile on|off; mobile control on|off; mobile screenshots on|off. Changes affect this character only.");
+                ChatGui.Print("[Sentinel Relay] /srelay mobile all on|off; mobile on|off; mobile control on|off; mobile screenshots on|off. Saved for this character.");
                 return true;
         }
         StopMobileBridge(); // Every local permission change retires the old game epoch and queued work.

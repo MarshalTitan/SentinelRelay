@@ -1,5 +1,7 @@
 # Milestone A — one supervised proving session
 
+For the newer **Windows installer and setup window** (Relay 0.6.0.1 candidate), see [Desktop setup](DESKTOP_SETUP.md). The instructions below document the original 0.6.0.0 console candidate and remain the full game/phone acceptance checklist.
+
 Candidate pairing: Sentinel Remote Android 0.1.0 and Sentinel Relay **0.6.0.0 candidate**, plus the host from the same Relay source commit. These are candidates until the checklist below passes. The published Discord plugin remains independent; do not replace the production catalog with an unverified package.
 
 ## Validated downloads

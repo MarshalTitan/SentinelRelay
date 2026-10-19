@@ -53,9 +53,51 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
         state.Epoch = Guid.NewGuid().ToString("N"); // Rebinding invalidates all old sessions/reset intent.
         return (true, true);
     });
+    public LocalHostSnapshot Snapshot() => store.Access(state => (new LocalHostSnapshot(
+        state.Enabled, state.Instances.ToArray(), state.Bindings.ToArray(),
+        state.Devices.Select(d => new LocalDevice(d.Id, d.Label, d.Control, d.Revoked)).ToArray()), false));
+
+    public InstanceInfo ConnectGame(GameBinding candidate, string label) => store.Access(state =>
+    {
+        ValidateLabel(label);
+        if (string.IsNullOrWhiteSpace(candidate.CharacterKey)) throw new InvalidOperationException("character_missing");
+        var matching = state.Bindings.Where(b => b.CharacterKey == candidate.CharacterKey).ToArray();
+        if (matching.Length > 1) throw new InvalidOperationException("character_ambiguous");
+        InstanceInfo instance;
+        if (matching.Length == 1)
+            instance = state.Instances.Single(i => i.InstanceId == matching[0].InstanceId);
+        else
+        {
+            if (state.Instances.Count >= 16) throw new InvalidOperationException("instance_limit");
+            instance = new(Guid.NewGuid().ToString("N"), label);
+            state.Instances.Add(instance);
+        }
+        if (state.Bindings.Any(b => b.InstanceId != instance.InstanceId && b.ProcessId == candidate.ProcessId && b.StartedUtcTicks == candidate.StartedUtcTicks))
+            throw new InvalidOperationException("process_already_bound");
+        state.Bindings.RemoveAll(b => b.InstanceId == instance.InstanceId);
+        state.Bindings.Add(candidate with { InstanceId = instance.InstanceId });
+        state.Epoch = Guid.NewGuid().ToString("N");
+        return (instance, true);
+    });
+
+    public int ReconnectKnown(IReadOnlyList<GameBinding> discovered) => store.Access(state =>
+    {
+        var replacements = DesktopSetupPolicy.Rebindings(state.Bindings, discovered);
+        foreach (var binding in replacements)
+        {
+            state.Bindings.RemoveAll(b => b.InstanceId == binding.InstanceId);
+            state.Bindings.Add(binding);
+        }
+        if (replacements.Length > 0) state.Epoch = Guid.NewGuid().ToString("N");
+        return (replacements.Length, replacements.Length > 0);
+    });
+
     private static void ValidateLabel(string label)
     {
         if (string.IsNullOrWhiteSpace(label) || label.Length > 64 || label.Any(char.IsControl))
             throw new InvalidOperationException("invalid_label");
     }
 }
+
+public sealed record LocalDevice(string Id, string Label, bool Control, bool Revoked);
+public sealed record LocalHostSnapshot(bool Enabled, InstanceInfo[] Instances, GameBinding[] Bindings, LocalDevice[] Devices);

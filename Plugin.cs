@@ -102,7 +102,8 @@ public sealed partial class Plugin : IDalamudPlugin
             () => Configuration.ConfigurationTheme,
             SetConfigurationTheme,
             Configuration,
-            SaveConfiguration);
+            SaveConfiguration,
+            SetMobilePermissions);
 
         windows.AddWindow(mainWindow);
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)

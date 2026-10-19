@@ -161,5 +161,5 @@ Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamu
 
 ## Sentinel Remote foundation
 
-The optional [Sentinel Remote companion](remote/README.md) has Android and local game-bridge software ready as Milestone A candidates. Follow the [single setup and acceptance checklist](remote/docs/MILESTONE_A.md) for the matched Android, plugin and PC host builds. Manual input, live streaming and launcher recovery remain later stages. Existing Discord functionality continues independently; the production catalog is not changed by the candidate build.
+The optional [Sentinel Remote companion](remote/README.md) has Android and local game-bridge software ready as Milestone A candidates. The Windows installer candidate provides [desktop setup without PowerShell](remote/docs/DESKTOP_SETUP.md), including game discovery, pairing, tray disable, and verified reconnect. The [Milestone A checklist](remote/docs/MILESTONE_A.md) retains console setup and the full acceptance matrix. Manual input, live streaming and launcher recovery remain later stages. Existing Discord functionality continues independently; the production catalog is not changed by the candidate build.
 
