@@ -52,7 +52,11 @@ public static class RemoteWeb
             if (request.QueryString.HasValue || request.Method != "POST" || !request.HasJsonContentType())
             { context.Response.StatusCode = 400; return; }
             if (request.ContentLength > 4096)
-            { context.Response.StatusCode = 413; return; }
+            {
+                context.Response.Headers.Connection = "close";
+                context.Response.StatusCode = 413;
+                return;
+            }
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
             timeout.CancelAfter(TimeSpan.FromSeconds(5));
             context.RequestAborted = timeout.Token;
@@ -63,6 +67,7 @@ public static class RemoteWeb
                 {
                     var stateFailure = e is IOException and not BadHttpRequestException;
                     context.Response.StatusCode = e is BadHttpRequestException bad ? bad.StatusCode : stateFailure ? 503 : 400;
+                    if (e is BadHttpRequestException) context.Response.Headers.Connection = "close";
                     await context.Response.WriteAsJsonAsync(new Reply(false, stateFailure ? "state_unavailable" : "invalid_request"), Protocol.Json, CancellationToken.None);
                 }
             }

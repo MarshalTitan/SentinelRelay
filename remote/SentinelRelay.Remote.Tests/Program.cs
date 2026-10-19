@@ -158,6 +158,7 @@ try
     Check((await Send(requestJson, token: httpSession.SessionToken)).IsSuccessStatusCode, "HTTP authenticated session works");
     Check((await Send(requestJson, token: httpSession.SessionToken)).StatusCode == HttpStatusCode.BadRequest, "HTTP replay rejected");
     Check((await Send("{\"pad\":\"" + new string('x', 5000) + "\"}")).StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge, "body size bounded");
+    Check((await Send(JsonSerializer.Serialize(new RemoteRequest(1, 2, "session.ping"), Protocol.Json), token: httpSession.SessionToken)).IsSuccessStatusCode, "valid request reconnects after oversized body rejection");
     for (int i = 0; i < 10; i++) response = await Send(JsonSerializer.Serialize(new Enrollment(1, Protocol.Secret()), Protocol.Json), "/remote/v1/pair");
     Check(response.StatusCode == HttpStatusCode.TooManyRequests, "pairing rate limit enforced");
 }
