@@ -17,7 +17,7 @@ public sealed class TailscaleClient
         if (!File.Exists(path)) throw new SetupException("Install Tailscale, sign in, then click Connect securely again.");
         return path;
     }
-    private static async Task<(int ExitCode, string Output)> Run(params string[] arguments)
+    private static async Task<(int ExitCode, string Output, string Error)> Run(params string[] arguments)
     {
         using var process = new Process { StartInfo = new ProcessStartInfo(Executable())
         {
@@ -31,14 +31,14 @@ public sealed class TailscaleClient
         try
         {
             await process.WaitForExitAsync(timeout.Token);
-            return (process.ExitCode, await output + "\n" + await error);
+            return (process.ExitCode, await output, await error);
         }
         catch (OperationCanceledException)
         {
             try { process.Kill(true); } catch { }
             await process.WaitForExitAsync();
             // Preserve a web-consent link already printed by a waiting CLI, without logging it.
-            return (-1, await output + "\n" + await error);
+            return (-1, await output, await error);
         }
     }
     public async Task<TailnetIdentity> Identity()
@@ -56,7 +56,7 @@ public sealed class TailscaleClient
         if (state == "conflict") throw new SetupException("This PC already has another Serve route or Funnel configured. Keep that setup unchanged and review it before connecting Sentinel Remote.");
         if (state == "ready") return;
         var result = await Run("serve", "--bg", "32179");
-        var consent = Regex.Match(result.Output, @"https://login\.tailscale\.com/f/serve\?[^\s]+").Value.TrimEnd('.', ')', '"');
+        var consent = Regex.Match(result.Output + "\n" + result.Error, @"https://login\.tailscale\.com/f/serve\?[^\s]+").Value.TrimEnd('.', ')', '"');
         if (consent.Length > 0)
             throw new SetupException("Approve private HTTPS Serve in your browser, then click Connect securely again.", consent);
         if (result.ExitCode != 0) throw new SetupException("Tailscale could not enable private Serve. Open Tailscale and try again.");

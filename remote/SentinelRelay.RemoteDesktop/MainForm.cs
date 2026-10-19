@@ -91,7 +91,7 @@ public sealed class MainForm : Form
         tray.DoubleClick += (_, _) => Restore();
         FormClosing += (_, e) =>
         {
-            if (!exiting) { e.Cancel = true; Hide(); }
+            if (!exiting && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); }
         };
         refreshTimer.Tick += async (_, _) =>
         {
