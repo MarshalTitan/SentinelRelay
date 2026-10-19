@@ -166,6 +166,7 @@ finally { await web.StopAsync(); await web.DisposeAsync(); }
 await BridgeTests.Run(Check);
 await PipeServerTests.Run(Check);
 await DesktopSetupTests.Run(Check);
+StatusWireTests.Run(Check);
 Console.WriteLine($"{count} remote foundation checks passed.");
 
 sealed class TestClock : TimeProvider
