@@ -2,6 +2,18 @@
 
 Candidate pairing: Sentinel Remote Android 0.1.0 and Sentinel Relay **0.6.0.0 candidate**, plus the host from the same Relay source commit. These are candidates until the checklist below passes. The published Discord plugin remains independent; do not replace the production catalog with an unverified package.
 
+## Validated downloads
+
+Open each successful build page and download the named artifact at the bottom under **Artifacts**. Sign into the GitHub account if downloading requires it.
+
+| Install on | Build page | Artifact |
+|---|---|---|
+| Android phone | [Android APK](https://github.com/MarshalTitan/SentinelRemote/actions/runs/39194150121) | `SentinelRemote-Android-proving` |
+| FFXIV PC | [Relay plugin candidate](https://github.com/MarshalTitan/SentinelRelay/actions/runs/39194267538) | `SentinelRelay-0.6.0.0` |
+| FFXIV PC | [Standalone PC host](https://github.com/MarshalTitan/SentinelRelay/actions/runs/39194267510) | `SentinelRemoteHost-foundation-candidate` |
+
+Verified source: Android `84a496be101f4b999a1414f41a50977622b3693f`; Relay/host `8a5445bcfd4c6c56b64751232a6fc7dddf37fe79`. These exact heads passed Android analysis, seven app tests and APK packaging; Windows/Linux 80 remote/bridge checks and 57 Relay regressions; and normal plugin/release-policy validation. Android PR #1 and Relay PR #14 are merged. These checks do not establish real-device acceptance. The production Relay release remains 0.5.0.7.
+
 ## Downloads and installation
 
 1. From SentinelRemote's successful **Android proving build**, download `SentinelRemote-Android-proving`, extract it and install `SentinelRemote-0.1.0-proving.apk` on Android. This is a signed debug APK for private proving. Allow installation from the chosen file manager/browser when Android requests it. Later CI debug builds may require uninstall/reinstall and fresh pairing because the signing key is temporary.

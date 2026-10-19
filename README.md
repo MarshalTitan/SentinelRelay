@@ -161,5 +161,5 @@ Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamu
 
 ## Sentinel Remote foundation
 
-The optional [Sentinel Remote PC foundation](remote/README.md) is a separate external-host project for an Android-first game-rescue companion. It is not part of the released Dalamud plugin. Its game bridge, app, input, streaming and recovery stages remain pending; existing Discord functionality continues to work independently.
+The optional [Sentinel Remote companion](remote/README.md) has Android and local game-bridge software ready as Milestone A candidates. Follow the [single setup and acceptance checklist](remote/docs/MILESTONE_A.md) for the matched Android, plugin and PC host builds. Manual input, live streaming and launcher recovery remain later stages. Existing Discord functionality continues independently; the production catalog is not changed by the candidate build.
 

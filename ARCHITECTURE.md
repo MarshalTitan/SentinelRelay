@@ -1,6 +1,6 @@
 # Sentinel Relay architecture
 
-The optional [Sentinel Remote design and host foundation](remote/docs/ARCHITECTURE.md) lives outside the Dalamud plugin. The current released plugin flows below remain the production Discord architecture; there is no game bridge to the new host yet.
+The optional [Sentinel Remote companion](remote/docs/ARCHITECTURE.md) adds an independent PC host and a default-off per-character local bridge in the 0.6.0.0 candidate, with an Android client in SentinelRemote. The released Discord flows below remain independent. Use the [Milestone A checklist](remote/docs/MILESTONE_A.md) before claiming real-device readiness.
 
 ## Scope
 

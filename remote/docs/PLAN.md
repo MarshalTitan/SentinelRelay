@@ -11,14 +11,14 @@ Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone 
 | D: Recovery | Process lifetime monitor independent of plugin, last-known state; configured launcher-only action; state-aware lobby/character recovery, bounded incident evidence, secure manual authentication only if unavoidable | Disconnect/exited process distinguished correctly; local launcher/account flow; correct known character; fresh Relay epoch/status; no automatic skip/reset replay. Unknown UI halts assistance; no character modification/deletion tested. |
 | iOS | Reuse Flutter protocol/UI; platform secure storage, lifecycle, media and touch verification; signed installation/distribution | After Android/PC input/view proof. User's Apple setup and private distribution approach must be confirmed separately. |
 
-## Next software tasks before Milestone A
+## Milestone A implementation status
 
 1. `MarshalTitan/SentinelRemote` now exists and is accessible, with the Android Flutter application. PC code remains in SentinelRelay.
-2. Build the Android protocol client against the v1 host. Pin Flutter/package versions only after maintenance/license review. Require HTTPS; store device credential securely; sessions only in memory. Use explicit pending confirmations, last-seen state and clear per-PC/client selection.
-3. Implement current-user-only named-pipe bridge with kernel client-PID checks, local trusted installation enrollment, new process/game epochs and framework-thread SRank dispatch. Invalidate pending intent at logout, character switch, bridge loss and reconnect. Add bridge-loss/late-message/PID-reuse/routing tests before real game actions.
-4. Expose only supported status fields. Profiles/current map/vnavmesh may be unknown. Never scrape plugin configuration files or infer profile application from a display label.
-5. Add user-session tray lifetime/startup opt-in and a visible Disable Remote Control button. Preserve local CLI for emergency recovery. Do not require admin privileges just to run status/commands.
-6. Package signed Android proving APK and Windows candidate together, with one concise test checklist. Do not produce a public plugin release per small internal step. Keep existing Discord Relay usable throughout.
+2. Implemented: Flutter Android client, pinned SDK and locked dependencies, HTTPS-only transport, OS-backed credentials, memory-only sessions/confirmation, per-PC/client selection, background cancellation and no automatic mutation retry.
+3. Implemented: current-user-only local pipe, kernel server-PID verification, explicit local process lifetime/character binding, new game epochs, framework-only fixed SRank dispatch and screenshot capture with a second identity check. Real pipe disconnect/expiry and bridge routing/epoch tests pass on Windows and Linux.
+4. Implemented: observed process/Relay health, character/world/territory/map, SRank, heartbeat and nullable vnavmesh readiness. Last-known state is explicitly marked. Profiles stays unknown; no config scraping is used.
+5. Local CLI emergency disable/revoke is implemented. A user-session tray and startup opt-in remain deferred, and are required before enabling manual input in Milestone B. No administration privilege is required for the current host.
+6. Matched Android debug APK, Windows plugin and self-contained host candidates are available through the [validated download/checklist page](MILESTONE_A.md). Stable private Android release signing remains a later packaging task. The current production Discord catalog is unchanged pending supervised acceptance.
 
 ## Automated verification scope
 
