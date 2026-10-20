@@ -13,7 +13,7 @@ static class ManualInputTests
 {
     public static async Task Run(Action<bool, string> check)
     {
-        var store = new MemoryStore();
+        var store = new SlowStore();
         var admin = new LocalAdministration(store); admin.SetEnabled(true);
         var slot = admin.AddInstance("One"); var other = admin.AddInstance("Other");
         var binding = new GameBinding(slot.InstanceId, 123, 123, "game.exe", "cid");
@@ -102,6 +102,22 @@ static class ManualInputTests
             check(await Read(denied) is null, "websocket rescue grant alone does not allow gamepad");
         check(input.Diagnostic.Code == "manual_not_permitted", "missing local manual permission has a stable startup diagnostic");
         input.Permit(device.DeviceId, true);
+        store.Delay = 12;
+        using (var sustained = await Connect(session))
+        {
+            var current = await Read(sustained);
+            var accepted = 0;
+            while (current is not null && accepted < 30)
+            {
+                await Send(sustained, Frame(current));
+                current = await Read(sustained);
+                if (current is not null) accepted++;
+            }
+            check(accepted == 30 && input.Diagnostic.AcceptedFrames >= 30,
+                "sustained input survives overlapping watchdog and frame authorization with slow state reads");
+        }
+        await Wait(() => !input.Active);
+        store.Delay = 0;
         using (var good = await Connect(session))
         {
             var p = await Read(good); check(p is not null, "authorized locally opted-in websocket receives freshness poll");
@@ -176,6 +192,16 @@ static class ManualInputTests
             check(output.Disposed && output.Last == ControllerFrame.Neutral, "live device revocation releases held websocket input");
         }
         await web.StopAsync();
+    }
+    private sealed class SlowStore : IStateStore
+    {
+        private readonly MemoryStore inner = new();
+        public volatile int Delay;
+        public T Access<T>(Func<RemoteState, (T Result, bool Save)> action) => inner.Access(state =>
+        {
+            if (Delay > 0) Thread.Sleep(Delay); // Model real on-disk authority read latency.
+            return action(state);
+        });
     }
     private sealed class FakeTarget : IManualTarget
     {
