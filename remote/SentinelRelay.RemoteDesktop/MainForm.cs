@@ -125,6 +125,15 @@ public sealed class MainForm : Form
             host.Desktop?.Stop();
             status.Text = "Desktop access stopped; local permission cleared.";
             return Task.CompletedTask;
+        }), Work("Copy desktop result", () =>
+        {
+            var result = host.Desktop?.Diagnostic;
+            Clipboard.SetText("Sentinel Remote desktop 0.3.0" + Environment.NewLine +
+                "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
+                "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
+                "Frames: " + (result?.Frames ?? 0) + Environment.NewLine + "Inputs: " + (result?.Inputs ?? 0));
+            status.Text = "Desktop result copied.";
+            return Task.CompletedTask;
         })));
         Add(page, TextLabel("Launcher and window recovery", 13, FontStyle.Bold));
         Add(page, TextLabel("Select XIVLauncher.exe once on this PC. Opening the launcher works with FFXIV closed. Each phone needs separate local recovery permission, which resets when this host restarts. Use the phone's Desktop view to click through the launcher and character selection."));

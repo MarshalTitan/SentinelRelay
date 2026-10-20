@@ -86,8 +86,14 @@ static class DesktopStreamTests
             await Send(socket, new(1, 2, "tap", frame.FrameId, .25, .75));
             check((await Read(socket))?.GetProperty("code").GetString() == "desktop_applied" && adapter.Inputs == 1,
                 "desktop tap dispatches once against the displayed frame");
-            await Send(socket, new(1, 2, "tap", frame.FrameId, .25, .75));
-            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_request_rejected" && adapter.Inputs == 1,
+            await Task.Delay(350);
+            await Send(socket, new(1, 3, "frame"));
+            await Send(socket, new(1, 4, "tap", frame.FrameId, .25, .75));
+            await Read(socket);
+            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_applied" && adapter.Inputs == 2,
+                "one capture in flight does not discard a click on the prior recent displayed frame");
+            await Send(socket, new(1, 4, "tap", frame.FrameId, .25, .75));
+            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_request_rejected" && adapter.Inputs == 2,
                 "replayed desktop request cannot repeat a click");
         }
         await WaitStopped();
@@ -95,7 +101,7 @@ static class DesktopStreamTests
         {
             await Read(socket); await Send(socket, new(1, 1, "frame")); await Read(socket);
             await Send(socket, new(1, 2, "key", Protocol.Secret(), Key: "Enter"));
-            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_stale_frame" && adapter.Inputs == 1,
+            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_stale_frame" && adapter.Inputs == 2,
                 "keyboard input cannot apply to a different or old view");
         }
         await WaitStopped();

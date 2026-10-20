@@ -14,12 +14,18 @@ public sealed class DesktopAdapter : IDesktopAdapter
     private static Rectangle CurrentBounds()
     {
         using var process = Process.GetCurrentProcess();
-        if (!InteractiveDesktop.Available(process.SessionId)) throw new InvalidOperationException();
-        var area = Screen.PrimaryScreen?.Bounds ?? throw new InvalidOperationException();
-        if (area.Width < 1 || area.Height < 1 || (long)area.Width * area.Height > 16777216) throw new InvalidOperationException();
+        if (!InteractiveDesktop.Available(process.SessionId)) throw new DesktopAccessException("desktop_session_unavailable");
+        var area = Screen.PrimaryScreen?.Bounds ?? throw new DesktopAccessException("desktop_display_unavailable");
+        if (area.Width < 1 || area.Height < 1 || (long)area.Width * area.Height > 16777216) throw new DesktopAccessException("desktop_display_unavailable");
         return area;
     }
     public DesktopImage Capture()
+    {
+        try { return CaptureCore(); }
+        catch (DesktopAccessException) { throw; }
+        catch { throw new DesktopAccessException("desktop_capture_failed"); }
+    }
+    private DesktopImage CaptureCore()
     {
         lock (gate)
         {
