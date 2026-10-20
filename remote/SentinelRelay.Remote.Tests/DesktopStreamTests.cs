@@ -112,11 +112,12 @@ static class DesktopStreamTests
             check(await Read(socket) is null, "local desktop Stop closes an active view");
         }
         await WaitStopped();
-        using (var socket = await Connect(token))
+        for (var attempt = 0; attempt < 4; attempt++)
         {
+            using var socket = await Connect(token);
             var code = (await Read(socket))?.GetProperty("code").GetString();
             check(code == "desktop_not_permitted",
-                "local desktop Stop clears permission and prevents automatic reacquisition; observed " + (code ?? "closed"));
+                "local desktop Stop prevents reacquisition and rapid denied reconnect completes its handshake; observed " + (code ?? "closed"));
         }
         desktop.Permit(phone.DeviceId, true);
         adapter.Block = true;

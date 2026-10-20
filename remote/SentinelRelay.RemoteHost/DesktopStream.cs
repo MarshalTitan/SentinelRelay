@@ -59,7 +59,7 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
     }
     public async Task Run(WebSocket socket, string? token, CancellationToken cancellation)
     {
-        if (!await exclusive.WaitAsync(0, cancellation)) { socket.Abort(); return; }
+        if (!await exclusive.WaitAsync(TimeSpan.FromMilliseconds(250), cancellation)) { socket.Abort(); return; }
         using var life = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         Task? watch = null;
         try
@@ -137,7 +137,7 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
             if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
             {
                 using var close = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-                try { await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", close.Token); } catch { }
+                try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", close.Token); } catch { }
             }
             socket.Abort();
         }
