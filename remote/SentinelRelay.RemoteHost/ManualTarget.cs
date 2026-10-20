@@ -45,6 +45,13 @@ public sealed class ManualTarget : IManualTarget
     public bool Allowed(ControllerOwner owner) => !cancel.IsCancellationRequested && owner.Binding == binding &&
         owner.GameEpoch == epoch && Stopwatch.GetElapsedTime(Interlocked.Read(ref observed)) < TimeSpan.FromMilliseconds(300) &&
         SingleForeground(binding);
+    public sealed record ObservedProcess(int Id, long StartedUtcTicks, string? Executable);
+    public static bool MatchesOnlyProcess(GameBinding binding, ObservedProcess[]? allGames, int foregroundPid) =>
+        allGames is { Length: 1 } && allGames[0].Id == binding.ProcessId &&
+        allGames[0].StartedUtcTicks == binding.StartedUtcTicks && foregroundPid == binding.ProcessId &&
+        !string.IsNullOrWhiteSpace(allGames[0].Executable) &&
+        string.Equals(allGames[0].Executable, binding.Executable, StringComparison.OrdinalIgnoreCase);
+
     private static bool SingleForeground(GameBinding binding)
     {
         if (!OperatingSystem.IsWindows()) return false;
@@ -53,11 +60,10 @@ public sealed class ManualTarget : IManualTarget
             var games = Process.GetProcessesByName("ffxiv_dx11").Concat(Process.GetProcessesByName("ffxiv")).ToArray();
             try
             {
-                if (games.Length != 1 || games[0].Id != binding.ProcessId ||
-                    games[0].StartTime.ToUniversalTime().Ticks != binding.StartedUtcTicks ||
-                    !string.Equals(games[0].MainModule?.FileName, binding.Executable, StringComparison.OrdinalIgnoreCase)) return false;
+                if (games.Length != 1) return false; // Includes unbound and other-session FFXIV processes.
                 GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
-                return pid == binding.ProcessId; // Also releases on screen lock/focus loss. This is additional to the one-client veto.
+                return MatchesOnlyProcess(binding,
+                    [new(games[0].Id, games[0].StartTime.ToUniversalTime().Ticks, games[0].MainModule?.FileName)], checked((int)pid));
             }
             finally { foreach (var game in games) game.Dispose(); }
         }

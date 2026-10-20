@@ -17,6 +17,16 @@ static class ManualInputTests
         var slot = admin.AddInstance("One"); var other = admin.AddInstance("Other");
         var binding = new GameBinding(slot.InstanceId, 123, 123, "game.exe", "cid");
         admin.Bind(binding);
+        var seen = new ManualTarget.ObservedProcess(binding.ProcessId, binding.StartedUtcTicks, binding.Executable);
+        check(ManualTarget.MatchesOnlyProcess(binding, [seen], binding.ProcessId), "single matching foreground process allowed");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen, new(456, 999, "unbound.exe")], binding.ProcessId),
+            "an unbound second FFXIV process vetoes manual input");
+        check(!ManualTarget.MatchesOnlyProcess(binding, null, binding.ProcessId), "unknown process visibility vetoes manual input");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { StartedUtcTicks = 999 }], binding.ProcessId),
+            "reused PID cannot acquire manual input");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { Executable = "other.exe" }], binding.ProcessId),
+            "wrong executable cannot acquire manual input");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen], 0), "screen lock or foreground loss vetoes manual input");
         var authority = new RemoteAuthority(store);
         DeviceCredential Pair(bool control, string instance) => (DeviceCredential)authority.Enroll(
             new(1, admin.Invite("Phone", [instance], control))).Data!;
