@@ -223,7 +223,7 @@ public sealed class MainForm : Form
         parent.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         parent.Controls.Add(child, 0, parent.RowCount++);
         // Wrapped labels follow available width when resized.
-        if (child is Label label) parent.SizeChanged += (_, _) => label.MaximumSize = new Size(Math.Max(240, parent.ClientSize.Width - parent.Padding.Horizontal), 0);
+        if (child is Label or CheckBox) parent.SizeChanged += (_, _) => child.MaximumSize = new Size(Math.Max(240, parent.ClientSize.Width - parent.Padding.Horizontal), 0);
     }
     private static FlowLayoutPanel Row(params Control[] children)
     {
@@ -386,7 +386,7 @@ public sealed class MainForm : Form
         var ids = grants.CheckedItems.Cast<Slot>().Select(s => s.Id).ToArray();
         if (ids.Length == 0 && !trust.Checked) throw new SetupException("Approve a character or choose trusted desktop access before pairing.");
         var invitation = admin.Invite(phoneName.Text.Trim(), ids, control.Checked, trust.Checked);
-        using var dialog = new PairingForm(identity.Url, invitation);
+        using var dialog = new PairingForm(identity.Url, invitation, () => Populate(admin.Snapshot()));
         dialog.ShowDialog(this);
         Populate(admin.Snapshot());
         return Task.CompletedTask;
