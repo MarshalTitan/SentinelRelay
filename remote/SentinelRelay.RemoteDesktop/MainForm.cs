@@ -155,6 +155,12 @@ public sealed class MainForm : Form
         Populate(admin.Snapshot());
     }
 
+    internal void ScrollToGamepadPreview()
+    {
+        var scroll = Controls.OfType<Panel>().First(p => p.AutoScroll);
+        scroll.AutoScrollPosition = new Point(0, scroll.VerticalScroll.Maximum);
+        PerformLayout();
+    }
     private static Label TextLabel(string text, float size = 10, FontStyle style = FontStyle.Regular) => new()
     {
         Text = text, AutoSize = true, MaximumSize = new Size(1040, 0),
