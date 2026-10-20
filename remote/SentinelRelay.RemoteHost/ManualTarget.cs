@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using SentinelRelay.Remote;
 
 namespace SentinelRelay.RemoteHost;
@@ -62,9 +61,9 @@ public sealed class ManualTarget : IManualTarget
         return true;
     }
     public sealed record ObservedProcess(int Id, long StartedUtcTicks, string? Executable);
-    public static bool MatchesOnlyProcess(GameBinding binding, ObservedProcess[]? allGames, int foregroundPid) =>
-        ExplainProcess(binding, allGames, foregroundPid).Length == 0;
-    public static string ExplainProcess(GameBinding binding, ObservedProcess[]? allGames, int foregroundPid)
+    public static bool MatchesOnlyProcess(GameBinding binding, ObservedProcess[]? allGames, bool desktopAvailable) =>
+        ExplainProcess(binding, allGames, desktopAvailable).Length == 0;
+    public static string ExplainProcess(GameBinding binding, ObservedProcess[]? allGames, bool desktopAvailable)
     {
         if (allGames is null) return "target_visibility_unknown";
         if (allGames.Length == 0) return "target_no_game";
@@ -73,7 +72,7 @@ public sealed class ManualTarget : IManualTarget
         if (game.Id != binding.ProcessId || game.StartedUtcTicks != binding.StartedUtcTicks ||
             string.IsNullOrWhiteSpace(game.Executable) ||
             !string.Equals(game.Executable, binding.Executable, StringComparison.OrdinalIgnoreCase)) return "target_process_changed";
-        return foregroundPid == binding.ProcessId ? "" : "target_foreground";
+        return desktopAvailable ? "" : "target_desktop_unavailable";
     }
     private static string Inspect(GameBinding binding)
     {
@@ -85,15 +84,12 @@ public sealed class ManualTarget : IManualTarget
             {
                 if (games.Length == 0) return "target_no_game";
                 if (games.Length != 1) return "target_extra_game"; // Also unbound and other-session games.
-                GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
                 return ExplainProcess(binding,
-                    [new(games[0].Id, games[0].StartTime.ToUniversalTime().Ticks, games[0].MainModule?.FileName)], checked((int)pid));
+                    [new(games[0].Id, games[0].StartTime.ToUniversalTime().Ticks, games[0].MainModule?.FileName)], InteractiveDesktop.Available(games[0].SessionId));
             }
             finally { foreach (var game in games) game.Dispose(); }
         }
         catch { return "target_visibility_unknown"; }
     }
     public void Dispose() { cancel.Cancel(); epoch = null; }
-    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
 }

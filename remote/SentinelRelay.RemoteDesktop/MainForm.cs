@@ -36,6 +36,8 @@ public sealed class MainForm : Form
         store = new FileStateStore(directory);
         admin = new LocalAdministration(store);
         preferences = DesktopPreferences.Load(directory);
+        if (preferences.LauncherPath is not null && preferences.LauncherHash is not null)
+            host.Recovery.Configure(new(preferences.LauncherPath, preferences.LauncherHash));
         Text = "Sentinel Remote";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(860, 700);
@@ -84,7 +86,7 @@ public sealed class MainForm : Form
         emergency.Click += async (_, _) => await Disable();
         Add(page, Row(Work("Revoke selected phone", Revoke)));
         Add(page, TextLabel("Phone gamepad", 13, FontStyle.Bold));
-        Add(page, TextLabel("Keep exactly one FFXIV client running, in the foreground, with other games closed. Gamepad permission is separate from rescue controls and resets when this host restarts."));
+        Add(page, TextLabel("Keep exactly one FFXIV client running with other games closed. Minimized/background play is allowed; enable FFXIV's inactive-client gamepad setting. Windows must stay awake and unlocked; the monitor can be off. Gamepad permission is separate from rescue controls and resets when this host restarts."));
         Add(page, Row(Work("Prepare gamepad support", async () =>
         {
             if (!host.Running) throw new SetupException("Click Connect securely first.");
@@ -100,7 +102,7 @@ public sealed class MainForm : Form
         }), Work("Copy gamepad result", () =>
         {
             var result = host.Input?.Diagnostic;
-            Clipboard.SetText("Sentinel Remote gamepad 0.2.2" + Environment.NewLine +
+            Clipboard.SetText("Sentinel Remote gamepad 0.2.3" + Environment.NewLine +
                 "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
                 "Phase: " + (result?.Phase ?? "host_not_connected") + Environment.NewLine +
                 "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
@@ -109,6 +111,26 @@ public sealed class MainForm : Form
             return Task.CompletedTask;
         })));
         Add(page, TextLabel("The signed controller component downloads from its official author. Install the official USBip x64 driver separately if Gamepad Check has not already passed on this PC."));
+        Add(page, TextLabel("Launcher and window recovery", 13, FontStyle.Bold));
+        Add(page, TextLabel("Select XIVLauncher.exe once on this PC. Opening the launcher works with FFXIV closed. Each phone needs separate local recovery permission, which resets when this host restarts. Login-screen viewing and character-selection controls are not included yet."));
+        Add(page, Row(Work("Choose XIVLauncher", () =>
+        {
+            using var choose = new OpenFileDialog { Title = "Select your installed XIVLauncher.exe", Filter = "XIVLauncher|XIVLauncher.exe", CheckFileExists = true };
+            if (choose.ShowDialog(this) != DialogResult.OK) return Task.CompletedTask;
+            var selected = SentinelRelay.RemoteHost.RecoveryActions.SelectLauncher(choose.FileName);
+            preferences = preferences with { LauncherPath = selected.Path, LauncherHash = selected.Hash };
+            preferences.Save(directory);
+            host.Recovery.Configure(selected);
+            status.Text = "XIVLauncher selected. Select a paired phone and allow recovery.";
+            return Task.CompletedTask;
+        }), Work("Allow selected phone recovery", () =>
+        {
+            if (!host.Running || devices.SelectedItem is not DeviceRow phone || !phone.Control)
+                throw new SetupException("Connect securely and select a paired phone with control permission first.");
+            host.Recovery.Permit(phone.Id, true);
+            status.Text = "Launcher and window recovery allowed for " + phone.Label + " until this host restarts.";
+            return Task.CompletedTask;
+        })));
         Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));
         // Keep emergency access reachable even on short laptop displays and while the page scrolls.
         var safetyBar = new FlowLayoutPanel
@@ -257,7 +279,7 @@ public sealed class MainForm : Form
         if (resume && !admin.Snapshot().Enabled) { await host.DisposeAsync(); return; }
         if (!resume && !admin.Snapshot().Enabled) admin.SetEnabled(true);
         identity = current;
-        preferences = new(current.Host, current.Login, true);
+        preferences = preferences with { Host = current.Host, Login = current.Login, ResumeOnLaunch = true };
         preferences.Save(directory);
         address.Text = current.Url;
         status.Text = "Connected privately. Your paired phones can access approved characters.";
@@ -354,6 +376,7 @@ public sealed class MainForm : Form
     {
         if (devices.SelectedItem is not DeviceRow device) throw new SetupException("Select a paired phone first.");
         host.Input?.Permit(device.Id, false);
+        host.Recovery.Permit(device.Id, false);
         admin.Revoke(device.Id);
         Populate(admin.Snapshot());
         status.Text = "Phone access revoked.";

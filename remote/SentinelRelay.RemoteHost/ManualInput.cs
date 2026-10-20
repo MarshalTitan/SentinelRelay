@@ -69,7 +69,7 @@ public sealed class ManualInput : IDisposable
         "session_unavailable" => "refresh the phone session",
         "target_no_game" => "FFXIV is not running",
         "target_extra_game" => "more than one FFXIV is running",
-        "target_foreground" => "keep FFXIV in the foreground",
+        "target_desktop_unavailable" => "unlock Windows in the game user session",
         "target_process_changed" => "refresh the approved character",
         "target_visibility_unknown" => "game identity could not be checked",
         "target_bridge_unavailable" => "Relay bridge did not respond",

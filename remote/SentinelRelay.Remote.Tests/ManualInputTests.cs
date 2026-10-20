@@ -19,15 +19,22 @@ static class ManualInputTests
         var binding = new GameBinding(slot.InstanceId, 123, 123, "game.exe", "cid");
         admin.Bind(binding);
         var seen = new ManualTarget.ObservedProcess(binding.ProcessId, binding.StartedUtcTicks, binding.Executable);
-        check(ManualTarget.MatchesOnlyProcess(binding, [seen], binding.ProcessId), "single matching foreground process allowed");
-        check(!ManualTarget.MatchesOnlyProcess(binding, [seen, new(456, 999, "unbound.exe")], binding.ProcessId),
+        check(ManualTarget.MatchesOnlyProcess(binding, [seen], true), "single matching process allowed regardless of window focus");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen, new(456, 999, "unbound.exe")], true),
             "an unbound second FFXIV process vetoes manual input");
-        check(!ManualTarget.MatchesOnlyProcess(binding, null, binding.ProcessId), "unknown process visibility vetoes manual input");
-        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { StartedUtcTicks = 999 }], binding.ProcessId),
+        check(!ManualTarget.MatchesOnlyProcess(binding, null, true), "unknown process visibility vetoes manual input");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { StartedUtcTicks = 999 }], true),
             "reused PID cannot acquire manual input");
-        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { Executable = "other.exe" }], binding.ProcessId),
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen with { Executable = "other.exe" }], true),
             "wrong executable cannot acquire manual input");
-        check(!ManualTarget.MatchesOnlyProcess(binding, [seen], 0), "screen lock or foreground loss vetoes manual input");
+        check(ManualTarget.MatchesOnlyProcess(binding, [seen], true), "background or minimized window does not veto the verified game");
+        check(!ManualTarget.MatchesOnlyProcess(binding, [seen], false), "unavailable interactive desktop vetoes manual input");
+        check(InteractiveDesktop.Matches(1, 1, true, "Default", "Default"), "ordinary desktop permits background input");
+        check(!InteractiveDesktop.Matches(1, 1, true, "Default", "Winlogon"), "locked or secure desktop vetoes input");
+        check(!InteractiveDesktop.Matches(1, 1, false, "Default", "Default"), "disconnected Windows session vetoes input");
+        check(!InteractiveDesktop.Matches(1, 2, true, "Default", "Default"), "another Windows session cannot receive input");
+        check(!InteractiveDesktop.Matches(1, 1, true, "Default", null), "unknown input desktop vetoes input");
+        check(!InteractiveDesktop.Matches(0, 0, true, "Default", "Default"), "service session cannot receive input");
         var authority = new RemoteAuthority(store);
         DeviceCredential Pair(bool control, string instance) => (DeviceCredential)authority.Enroll(
             new(1, admin.Invite("Phone", [instance], control))).Data!;
@@ -43,9 +50,9 @@ static class ManualInputTests
         var oldOwner = authority.InputOwner(session, slot.InstanceId)!;
         session = Session(device);
         check(!authority.InputAllowed(oldOwner), "input reconnect invalidates old session owner");
-        check(ManualTarget.ExplainProcess(binding, [], binding.ProcessId) == "target_no_game", "diagnostic distinguishes no game");
-        check(ManualTarget.ExplainProcess(binding, [seen], 0) == "target_foreground", "diagnostic distinguishes foreground loss");
-        check(ManualTarget.ExplainProcess(binding, [seen, seen], binding.ProcessId) == "target_extra_game", "diagnostic distinguishes extra game");
+        check(ManualTarget.ExplainProcess(binding, [], true) == "target_no_game", "diagnostic distinguishes no game");
+        check(ManualTarget.ExplainProcess(binding, [seen], false) == "target_desktop_unavailable", "diagnostic distinguishes lock or desktop loss");
+        check(ManualTarget.ExplainProcess(binding, [seen, seen], true) == "target_extra_game", "diagnostic distinguishes extra game");
         var output = new FakeOutput(); var target = new FakeTarget();
         string? startupFailure = null;
         using var input = new ManualInput(authority, _ => Task.FromResult<IManualTarget>(target),

@@ -1,7 +1,7 @@
 namespace SentinelRelay.Remote;
 
-/// <summary>Serializes authorization and one-shot intent. No game, shell, filesystem, or input dispatcher.</summary>
-public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null, IGameBridge? gameBridge = null)
+/// <summary>Serializes authorization and one-shot intent. Fixed game/recovery intents only; no remote shell or arbitrary input dispatcher.</summary>
+public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null, IGameBridge? gameBridge = null, IRecoveryActions? recovery = null)
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
     private readonly object gate = new();
@@ -155,6 +155,34 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (request.Operation == "instances.list")
                 return (End(true, "instances", state.Instances.Where(i => device.Instances.Contains(i.InstanceId)).ToArray()), false);
             if (request.Operation == "session.ping") return (End(true, "alive", new { state.HostId, ProtocolVersion = Protocol.Version }), false);
+            if (request.Operation is "launcher.open" or "game.restore")
+            {
+                if (!device.Control) return (End(false, "control_not_authorized"), false);
+                if (request.Confirmation is not null) return (End(false, "invalid_request"), false);
+                GameBinding? target = null;
+                if (request.Operation == "launcher.open")
+                {
+                    if (request.InstanceId is not null) return (End(false, "invalid_request"), false);
+                }
+                else
+                {
+                    if (!device.Instances.Contains(request.InstanceId ?? "") ||
+                        !state.Instances.Any(i => i.InstanceId == request.InstanceId))
+                        return (End(false, "instance_not_authorized"), false);
+                    target = state.Bindings.FirstOrDefault(b => b.InstanceId == request.InstanceId);
+                    if (target is null) return (End(false, "process_exited"), false);
+                }
+                if (recovery is null) return (End(false, "recovery_unavailable"), false);
+                var budget = "recovery:" + device.Id;
+                if (!mutationTimes.TryGetValue(budget, out var recent)) mutationTimes[budget] = recent = new();
+                while (recent.TryPeek(out var stamp) && time.GetElapsedTime(stamp) >= TimeSpan.FromSeconds(30)) recent.Dequeue();
+                if (recent.Count >= 3) return (End(false, "cooldown"), false);
+                recent.Enqueue(time.GetTimestamp());
+                // Execute under this serialized authorization/state access. Local actions are
+                // one-shot, never queued/retried, and have no phone-supplied executable/arguments.
+                var result = recovery.Execute(device.Id, request.Operation, target);
+                return (End(result.Success, result.Code, result.Data), false);
+            }
             if (request.Operation is not ("srank.status" or "screenshot" or "srank.skip" or "srank.reset.request" or "srank.reset.confirm"))
                 return (End(false, "operation_not_allowed"), false);
             if (!device.Instances.Contains(request.InstanceId) || !state.Instances.Any(i => i.InstanceId == request.InstanceId))

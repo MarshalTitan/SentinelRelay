@@ -37,6 +37,12 @@ iOS: building/signing requires the Apple/Xcode toolchain. Apple's free Personal 
 - [Apple developer account and Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account)
 - [TestFlight overview](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview)
 
-## Known unimplemented capabilities
+## Current input and recovery candidates
 
-Android pairing/status/rescue UI, private local bridge, process lifetime/character binding, optional vnavmesh readiness and last-known status are implemented candidates. The desktop/tray, startup opt-in and verified same-character rebinding are implemented. Milestone B has an isolated lease/watchdog core and an experimental VIIPER backend worker with a native-proof CI gate. The shipped host/Android do not invoke the worker and have no phone input endpoint. The first gamepad version is limited to exactly one running FFXIV client per PC, as approved by the user. See [manual input research and integration gate](MILESTONE_B.md). Profiles IPC, the live input backend/authorization/device routing, streaming, launcher launch, manual authentication, lobby/character assistant and incident collection/export remain unimplemented. CI alone does not establish real-device acceptance.
+The draft gamepad integration now connects Android touch controls to the supervised VIIPER worker. Windows 10 native helper checks passed, and the user confirmed actual movement and camera control. PC 0.2.3 allows background/minimized play while retaining live character/process/epoch, single-FFXIV, Windows desktop/session, authorization and watchdog checks. Minimized/monitor-off behavior and the complete interruption/release/coexistence matrix still require field acceptance; Windows Server native enumeration CI remains unresolved.
+
+The first gamepad version is limited to exactly one running FFXIV client per PC, as approved by the user. See [manual input research and integration gate](MILESTONE_B.md) and [current preview setup and recovery scope](GAMEPAD_PREVIEW.md).
+
+A separate authenticated locally permitted launcher action now opens a locally selected/hash-approved XIVLauncher without requiring FFXIV to be running. A saved-process window restore action is also implemented. Android Preview 0.2.1 exposes these buttons. The phone-to-PC connection is independent of an active gamepad lease.
+
+Still unimplemented: launcher/lobby view and interaction, pre-login/character-selection control, confirmed logout, streaming, Profiles IPC, incident collection/export, stable Android preview signing and iOS distribution. Missing bridge identity must not authorize unidentified lobby/game control. The intended workflow is phone PC access -> open XIVLauncher -> user authentication -> view/select intended character -> verified in-game control while minimized/monitor off. Do not call that complete until its full path is implemented and proven on devices.

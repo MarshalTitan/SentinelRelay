@@ -170,6 +170,7 @@ await DesktopSetupTests.Run(Check);
 StatusWireTests.Run(Check);
 ControllerLeaseTests.Run(Check);
 await ManualInputTests.Run(Check);
+RecoveryTests.Run(Check);
 await WorkerStartupTests.Run(Check);
 Console.WriteLine($"{count} remote foundation checks passed.");
 return 0;

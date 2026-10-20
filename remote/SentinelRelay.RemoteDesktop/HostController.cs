@@ -15,6 +15,7 @@ public sealed class HostController : IAsyncDisposable
     private WebApplication? app;
     public ManualInput? Input { get; private set; }
     private string? backend;
+    public RecoveryActions Recovery { get; } = new();
     public async Task PrepareInput() { backend = await BackendPackage.Prepare(); }
     public void PermitInput(string device, bool enabled)
     {
@@ -25,7 +26,7 @@ public sealed class HostController : IAsyncDisposable
     public async Task Start(TailnetIdentity identity, IStateStore store)
     {
         if (app is not null) return;
-        var authority = new RemoteAuthority(store, gameBridge: new PipeGameBridge());
+        var authority = new RemoteAuthority(store, gameBridge: new PipeGameBridge(), recovery: Recovery);
         var input = new ManualInput(authority, ManualTarget.Create,
             () => backend is null ? throw new SentinelRelay.RemoteInput.InputBackendException("input_not_prepared") : WorkerOutput.Start(backend));
         var candidate = RemoteWeb.Create(authority, identity.Host, identity.Login, input: input);
@@ -39,6 +40,7 @@ public sealed class HostController : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
+        Recovery.Clear();
         Input?.Dispose(); Input = null;
         if (app is null) return;
         var current = app; app = null;
