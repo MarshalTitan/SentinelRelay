@@ -10,6 +10,7 @@ static class WorkerStartupTests
     // This verifies the host launch/ready/packet path separately from the standalone native proof.
     public static async Task<int> Child(string mode)
     {
+        if (mode == "silent") { await Task.Delay(TimeSpan.FromSeconds(12)); return 2; }
         if (mode == "fail") { Console.WriteLine("{\"ready\":false,\"code\":\"backend_attach_failed\"}"); return 2; }
         if (mode == "malformed") { Console.WriteLine("not json"); return 2; }
         Console.WriteLine("{\"ready\":true,\"code\":\"worker_ready\"}"); Console.Out.Flush();
@@ -57,6 +58,8 @@ static class WorkerStartupTests
         }
         try { using var failed = await WorkerOutput.StartProcess(Info("fail")); check(false, "backend error propagation"); }
         catch (InputBackendException error) { check(error.Code == "backend_attach_failed", "host preserves known worker startup failure code"); }
+        try { using var failed = await WorkerOutput.StartProcess(Info("silent")); check(false, "silent worker startup"); }
+        catch (InputBackendException error) { check(error.Code == "input_worker_timeout", "silent worker startup ends with bounded timeout diagnostic"); }
         try { using var failed = await WorkerOutput.StartProcess(Info("malformed")); check(false, "malformed worker response"); }
         catch (InputBackendException error) { check(error.Code == "input_worker_reply_invalid", "host rejects malformed worker ready reply without raw text"); }
     }

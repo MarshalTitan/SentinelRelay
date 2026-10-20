@@ -64,6 +64,7 @@ public sealed class ManualInput : IDisposable
         "starting_worker" => "starting controller",
         "waiting_first_frame" => "waiting for first phone frame",
         "active" => "active",
+        "input_not_prepared" => "prepare gamepad support on PC",
         "manual_not_permitted" => "allow this phone locally",
         "session_unavailable" => "refresh the phone session",
         "target_no_game" => "FFXIV is not running",
@@ -145,7 +146,7 @@ public sealed class ManualInput : IDisposable
             owner = owner with { GameEpoch = epoch };
             bool Allowed(ControllerOwner o)
             {
-                var code = life.IsCancellationRequested ? "local_stop" :
+                var code = life.IsCancellationRequested ? "phone_disconnected" :
                     !Permitted(o.DeviceId) ? "permission_removed" :
                     !authority.InputAllowed(o) ? "session_unavailable" :
                     !target.Allowed(o) ? target.StatusCode : "";
@@ -178,7 +179,7 @@ public sealed class ManualInput : IDisposable
                 Report("active", "active", ++frames);
                 await Task.Delay(50, life.Token);
             }
-            outcome = "local_stop";
+            outcome = "phone_disconnected";
         }
         catch (InputBackendException error) { outcome = SafeBackendCode(error.Code); }
         catch (TimeoutException) { outcome = "input_worker_timeout"; }

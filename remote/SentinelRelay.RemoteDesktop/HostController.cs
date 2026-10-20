@@ -27,7 +27,7 @@ public sealed class HostController : IAsyncDisposable
         if (app is not null) return;
         var authority = new RemoteAuthority(store, gameBridge: new PipeGameBridge());
         var input = new ManualInput(authority, ManualTarget.Create,
-            () => backend is null ? throw new IOException("input_not_prepared") : WorkerOutput.Start(backend));
+            () => backend is null ? throw new SentinelRelay.RemoteInput.InputBackendException("input_not_prepared") : WorkerOutput.Start(backend));
         var candidate = RemoteWeb.Create(authority, identity.Host, identity.Login, input: input);
         try { await candidate.StartAsync(); app = candidate; Input = input; }
         catch

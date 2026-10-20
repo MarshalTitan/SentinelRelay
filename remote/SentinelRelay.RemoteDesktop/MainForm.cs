@@ -159,7 +159,8 @@ public sealed class MainForm : Form
         {
             inputStatus.Text = host.Input?.Status ?? "Phone gamepad: off";
             inputStatus.ForeColor = host.Input?.Active == true ? Color.FromArgb(176, 42, 65) : ForeColor;
-            tray.Text = host.Input?.Active == true ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" : "Sentinel Remote";
+            tray.Text = host.Input?.Diagnostic.Phase == "active" ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" :
+                host.Input?.Active == true ? "Sentinel Remote - starting gamepad" : "Sentinel Remote";
         };
         if (!smoke) inputTimer.Start();
         Populate(admin.Snapshot());
