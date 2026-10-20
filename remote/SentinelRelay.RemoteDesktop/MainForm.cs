@@ -127,7 +127,7 @@ public sealed class MainForm : Form
         };
         refreshTimer.Tick += async (_, _) =>
         {
-            if (busy || closing) return;
+            if (busy || closing || host.Input?.Active == true) return;
             await WorkSafely(async () =>
             {
                 if (!host.Running && preferences.ResumeOnLaunch && admin.Snapshot().Enabled) await Connect(true);

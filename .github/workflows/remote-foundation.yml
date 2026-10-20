@@ -70,7 +70,7 @@ jobs:
           $destination = Join-Path $env:RUNNER_TEMP 'SentinelRemote-install-check'
           $installer = Get-Item 'desktop-installer/SentinelRemote-0.2.0-Windows-Setup.exe'
           $installed = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -WindowStyle Hidden -Wait -PassThru
-          if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe")) { throw 'Installer verification failed' }
+          if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe") -or !(Test-Path -LiteralPath "$destination/worker/SentinelRelay.RemoteInput.exe")) { throw 'Installer verification failed' }
           # Exercise the installed executable's real startup/token path too.
           $preview = Join-Path $env:RUNNER_TEMP 'SentinelRemote-installed-preview'
           $opened = Start-Process -FilePath "$destination/SentinelRemote.exe" -ArgumentList '--smoke-test', $preview -WindowStyle Hidden -Wait -PassThru
