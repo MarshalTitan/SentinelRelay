@@ -15,6 +15,14 @@ No PowerShell or additional Relay DLL update is required by this integration. Cl
 
 The preview APK uses CI debug signing for supervised testing. Its signing key is not yet stable across rebuilds; do not promise seamless preview updates. The original Android app uses its existing separate identity and is unaffected.
 
+## Startup result (Windows 0.2.1)
+
+If Start briefly enables and then stops, finish the attempt before opening the PC window. Click **Copy gamepad result** in the PC's Phone gamepad section and paste it into the setup conversation. It includes only app version, Windows version, phase, allowlisted outcome code and accepted-frame count; no credentials, addresses, character IDs or raw backend messages.
+
+Opening the PC window while input is still active intentionally triggers the foreground veto. Do not press Stop or Allow again before copying a failed attempt, since that records a new local action.
+
+This PC-only update works with Android Preview 0.2.0. Keep the phone app installed and paired. The PC host restart clears manual permission, so click Prepare and Allow once after updating. The update diagnoses startup and validates the host's child-process/pipe path; it does not claim the reported real-PC startup failure is resolved until retested.
+
 ## Transport and release
 
 The authenticated private Serve boundary remains unchanged. A single WebSocket accepts one strict hello and then responds to server-issued challenges at at most 20 states/sec. Each text frame is at most 512 bytes, must match the current positive sequence/random challenge, and must arrive within 250 ms measured on the host's monotonic clock. There is no input push queue or automatic retry. HTTP rescue/status rate limits remain 120 requests/minute.

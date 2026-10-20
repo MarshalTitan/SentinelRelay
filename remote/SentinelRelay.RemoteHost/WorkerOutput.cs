@@ -8,6 +8,7 @@ namespace SentinelRelay.RemoteHost;
 public sealed class WorkerOutput : IManualOutput
 {
     private readonly Process process;
+    internal int ProcessId => process.Id;
     private long sequence;
     private bool sent, disposed;
     private WorkerOutput(Process process) { this.process = process; }
@@ -21,27 +22,44 @@ public sealed class WorkerOutput : IManualOutput
             WorkingDirectory = AppContext.BaseDirectory,
         };
         info.ArgumentList.Add("--worker"); info.ArgumentList.Add(backend);
-        var process = Process.Start(info) ?? throw new IOException("input_worker_unavailable");
+        return await StartProcess(info);
+    }
+    internal static async Task<WorkerOutput> StartProcess(ProcessStartInfo info)
+    {
+        info.UseShellExecute = false; info.CreateNoWindow = true;
+        info.RedirectStandardInput = info.RedirectStandardOutput = info.RedirectStandardError = true;
+        Process process;
+        try { process = Process.Start(info) ?? throw new InputBackendException("input_worker_unavailable"); }
+        catch { throw new InputBackendException("input_worker_unavailable"); }
         try
         {
             _ = process.StandardError.ReadToEndAsync();
-            var line = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            if (line is null || line.Length > 1024) throw new IOException();
+            var line = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(8));
+            if (line is null || line.Length > 1024) throw new InputBackendException("input_worker_reply_invalid");
             using var ready = JsonDocument.Parse(line);
             if (!ready.RootElement.TryGetProperty("ready", out var value) || value.ValueKind != JsonValueKind.True)
-                throw new IOException("input_backend_unavailable");
+            {
+                var code = ready.RootElement.TryGetProperty("code", out var reason) && reason.ValueKind == JsonValueKind.String
+                    ? reason.GetString() : null;
+                throw new InputBackendException(code ?? "input_backend_unavailable");
+            }
             _ = process.StandardOutput.ReadToEndAsync();
-            return new WorkerOutput(process);
+            var output = new WorkerOutput(process);
+            output.Write(ControllerFrame.Neutral); // Start with a fresh neutral packet, as in the native proof.
+            return output;
         }
-        catch
+        catch (Exception error)
         {
             try { process.StandardInput.Close(); process.Kill(); } catch { }
-            process.Dispose(); throw;
+            process.Dispose();
+            if (error is TimeoutException) throw new InputBackendException("input_worker_timeout");
+            if (error is InputBackendException) throw;
+            throw new InputBackendException("input_worker_reply_invalid");
         }
     }
     public void Send(ControllerFrame frame)
     {
-        if (disposed || process.HasExited) throw new IOException("input_worker_stopped");
+        if (disposed || process.HasExited) throw new InputBackendException("input_worker_stopped");
         sent = true;
         Write(frame);
     }
@@ -53,7 +71,7 @@ public sealed class WorkerOutput : IManualOutput
             WorkerWire.Write(process.StandardInput.BaseStream, WorkerPacket.Create(++sequence, frame), deadline.Token)
                 .WaitAsync(TimeSpan.FromMilliseconds(120)).GetAwaiter().GetResult();
         }
-        catch { Dispose(); throw new IOException("input_worker_stopped"); }
+        catch { Dispose(); throw new InputBackendException("input_worker_stopped"); }
     }
     public void Neutralize()
     {

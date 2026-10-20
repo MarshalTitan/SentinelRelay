@@ -97,6 +97,16 @@ public sealed class MainForm : Form
             host.PermitInput(phone.Id, true);
             status.Text = "Gamepad allowed for " + phone.Label + " until this host restarts or you stop gamepad access.";
             return Task.CompletedTask;
+        }), Work("Copy gamepad result", () =>
+        {
+            var result = host.Input?.Diagnostic;
+            Clipboard.SetText("Sentinel Remote gamepad 0.2.1" + Environment.NewLine +
+                "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
+                "Phase: " + (result?.Phase ?? "host_not_connected") + Environment.NewLine +
+                "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
+                "Accepted frames: " + (result?.AcceptedFrames ?? 0));
+            status.Text = "Gamepad result copied. Paste it into the setup conversation.";
+            return Task.CompletedTask;
         })));
         Add(page, TextLabel("The signed controller component downloads from its official author. Install the official USBip x64 driver separately if Gamepad Check has not already passed on this PC."));
         Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));

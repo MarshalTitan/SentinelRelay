@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SentinelRelay.Remote;
 using SentinelRelay.RemoteHost;
 
+if (args is ["--test-input-child", var mode]) return await WorkerStartupTests.Child(mode);
 var count = 0;
 void Check(bool condition, string name)
 {
@@ -169,7 +170,9 @@ await DesktopSetupTests.Run(Check);
 StatusWireTests.Run(Check);
 ControllerLeaseTests.Run(Check);
 await ManualInputTests.Run(Check);
+await WorkerStartupTests.Run(Check);
 Console.WriteLine($"{count} remote foundation checks passed.");
+return 0;
 
 sealed class TestClock : TimeProvider
 {

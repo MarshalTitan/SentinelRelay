@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using SentinelRelay.Remote;
 using SentinelRelay.RemoteHost;
+using SentinelRelay.RemoteInput;
 
 static class ManualInputTests
 {
@@ -42,9 +43,14 @@ static class ManualInputTests
         var oldOwner = authority.InputOwner(session, slot.InstanceId)!;
         session = Session(device);
         check(!authority.InputAllowed(oldOwner), "input reconnect invalidates old session owner");
+        check(ManualTarget.ExplainProcess(binding, [], binding.ProcessId) == "target_no_game", "diagnostic distinguishes no game");
+        check(ManualTarget.ExplainProcess(binding, [seen], 0) == "target_foreground", "diagnostic distinguishes foreground loss");
+        check(ManualTarget.ExplainProcess(binding, [seen, seen], binding.ProcessId) == "target_extra_game", "diagnostic distinguishes extra game");
         var output = new FakeOutput(); var target = new FakeTarget();
+        string? startupFailure = null;
         using var input = new ManualInput(authority, _ => Task.FromResult<IManualTarget>(target),
-            () => Task.FromResult<IManualOutput>(output = new FakeOutput()));
+            () => startupFailure is null ? Task.FromResult<IManualOutput>(output = new FakeOutput()) :
+                Task.FromException<IManualOutput>(new InputBackendException(startupFailure)));
         var poll = new InputPoll(1, 1, Protocol.Secret());
         InputFrame Frame(InputPoll p) => new(1, p.Sequence, p.Challenge, .5, -.5, .25, -.25, .75, .25, 0x1201);
         check(ManualInput.Accept(Frame(poll), poll, TimeSpan.FromMilliseconds(249)), "input accepts fresh bounded complete state");
@@ -94,6 +100,7 @@ static class ManualInputTests
         }
         using (var denied = await Connect(session))
             check(await Read(denied) is null, "websocket rescue grant alone does not allow gamepad");
+        check(input.Diagnostic.Code == "manual_not_permitted", "missing local manual permission has a stable startup diagnostic");
         input.Permit(device.DeviceId, true);
         using (var good = await Connect(session))
         {
@@ -143,6 +150,15 @@ static class ManualInputTests
             check(output.Disposed && output.Last == ControllerFrame.Neutral, "target second-client/focus/identity veto neutralizes held output");
         }
         await Wait(() => !input.Active); target.Valid = true;
+        startupFailure = "backend_attach_failed";
+        using (var failed = await Connect(session)) check(await Read(failed) is null, "backend startup failure closes phone connection");
+        check(input.Diagnostic.Code == "backend_attach_failed", "backend attach failure survives cleanup in the PC diagnostic");
+        startupFailure = "private_arbitrary_backend_text";
+        using (var failed = await Connect(session)) check(await Read(failed) is null, "unknown backend failure closes phone connection");
+        check(input.Diagnostic.Code == "input_backend_unavailable" &&
+            !JsonSerializer.Serialize(input.Diagnostic).Contains("private_arbitrary_backend_text"),
+            "diagnostic excludes arbitrary backend details");
+        startupFailure = null;
         using (var revoked = await Connect(session))
         {
             var p = (await Read(revoked))!; await Send(revoked, Frame(p)); await Read(revoked);
