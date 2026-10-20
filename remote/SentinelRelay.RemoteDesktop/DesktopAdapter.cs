@@ -33,7 +33,15 @@ public sealed class DesktopAdapter : IDesktopAdapter
             using var original = new Bitmap(area.Width, area.Height, PixelFormat.Format24bppRgb);
             using (var graphics = Graphics.FromImage(original))
             {
-                graphics.CopyFromScreen(area.Location, Point.Empty, area.Size, CopyPixelOperation.SourceCopy | CopyPixelOperation.CaptureBlt);
+                var screen = GetDC(0);
+                if (screen == 0) throw new DesktopAccessException("desktop_capture_failed");
+                var target = graphics.GetHdc();
+                try
+                {
+                    if (!BitBlt(target, 0, 0, area.Width, area.Height, screen, area.X, area.Y, 0x40CC0020 /* SRCCOPY | CAPTUREBLT */))
+                        throw new DesktopAccessException("desktop_capture_failed");
+                }
+                finally { graphics.ReleaseHdc(target); ReleaseDC(0, screen); }
                 var cursor = Cursor.Position;
                 if (area.Contains(cursor))
                     Cursors.Default.Draw(graphics, new Rectangle(cursor.X - area.X, cursor.Y - area.Y, 24, 24));
@@ -109,6 +117,10 @@ public sealed class DesktopAdapter : IDesktopAdapter
     { public int X, Y; public uint Data, Flags, Time; public nuint Extra; }
     [StructLayout(LayoutKind.Sequential)] private struct KeyboardInput
     { public ushort VirtualKey, Scan; public uint Flags, Time; public nuint Extra; }
+    [DllImport("user32.dll")] private static extern nint GetDC(nint window);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(nint window, nint dc);
+    [DllImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BitBlt(nint target, int x, int y, int width, int height, nint source, int sourceX, int sourceY, uint operation);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] private static extern uint SendInput(uint count, Input[] inputs, int size);
 }

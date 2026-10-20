@@ -25,6 +25,7 @@ internal static class DesktopSmoke
             pair.Show();
             Application.DoEvents();
             Capture(pair, Path.Combine(output, "pairing.png"), new Size(650, 330));
+            DesktopNativeSmoke.Run(output);
             return 0;
         }
         finally
