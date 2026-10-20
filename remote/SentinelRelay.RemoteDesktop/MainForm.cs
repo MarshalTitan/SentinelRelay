@@ -146,6 +146,8 @@ public sealed class MainForm : Form
         })));
         Add(options, TextLabel("Windows must stay awake and unlocked. Monitor-off rendering depends on the PC's display hardware."));
         Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));
+        emergency = new Button { Text = "Disable all remote access", AutoSize = true, BackColor = Color.FromArgb(176, 42, 65), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Padding = new Padding(8) };
+        emergency.Click += async (_, _) => await Disable();
         // Keep emergency access reachable even on short laptop displays and while the page scrolls.
         var safetyBar = new FlowLayoutPanel
         {
