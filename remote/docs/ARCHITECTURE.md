@@ -1,5 +1,13 @@
 # Sentinel Remote architecture and feasibility audit
 
+## Remembered setup — 0.4.0 candidate
+
+The user chose to retain Tailscale and simplify the installed apps. A visible local full-PC trust approval now persists per control phone across host restarts; it covers desktop, gamepad and configured launcher recovery. Old devices and ordinary/view-only invitations default to untrusted. Trusted enrollment can precede game enrollment; a subsequent explicit local character approval extends trusted phones only. Pairing uses one versioned setup code, retaining the same short-lived one-use secret and private origin checks.
+
+The WinForms app restores only saved, non-revoked control-phone approvals while enabled, automatically prepares the pinned controller backend, and preserves exact Tailscale owner/host matching on automatic resume. Pause removes saved trust and outstanding trusted invitations; Revoke removes trust and the credential; Disable closes the host and persists disabled state. Active native leases never resume automatically. The signed driver remains a one-time system prerequisite.
+
+Android remembers the selected PC, safely renews read-only sessions, discovers game readiness within Desktop, and resumes view after foregrounding. Manual actions and gamepad acquisition are never retried/replayed. Existing native freshness/watchdogs and HTTP/private Serve boundaries are unchanged. See [current setup and acceptance](DESKTOP_MIRROR.md). The prior 0.3.0 memory-only permission statements below are historical and superseded by this explicit local persistent approval.
+
 ## Desktop recovery scope — user clarification, 2026-10-20 UTC
 
 The user explicitly requested full desktop mirroring and manual touch/keyboard control to open ordinary apps/files, operate XIVLauncher, click Log In and select a character. Once logged in, the same view combines with a small joystick/button panel for rescue and target/menu selection, not general gameplay. This supersedes the historical game-window-only and no-desktop-input scope below. Desktop access is a separate, default-off local per-phone permission; it does not depend on FFXIV, Dalamud or a character heartbeat.

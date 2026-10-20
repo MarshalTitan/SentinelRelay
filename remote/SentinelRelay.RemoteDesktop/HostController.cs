@@ -17,7 +17,37 @@ public sealed class HostController : IAsyncDisposable
     private string? backend;
     public DesktopStream? Desktop { get; private set; }
     public RecoveryActions Recovery { get; } = new();
-    public async Task PrepareInput() { backend = await BackendPackage.Prepare(); }
+    private Task? preparation;
+    private readonly HashSet<string> trusted = [];
+    public int TrustedPhoneCount => trusted.Count;
+    public string PreparationStatus { get; private set; } = "Controller support will prepare when a phone is trusted.";
+    public Task PrepareInput() => preparation is { IsCompleted: false } ? preparation : preparation = PrepareBackend();
+    private async Task PrepareBackend()
+    {
+        PreparationStatus = "Preparing controller support...";
+        try { backend = await BackendPackage.Prepare(); PreparationStatus = "Controller support ready."; }
+        catch { PreparationStatus = "Controller setup needs attention. Open More options and retry."; throw; }
+    }
+    private async Task PrepareAutomatically()
+    {
+        try { await PrepareInput(); } catch { /* Show a stable local status; desktop access remains usable. */ }
+    }
+    public void SyncTrustedPhones(LocalHostSnapshot snapshot)
+    {
+        if (Input is null || Desktop is null) return;
+        var wanted = snapshot.Enabled
+            ? snapshot.Devices.Where(d => d.Trusted && d.Control && !d.Revoked).Select(d => d.Id).ToHashSet()
+            : new HashSet<string>();
+        foreach (var id in trusted.Except(wanted).ToArray())
+        {
+            Input.Permit(id, false); Desktop.Permit(id, false); Recovery.Permit(id, false); trusted.Remove(id);
+        }
+        foreach (var id in wanted.Except(trusted).ToArray())
+        {
+            Input.Permit(id, true); Desktop.Permit(id, true); Recovery.Permit(id, true); trusted.Add(id);
+        }
+        if (wanted.Count > 0 && backend is null && preparation is null) _ = PrepareAutomatically();
+    }
     public void PermitInput(string device, bool enabled)
     {
         if (Input is null || backend is null) throw new SetupException("Connect securely and prepare gamepad support first.");
@@ -42,6 +72,7 @@ public sealed class HostController : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
+        trusted.Clear();
         Desktop?.Dispose(); Desktop = null;
         Recovery.Clear();
         Input?.Dispose(); Input = null;

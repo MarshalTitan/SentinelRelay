@@ -14,7 +14,7 @@ public sealed class MainForm : Form
     private readonly NotifyIcon tray;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 8000 };
     private readonly System.Windows.Forms.Timer inputTimer = new() { Interval = 200 };
-    private readonly Label inputStatus = TextLabel("Phone gamepad: off until allowed locally", 10, FontStyle.Bold);
+    private readonly Label inputStatus = TextLabel("No phone session active", 10, FontStyle.Bold);
     private readonly Label status = TextLabel("Set up your private phone connection.", 11);
     private readonly TextBox address = new() { ReadOnly = true, Dock = DockStyle.Fill };
     private readonly ListBox games = new() { Dock = DockStyle.Fill, Height = 95, DisplayMember = "" };
@@ -22,7 +22,8 @@ public sealed class MainForm : Form
     private readonly ListBox devices = new() { Dock = DockStyle.Fill, Height = 70 };
     private readonly CheckBox startup = new() { Text = "Start with Windows", AutoSize = true };
     private readonly TextBox phoneName = new() { Text = "My phone", Width = 200, MaxLength = 64 };
-    private readonly CheckBox control = new() { Text = "Allow rescue controls", Checked = true, AutoSize = true };
+    private readonly CheckBox control = new() { Text = "Allow game rescue controls", Checked = true, AutoSize = true };
+    private readonly CheckBox trust = new() { Text = "Trust this phone for desktop, gamepad and launcher access; remember after restart", Checked = true, AutoSize = true };
     private readonly List<Button> workButtons = [];
     private readonly Button emergency;
     private TailnetIdentity? identity;
@@ -68,76 +69,71 @@ public sealed class MainForm : Form
         };
         Add(page, startup);
 
-        Add(page, TextLabel("2  Select your game", 13, FontStyle.Bold));
-        Add(page, TextLabel("In Relay's General page, click Enable all mobile features once for each character. Log in, then refresh here."));
+        Add(page, TextLabel("2  Pair your phone once", 13, FontStyle.Bold));
+        Add(page, TextLabel("Keep Tailscale signed in on both devices. A trusted phone can see and control this PC's ordinary desktop and use the rescue gamepad. Approval is saved until you pause or revoke it."));
+        Add(page, Row(new Label { Text = "Phone name", AutoSize = true, Padding = new Padding(0, 6, 4, 0) }, phoneName,
+            Work("Pair a phone", PairPhone)));
+        Add(page, trust);
+        Add(page, control);
+        trust.CheckedChanged += (_, _) => { if (trust.Checked) control.Checked = true; };
+        control.CheckedChanged += (_, _) => { if (!control.Checked) trust.Checked = false; };
+        Add(page, TextLabel("On the phone, choose Pair a PC and paste the single setup code. After pairing, open Desktop. There is no separate Sentinel account to create."));
+        Add(page, TextLabel("Your phones", 13, FontStyle.Bold));
+        Add(page, devices);
+        Add(page, Row(Work("Trust selected phone", () =>
+        {
+            if (devices.SelectedItem is not DeviceRow phone || !phone.Control)
+                throw new SetupException("Select a paired phone with game rescue control permission first.");
+            admin.TrustPhone(phone.Id, true);
+            Populate(admin.Snapshot());
+            status.Text = "Trusted " + phone.Label + ". Desktop, gamepad and launcher access will be remembered.";
+            return Task.CompletedTask;
+        }), Work("Revoke selected phone", Revoke)));
+
+        Add(page, TextLabel("3  Approve your character once (for game controls)", 13, FontStyle.Bold));
+        Add(page, TextLabel("Desktop works before FFXIV opens. To add game controls, log in and click Enable all mobile features in Relay's General page once, then connect the character below. Its identity is remembered after game restarts."));
         Add(page, games);
         Add(page, Row(Work("Refresh games", RefreshGames), Work("Connect selected character", ConnectGame)));
-        Add(page, TextLabel("Approved characters - check the ones this phone may access"));
+        Add(page, TextLabel("Characters included in new phone invitations"));
         Add(page, grants);
+        Add(page, TextLabel("Trusted phones receive characters you explicitly approve here. View/rescue-only phones keep their original character grants."));
 
-        Add(page, TextLabel("3  Pair your phone", 13, FontStyle.Bold));
-        Add(page, Row(new Label { Text = "Phone name", AutoSize = true, Padding = new Padding(0, 6, 4, 0) }, phoneName, control,
-            Work("Show pairing invitation", PairPhone)));
-        Add(page, TextLabel("Open Sentinel Remote on Android, choose Pair a PC, and enter the address and invitation shown here."));
-
-        Add(page, TextLabel("Paired phones", 13, FontStyle.Bold));
-        Add(page, devices);
-        emergency = new Button { Text = "Disable all remote access", AutoSize = true, BackColor = Color.FromArgb(176, 42, 65), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Padding = new Padding(8) };
-        emergency.Click += async (_, _) => await Disable();
-        Add(page, Row(Work("Revoke selected phone", Revoke)));
-        Add(page, TextLabel("Phone gamepad", 13, FontStyle.Bold));
-        Add(page, TextLabel("Keep exactly one FFXIV client running with other games closed. Minimized/background play is allowed; enable FFXIV's inactive-client gamepad setting. Windows must stay awake and unlocked; the monitor can be off. Gamepad permission is separate from rescue controls and resets when this host restarts."));
-        Add(page, Row(Work("Prepare gamepad support", async () =>
+        var options = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 1, Visible = false };
+        options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var more = new Button { Text = "More options", AutoSize = true };
+        more.Click += (_, _) => { options.Visible = !options.Visible; more.Text = options.Visible ? "Hide more options" : "More options"; };
+        Add(page, more);
+        Add(page, options);
+        Add(options, TextLabel("Controller support", 13, FontStyle.Bold));
+        Add(options, TextLabel("Controller support prepares automatically for trusted phones. Keep exactly one FFXIV client running and enable FFXIV's inactive-client gamepad setting for minimized input. The signed USBip x64 driver is a one-time prerequisite if Gamepad Check has not passed on this PC."));
+        Add(options, Row(Work("Retry controller setup", async () =>
         {
             if (!host.Running) throw new SetupException("Click Connect securely first.");
             await host.PrepareInput();
-            status.Text = "Gamepad component verified. Select a paired phone, then allow gamepad control.";
-        }), Work("Allow selected phone gamepad", () =>
-        {
-            if (devices.SelectedItem is not DeviceRow phone || !phone.Control)
-                throw new SetupException("Select a paired phone with rescue control permission first.");
-            host.PermitInput(phone.Id, true);
-            status.Text = "Gamepad allowed for " + phone.Label + " until this host restarts or you stop gamepad access.";
-            return Task.CompletedTask;
+            status.Text = "Controller support ready.";
         }), Work("Copy gamepad result", () =>
         {
             var result = host.Input?.Diagnostic;
-            Clipboard.SetText("Sentinel Remote gamepad 0.3.0" + Environment.NewLine +
+            Clipboard.SetText("Sentinel Remote gamepad 0.4.0" + Environment.NewLine +
                 "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
                 "Phase: " + (result?.Phase ?? "host_not_connected") + Environment.NewLine +
                 "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
                 "Accepted frames: " + (result?.AcceptedFrames ?? 0));
-            status.Text = "Gamepad result copied. Paste it into the setup conversation.";
-            return Task.CompletedTask;
-        })));
-        Add(page, TextLabel("The signed controller component downloads from its official author. Install the official USBip x64 driver separately if Gamepad Check has not already passed on this PC."));
-        Add(page, TextLabel("Desktop access", 13, FontStyle.Bold));
-        Add(page, TextLabel("Share the primary monitor with the selected phone. Desktop access lets it see and operate ordinary apps and files, including XIVLauncher and login screens. This separate permission resets when this host restarts."));
-        Add(page, Row(Work("Allow selected phone desktop", () =>
-        {
-            if (host.Desktop is null || devices.SelectedItem is not DeviceRow phone || !phone.Control)
-                throw new SetupException("Connect securely and select a paired phone with control permission first.");
-            host.Desktop.Permit(phone.Id, true);
-            status.Text = "Desktop view and touch/keyboard control allowed for " + phone.Label + ".";
-            return Task.CompletedTask;
-        }), Work("Stop desktop access", () =>
-        {
-            host.Desktop?.Stop();
-            status.Text = "Desktop access stopped; local permission cleared.";
+            status.Text = "Gamepad result copied.";
             return Task.CompletedTask;
         }), Work("Copy desktop result", () =>
         {
             var result = host.Desktop?.Diagnostic;
-            Clipboard.SetText("Sentinel Remote desktop 0.3.0" + Environment.NewLine +
+            Clipboard.SetText("Sentinel Remote desktop 0.4.0" + Environment.NewLine +
                 "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
                 "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
                 "Frames: " + (result?.Frames ?? 0) + Environment.NewLine + "Inputs: " + (result?.Inputs ?? 0));
             status.Text = "Desktop result copied.";
             return Task.CompletedTask;
         })));
-        Add(page, TextLabel("Launcher and window recovery", 13, FontStyle.Bold));
-        Add(page, TextLabel("Select XIVLauncher.exe once on this PC. Opening the launcher works with FFXIV closed. Each phone needs separate local recovery permission, which resets when this host restarts. Use the phone's Desktop view to click through the launcher and character selection."));
-        Add(page, Row(Work("Choose XIVLauncher", () =>
+        Add(options, TextLabel("Optional launcher shortcut", 13, FontStyle.Bold));
+        Add(options, TextLabel("You can open XIVLauncher through Desktop. Choose it here once only if you also want the phone's Open XIVLauncher shortcut."));
+        Add(options, Row(Work("Choose XIVLauncher", () =>
         {
             using var choose = new OpenFileDialog { Title = "Select your installed XIVLauncher.exe", Filter = "XIVLauncher|XIVLauncher.exe", CheckFileExists = true };
             if (choose.ShowDialog(this) != DialogResult.OK) return Task.CompletedTask;
@@ -145,16 +141,10 @@ public sealed class MainForm : Form
             preferences = preferences with { LauncherPath = selected.Path, LauncherHash = selected.Hash };
             preferences.Save(directory);
             host.Recovery.Configure(selected);
-            status.Text = "XIVLauncher selected. Select a paired phone and allow recovery.";
-            return Task.CompletedTask;
-        }), Work("Allow selected phone recovery", () =>
-        {
-            if (!host.Running || devices.SelectedItem is not DeviceRow phone || !phone.Control)
-                throw new SetupException("Connect securely and select a paired phone with control permission first.");
-            host.Recovery.Permit(phone.Id, true);
-            status.Text = "Launcher and window recovery allowed for " + phone.Label + " until this host restarts.";
+            status.Text = "XIVLauncher shortcut saved.";
             return Task.CompletedTask;
         })));
+        Add(options, TextLabel("Windows must stay awake and unlocked. Monitor-off rendering depends on the PC's display hardware."));
         Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));
         // Keep emergency access reachable even on short laptop displays and while the page scrolls.
         var safetyBar = new FlowLayoutPanel
@@ -162,8 +152,8 @@ public sealed class MainForm : Form
             Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true,
             Padding = new Padding(16, 6, 16, 6), BackColor = Color.White,
         };
-        var stopInput = new Button { Text = "Stop phone gamepad", AutoSize = true, Padding = new Padding(6) };
-        stopInput.Click += (_, _) => host.Input?.Stop();
+        var stopInput = new Button { Text = "Pause desktop + gamepad", AutoSize = true, Padding = new Padding(6) };
+        stopInput.Click += async (_, _) => await PausePhones();
         safetyBar.Controls.Add(emergency);
         safetyBar.Controls.Add(stopInput);
         safetyBar.Controls.Add(inputStatus);
@@ -173,7 +163,7 @@ public sealed class MainForm : Form
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open Sentinel Remote", null, (_, _) => Restore());
         menu.Items.Add("Disable all remote access", null, async (_, _) => await Disable());
-        menu.Items.Add("Stop phone gamepad", null, (_, _) => host.Input?.Stop());
+        menu.Items.Add("Pause desktop + gamepad", null, async (_, _) => await PausePhones());
         menu.Items.Add("Exit", null, async (_, _) => await Exit());
         tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "Sentinel Remote", ContextMenuStrip = menu, Visible = !smoke };
         tray.DoubleClick += (_, _) => Restore();
@@ -203,8 +193,10 @@ public sealed class MainForm : Form
         };
         inputTimer.Tick += (_, _) =>
         {
-            inputStatus.Text = host.Desktop?.Active == true ? "PHONE DESKTOP ACTIVE" : host.Input?.Status ?? "Phone gamepad: off";
-            inputStatus.ForeColor = host.Input?.Active == true ? Color.FromArgb(176, 42, 65) : ForeColor;
+            inputStatus.Text = host.Desktop?.Active == true ? "PHONE DESKTOP ACTIVE" :
+                host.Input?.Active == true ? host.Input.Status : !host.Running ? "Remote access off" :
+                host.TrustedPhoneCount == 0 ? "No trusted phones; approve one above" : host.PreparationStatus;
+            inputStatus.ForeColor = host.Desktop?.Active == true || host.Input?.Active == true ? Color.FromArgb(176, 42, 65) : ForeColor;
             tray.Text = host.Desktop?.Active == true ? "Sentinel Remote - PHONE DESKTOP ACTIVE" : host.Input?.Diagnostic.Phase == "active" ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" :
                 host.Input?.Active == true ? "Sentinel Remote - starting gamepad" : "Sentinel Remote";
         };
@@ -215,6 +207,7 @@ public sealed class MainForm : Form
     internal void ScrollToGamepadPreview()
     {
         var scroll = Controls.OfType<Panel>().First(p => p.AutoScroll);
+        foreach (var option in scroll.Controls.OfType<TableLayoutPanel>().SelectMany(p => p.Controls.OfType<TableLayoutPanel>())) option.Visible = true;
         scroll.AutoScrollPosition = new Point(0, scroll.VerticalScroll.Maximum);
         PerformLayout();
     }
@@ -363,6 +356,7 @@ public sealed class MainForm : Form
     }
     private void Populate(LocalHostSnapshot snapshot)
     {
+        host.SyncTrustedPhones(snapshot);
         var selected = grants.CheckedItems.Cast<Slot>().Select(s => s.Id).ToHashSet();
         var known = grants.Items.Cast<Slot>().Select(s => s.Id).ToHashSet();
         grants.BeginUpdate(); grants.Items.Clear();
@@ -378,10 +372,11 @@ public sealed class MainForm : Form
         var deviceId = (devices.SelectedItem as DeviceRow)?.Id;
         devices.BeginUpdate(); devices.Items.Clear();
         foreach (var device in snapshot.Devices.Where(d => !d.Revoked))
-            devices.Items.Add(new DeviceRow(device.Id, device.Label, device.Control));
+            devices.Items.Add(new DeviceRow(device.Id, device.Label, device.Control, device.Trusted));
         if (deviceId is not null)
             for (int i = 0; i < devices.Items.Count; i++)
                 if (((DeviceRow)devices.Items[i]).Id == deviceId) devices.SelectedIndex = i;
+        if (devices.SelectedIndex < 0 && devices.Items.Count > 0) devices.SelectedIndex = 0;
         devices.EndUpdate();
     }
     private Task PairPhone()
@@ -389,8 +384,8 @@ public sealed class MainForm : Form
         if (!host.Running || identity is null || !admin.Snapshot().Enabled)
             throw new SetupException("Click Connect securely before pairing a phone.");
         var ids = grants.CheckedItems.Cast<Slot>().Select(s => s.Id).ToArray();
-        if (ids.Length == 0) throw new SetupException("Check at least one approved character for this phone.");
-        var invitation = admin.Invite(phoneName.Text.Trim(), ids, control.Checked);
+        if (ids.Length == 0 && !trust.Checked) throw new SetupException("Approve a character or choose trusted desktop access before pairing.");
+        var invitation = admin.Invite(phoneName.Text.Trim(), ids, control.Checked, trust.Checked);
         using var dialog = new PairingForm(identity.Url, invitation);
         dialog.ShowDialog(this);
         Populate(admin.Snapshot());
@@ -406,6 +401,17 @@ public sealed class MainForm : Form
         Populate(admin.Snapshot());
         status.Text = "Phone access revoked.";
         return Task.CompletedTask;
+    }
+    private async Task PausePhones()
+    {
+        accessGeneration++;
+        try { admin.PauseTrustedPhones(); }
+        catch { await Disable(); return; }
+        host.Input?.Stop();
+        host.Desktop?.Stop();
+        host.Recovery.Clear();
+        Populate(admin.Snapshot());
+        status.Text = "Desktop, gamepad and launcher access paused and saved. Select a phone and Trust selected phone to allow them again.";
     }
     private async Task Disable()
     {
@@ -452,8 +458,8 @@ public sealed class MainForm : Form
         base.Dispose(disposing);
     }
     private sealed record Slot(string Id, string Label) { public override string ToString() => Label; }
-    private sealed record DeviceRow(string Id, string Label, bool Control)
+    private sealed record DeviceRow(string Id, string Label, bool Control, bool Trusted)
     {
-        public override string ToString() => Label + (Control ? " - status, screenshots, rescue controls" : " - view only");
+        public override string ToString() => Label + (Trusted ? " - trusted for desktop and gamepad" : Control ? " - game rescue only; desktop not trusted" : " - view only");
     }
 }

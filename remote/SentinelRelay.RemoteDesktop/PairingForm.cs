@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace SentinelRelay.RemoteDesktop;
 
 public sealed class PairingForm : Form
@@ -16,11 +18,11 @@ public sealed class PairingForm : Form
         Font = new Font("Segoe UI", 10);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 7 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.Controls.Add(new Label { Text = "On Android: Sentinel Remote > Pair a PC", AutoSize = true }, 0, 0);
+        layout.Controls.Add(new Label { Text = "On your phone: Sentinel Remote > Pair a PC. Paste the setup code below.", AutoSize = true }, 0, 0);
         layout.Controls.Add(new Label { Text = "Server URL", AutoSize = true }, 0, 1);
         layout.Controls.Add(new TextBox { Text = url, ReadOnly = true, Dock = DockStyle.Fill }, 0, 2);
-        layout.Controls.Add(new Label { Text = "One-time invitation - keep private", AutoSize = true }, 0, 3);
-        invitationBox = new TextBox { Text = invitation, ReadOnly = true, Multiline = true, Height = 60, Dock = DockStyle.Fill };
+        layout.Controls.Add(new Label { Text = "Setup code - expires in two minutes; keep private", AutoSize = true }, 0, 3);
+        invitationBox = new TextBox { Text = "sentinel-remote:1:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(url + "\n" + invitation)).TrimEnd('=').Replace('+', '-').Replace('/', '_'), ReadOnly = true, Multiline = true, Height = 80, Dock = DockStyle.Fill };
         layout.Controls.Add(invitationBox, 0, 4);
         layout.Controls.Add(countdown, 0, 5);
         var close = new Button { Text = "Done", AutoSize = true, DialogResult = DialogResult.OK };
@@ -34,7 +36,7 @@ public sealed class PairingForm : Form
     private void UpdateCountdown()
     {
         var seconds = Math.Max(0, (int)(expires - DateTimeOffset.UtcNow).TotalSeconds);
-        countdown.Text = seconds > 0 ? "Expires in " + seconds + " seconds. PC label can be any name you prefer." : "Invitation expired. Close this window and create another.";
+        countdown.Text = seconds > 0 ? "Expires in " + seconds + " seconds. Pair once; the phone remembers this PC." : "Invitation expired. Close this window and create another.";
         if (seconds == 0) { invitationBox.Clear(); timer.Stop(); }
     }
     protected override void Dispose(bool disposing)

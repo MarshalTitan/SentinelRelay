@@ -1,5 +1,13 @@
 # Sentinel Remote implementation and acceptance plan
 
+## Remembered setup — 0.4.0 candidate
+
+The user chose to retain Tailscale and simplify the installed apps. A visible local full-PC trust approval now persists per control phone across host restarts; it covers desktop, gamepad and configured launcher recovery. Old devices and ordinary/view-only invitations default to untrusted. Trusted enrollment can precede game enrollment; a subsequent explicit local character approval extends trusted phones only. Pairing uses one versioned setup code, retaining the same short-lived one-use secret and private origin checks.
+
+The WinForms app restores only saved, non-revoked control-phone approvals while enabled, automatically prepares the pinned controller backend, and preserves exact Tailscale owner/host matching on automatic resume. Pause removes saved trust and outstanding trusted invitations; Revoke removes trust and the credential; Disable closes the host and persists disabled state. Active native leases never resume automatically. The signed driver remains a one-time system prerequisite.
+
+Android remembers the selected PC, safely renews read-only sessions, discovers game readiness within Desktop, and resumes view after foregrounding. Manual actions and gamepad acquisition are never retried/replayed. Existing native freshness/watchdogs and HTTP/private Serve boundaries are unchanged. See [current setup and acceptance](DESKTOP_MIRROR.md). The prior 0.3.0 memory-only permission statements below are historical and superseded by this explicit local persistent approval.
+
 ## Current desktop scope (0.3.0 candidate)
 
 The user clarified the intended product: mirror the Windows desktop on the phone; manually open apps/files, operate XIVLauncher and select the intended character; then combine that view with joysticks/buttons for occasional movement, target and menu recovery. This explicitly replaces the original game-window-only restriction. The primary-desktop view, touch/Unicode keyboard control and combined rescue gamepad are implemented in the 0.3.0 draft candidates. Desktop access has separate local per-phone permission and does not depend on a running game. See [desktop mirror setup and field gate](DESKTOP_MIRROR.md). Native PC/GPU/DPI/monitor-off behavior and the real login-to-game handoff remain acceptance checks, not claims inferred from protocol tests.

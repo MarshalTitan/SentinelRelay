@@ -51,7 +51,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (state.Devices.Count >= 32) return (new Reply(false, "device_limit"), true);
             var token = Protocol.Secret();
             var id = Guid.NewGuid().ToString("N");
-            state.Devices.Add(new(id, invitation.Label, Protocol.Hash(token), invitation.Instances, invitation.Control));
+            state.Devices.Add(new(id, invitation.Label, Protocol.Hash(token), invitation.Instances, invitation.Control, Trusted: invitation.Trusted && invitation.Control));
             Record("device_paired", id);
             return (new Reply(true, "paired", new DeviceCredential(id, token, state.HostId)), true);
         });

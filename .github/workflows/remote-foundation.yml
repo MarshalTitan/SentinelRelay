@@ -69,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           $destination = Join-Path $env:RUNNER_TEMP 'SentinelRemote-install-check'
-          $installer = Get-Item 'desktop-installer/SentinelRemote-0.3.0-Windows-Setup.exe'
+          $installer = Get-Item 'desktop-installer/SentinelRemote-0.4.0-Windows-Setup.exe'
           $installed = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -WindowStyle Hidden -Wait -PassThru
           if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe") -or !(Test-Path -LiteralPath "$destination/worker/SentinelRelay.RemoteInput.exe")) { throw 'Installer verification failed' }
           # Exercise the installed executable's real startup/token path too.
