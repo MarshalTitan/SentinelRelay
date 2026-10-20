@@ -133,8 +133,7 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
         {
             life.Cancel();
             if (watch is not null) try { await watch; } catch { }
-            lock (gate) { connection = null; activeDevice = null; }
-            exclusive.Release();
+            lock (gate) { connection = null; activeDevice = null; exclusive.Release(); }
             if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
             {
                 using var close = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));

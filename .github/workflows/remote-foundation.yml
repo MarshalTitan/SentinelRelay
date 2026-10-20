@@ -51,6 +51,7 @@ jobs:
           $deadline = [DateTime]::UtcNow.AddSeconds(30)
           while (!(Test-Path 'desktop-preview/pairing.png') -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
           if (!(Test-Path 'desktop-preview/pairing.png')) { throw 'Desktop preview missing after normal user launch' }
+          Get-Content -LiteralPath 'desktop-preview/desktop-native-result.txt'
       - name: Emit isolated UI previews for review
         shell: pwsh
         run: |
@@ -78,6 +79,7 @@ jobs:
           $deadline = [DateTime]::UtcNow.AddSeconds(30)
           while (!(Test-Path "$preview/pairing.png") -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
           if (!(Test-Path "$preview/pairing.png")) { throw 'Installed desktop did not render after launch' }
+          Get-Content -LiteralPath "$preview/desktop-native-result.txt"
           $uninstalled = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -WindowStyle Hidden -Wait -PassThru
           if ($uninstalled.ExitCode -ne 0) { throw 'Uninstall verification failed' }
       - name: Write installer checksums

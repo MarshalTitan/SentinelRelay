@@ -35,13 +35,14 @@ public sealed class DesktopAdapter : IDesktopAdapter
             {
                 var screen = GetDC(0);
                 if (screen == 0) throw new DesktopAccessException("desktop_capture_failed");
-                var target = graphics.GetHdc();
+                nint target = 0;
                 try
                 {
+                    target = graphics.GetHdc();
                     if (!BitBlt(target, 0, 0, area.Width, area.Height, screen, area.X, area.Y, 0x40CC0020 /* SRCCOPY | CAPTUREBLT */))
                         throw new DesktopAccessException("desktop_capture_failed");
                 }
-                finally { graphics.ReleaseHdc(target); ReleaseDC(0, screen); }
+                finally { if (target != 0) graphics.ReleaseHdc(target); ReleaseDC(0, screen); }
                 var cursor = Cursor.Position;
                 if (area.Contains(cursor))
                     Cursors.Default.Draw(graphics, new Rectangle(cursor.X - area.X, cursor.Y - area.Y, 24, 24));

@@ -1,5 +1,10 @@
 # Sentinel Remote implementation and acceptance plan
 
+## Current desktop scope (0.3.0 candidate)
+
+The user clarified the intended product: mirror the Windows desktop on the phone; manually open apps/files, operate XIVLauncher and select the intended character; then combine that view with joysticks/buttons for occasional movement, target and menu recovery. This explicitly replaces the original game-window-only restriction. The primary-desktop view, touch/Unicode keyboard control and combined rescue gamepad are implemented in the 0.3.0 draft candidates. Desktop access has separate local per-phone permission and does not depend on a running game. See [desktop mirror setup and field gate](DESKTOP_MIRROR.md). Native PC/GPU/DPI/monitor-off behavior and the real login-to-game handoff remain acceptance checks, not claims inferred from protocol tests.
+
+
 Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone A Android/bridge software are implemented as candidates. Milestone A has partial real-device evidence recorded in [Desktop setup](DESKTOP_SETUP.md); the full [consolidated checklist](MILESTONE_A.md) is still open. Skip + Keep Queue queue preservation is explicitly deferred because consecutive S Rank spawns are unavailable; it does not block independent development. The original staged work table below describes each gate, not a claim that every later phase is implemented.
 
 | Stage | Software work | Acceptance gate |
@@ -45,4 +50,4 @@ The first gamepad version is limited to exactly one running FFXIV client per PC,
 
 A separate authenticated locally permitted launcher action now opens a locally selected/hash-approved XIVLauncher without requiring FFXIV to be running. A saved-process window restore action is also implemented. Android Preview 0.2.1 exposes these buttons. The phone-to-PC connection is independent of an active gamepad lease.
 
-Still unimplemented: launcher/lobby view and interaction, pre-login/character-selection control, confirmed logout, streaming, Profiles IPC, incident collection/export, stable Android preview signing and iOS distribution. Missing bridge identity must not authorize unidentified lobby/game control. The intended workflow is phone PC access -> open XIVLauncher -> user authentication -> view/select intended character -> verified in-game control while minimized/monitor off. Do not call that complete until its full path is implemented and proven on devices.
+Now implemented as a candidate: manual desktop view and touch/keyboard interaction before FFXIV starts, including launcher/lobby/character-selection screens, plus the combined gamepad view. Still unimplemented: automatic state-aware login assistance, confirmed automatic logout, high-rate hardware video, Profiles IPC, incident collection/export, stable Android preview signing and iOS distribution. Missing bridge identity must not authorize unidentified lobby/game control. The intended workflow is phone desktop access -> manually open XIVLauncher or another app -> user authentication -> view/select intended character -> verified in-game rescue controls. Software for this manual workflow is in the 0.3.0 draft candidates; do not call it accepted until proven on devices.

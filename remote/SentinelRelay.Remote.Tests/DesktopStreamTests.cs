@@ -113,8 +113,11 @@ static class DesktopStreamTests
         }
         await WaitStopped();
         using (var socket = await Connect(token))
-            check((await Read(socket))?.GetProperty("code").GetString() == "desktop_not_permitted",
-                "local desktop Stop clears permission and prevents automatic reacquisition");
+        {
+            var code = (await Read(socket))?.GetProperty("code").GetString();
+            check(code == "desktop_not_permitted",
+                "local desktop Stop clears permission and prevents automatic reacquisition; observed " + (code ?? "closed"));
+        }
         desktop.Permit(phone.DeviceId, true);
         adapter.Block = true;
         using (var socket = await Connect(token))

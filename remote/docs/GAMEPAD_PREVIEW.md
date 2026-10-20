@@ -1,5 +1,8 @@
 # Phone gamepad preview
 
+**Current 0.3.0 desktop preview:** the user clarified full desktop mirroring and manual app/login/character-selection control, with the gamepad over the same view after login. Use [Desktop mirror setup](DESKTOP_MIRROR.md) for this candidate. The 0.2.x history below describes the earlier gamepad-only/restricted-launcher step and its remaining work at that time.
+
+
 This work follows the [Windows 10 native backend pass](GAMEPAD_CHECK_RESULT_2026-10-19.md). It is a supervised candidate, not production acceptance.
 
 ## Setup
