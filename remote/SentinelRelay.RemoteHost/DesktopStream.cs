@@ -76,7 +76,7 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
             });
             await Send(socket, new(true, "desktop_ready"), life.Token);
             long sequence = 0, lastFrame = 0;
-            string? frameId = null;
+            var frames = new Queue<(string Id, long Stamp)>();
             var rate = new Queue<long>();
             while (!life.IsCancellationRequested)
             {
@@ -96,12 +96,14 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
                     if (image.Width is < 1 or > 1280 || image.Height is < 1 or > 720 ||
                         image.JpegBase64.Length is < 1 or > 440000 || !Protocol.IsSecret(image.FrameId))
                         throw new InvalidDataException();
-                    frameId = image.FrameId; lastFrame = now;
+                    lastFrame = now;
+                    frames.Enqueue((image.FrameId, now));
+                    while (frames.Count > 3) frames.Dequeue();
                     reply = new(true, "desktop_frame", image);
                 }
                 else
                 {
-                    if (frameId is null || request.FrameId != frameId || Stopwatch.GetElapsedTime(lastFrame) >= TimeSpan.FromSeconds(2))
+                    if (!frames.Any(f => f.Id == request.FrameId && Stopwatch.GetElapsedTime(f.Stamp) < TimeSpan.FromSeconds(2)))
                     { await Send(socket, new(false, "desktop_stale_frame"), life.Token); return; }
                     reply = await Task.Run(() => adapter.Apply(request) ? new Reply(true, "desktop_applied") : new(false, "desktop_input_unavailable"), life.Token);
                 }
@@ -119,7 +121,13 @@ public sealed class DesktopStream(RemoteAuthority authority, IDesktopAdapter ada
             life.Cancel();
             if (watch is not null) try { await watch; } catch { }
             lock (gate) { connection = null; activeDevice = null; }
-            socket.Abort(); exclusive.Release();
+            exclusive.Release();
+            if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+            {
+                using var close = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+                try { await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", close.Token); } catch { }
+            }
+            socket.Abort();
         }
     }
     private static async Task Send(WebSocket socket, Reply reply, CancellationToken cancel)

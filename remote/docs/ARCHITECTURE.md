@@ -1,5 +1,16 @@
 # Sentinel Remote architecture and feasibility audit
 
+## Desktop recovery scope — user clarification, 2026-10-20 UTC
+
+The user explicitly requested full desktop mirroring and manual touch/keyboard control to open ordinary apps/files, operate XIVLauncher, click Log In and select a character. Once logged in, the same view combines with a small joystick/button panel for rescue and target/menu selection, not general gameplay. This supersedes the historical game-window-only and no-desktop-input scope below. Desktop access is a separate, default-off local per-phone permission; it does not depend on FFXIV, Dalamud or a character heartbeat.
+
+The 0.3.0 candidate mirrors the primary monitor at up to 3 FPS with bounded in-memory JPEG frames (1280×720, 320 KiB). Taps, double-taps, long-press right-click and bounded Unicode text/special keys let the user operate ordinary windows. No filesystem/command-shell API is added; opening other apps/files happens through the visible Windows UI. Credentials intentionally typed by the user are sent once, held transiently and never logged/persisted. Desktop content is intentionally visible to the approved phone, including login screens; secure Windows/UAC/locked desktops remain inaccessible.
+
+The original selected-game screenshot and character-bound gamepad paths remain distinct. Desktop viewing does not authorize unbound gamepad input. Existing private Serve, pairing, live control-device/session/revocation checks and local emergency Disable continue to apply. Desktop authorization uses bounded 40 ms gate acquisition so simultaneous desktop and gamepad readers do not deny each other; longer contention fails closed, and the independent native watchdogs are unchanged.
+
+Desktop connections contain at most one pending capture and one input request; no input is automatically retried. Server request sequence, a recent unguessable displayed-frame ID, geometry/session checks and complete native down/up batches bound input. A few recent frames are accepted for at most two seconds to cover one capture in flight. View reconnect is read-only; it clears pending actions and never reacquires held gamepad input. Native capture/input, DPI, monitor-off and the actual launcher/login/menu handoff still require supervised field acceptance.
+
+
 Implementation update: the Android client now exists in `MarshalTitan/SentinelRemote`; Relay 0.6.0.0 is the Milestone A bridge candidate. The historical audit below records the pre-foundation baseline. Current bridge details and supervised setup are in [MILESTONE_A.md](MILESTONE_A.md).
 
 Audit date: 2026-10-19 UTC. Live source outranks the supplied project brief and older chat history. All implementations here are independent MIT code; no streaming, controller, or launcher project source was copied.

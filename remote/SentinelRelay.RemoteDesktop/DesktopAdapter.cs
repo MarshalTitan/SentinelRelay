@@ -10,9 +10,7 @@ namespace SentinelRelay.RemoteDesktop;
 public sealed class DesktopAdapter : IDesktopAdapter
 {
     private readonly object gate = new();
-    private string? frameId;
-    private Rectangle bounds;
-    private long captured;
+    private readonly Queue<(string Id, long Stamp, Rectangle Bounds)> frames = new();
     private static Rectangle CurrentBounds()
     {
         using var process = Process.GetCurrentProcess();
@@ -25,7 +23,6 @@ public sealed class DesktopAdapter : IDesktopAdapter
     {
         lock (gate)
         {
-            frameId = null;
             var area = CurrentBounds(); var stamp = Stopwatch.GetTimestamp();
             using var original = new Bitmap(area.Width, area.Height, PixelFormat.Format24bppRgb);
             using (var graphics = Graphics.FromImage(original))
@@ -49,7 +46,9 @@ public sealed class DesktopAdapter : IDesktopAdapter
             scaled.Save(encoded, ImageCodecInfo.GetImageEncoders().Single(c => c.FormatID == ImageFormat.Jpeg.Guid), options);
             if (encoded.Length is < 1 or > 327680 || CurrentBounds() != area ||
                 Stopwatch.GetElapsedTime(stamp) >= TimeSpan.FromSeconds(2)) throw new InvalidDataException();
-            bounds = area; captured = stamp; frameId = Protocol.Secret();
+            var frameId = Protocol.Secret();
+            frames.Enqueue((frameId, stamp, area));
+            while (frames.Count > 3) frames.Dequeue();
             return new(frameId, width, height, Convert.ToBase64String(encoded.ToArray()), DateTimeOffset.UtcNow);
         }
     }
@@ -57,8 +56,10 @@ public sealed class DesktopAdapter : IDesktopAdapter
     {
         lock (gate)
         {
-            if (!DesktopStream.Valid(request) || frameId != request.FrameId ||
-                Stopwatch.GetElapsedTime(captured) >= TimeSpan.FromSeconds(2) || CurrentBounds() != bounds) return false;
+            var frame = frames.FirstOrDefault(f => f.Id == request.FrameId);
+            if (!DesktopStream.Valid(request) || frame.Id is null ||
+                Stopwatch.GetElapsedTime(frame.Stamp) >= TimeSpan.FromSeconds(2) || CurrentBounds() != frame.Bounds) return false;
+            var bounds = frame.Bounds;
             if (request.Kind is "tap" or "doubleTap" or "rightClick")
             {
                 var x = bounds.X + (int)Math.Round(request.X!.Value * (bounds.Width - 1));

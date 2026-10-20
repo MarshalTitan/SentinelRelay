@@ -71,8 +71,11 @@ static class DesktopStreamTests
             while (desktop.Active && DateTime.UtcNow < until) await Task.Delay(20);
         }
         using (var denied = await Connect(token))
-            check((await Read(denied))?.GetProperty("code").GetString() == "desktop_not_permitted" && adapter.Captures == 0,
-                "desktop route requires separate local per-phone permission before capture");
+        {
+            var code = (await Read(denied))?.GetProperty("code").GetString();
+            check(code == "desktop_not_permitted" && adapter.Captures == 0,
+                "desktop route requires separate local per-phone permission before capture; observed " + (code ?? "closed"));
+        }
         desktop.Permit(phone.DeviceId, true);
         using (var socket = await Connect(token))
         {

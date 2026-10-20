@@ -78,10 +78,10 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
     }
 
     // Input uses an independent sequence on a single bounded socket. Never wait on a
-    // status/screenshot operation while holding native input: contention beyond the bounded 20 ms authorization wait fails closed.
+    // status/screenshot operation while holding native input: contention beyond the bounded 40 ms authorization wait fails closed.
     public ControllerOwner? InputOwner(string? token, string instanceId)
     {
-        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(20))) return null;
+        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return null;
         try
         {
             Prune();
@@ -101,7 +101,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
 
     public bool InputAllowed(ControllerOwner owner, bool touch = false)
     {
-        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(20))) return false;
+        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return false;
         try
         {
             Prune();
@@ -122,7 +122,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
     // Desktop access is a separate explicit PC-wide capability, independent of bindings.
     public DesktopOwner? DesktopSession(string? token)
     {
-        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(20))) return null;
+        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return null;
         try
         {
             Prune();
@@ -139,7 +139,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
     }
     public bool DesktopAllowed(DesktopOwner owner)
     {
-        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(20))) return false;
+        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return false;
         try
         {
             Prune();
