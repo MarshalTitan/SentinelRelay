@@ -150,6 +150,15 @@ static class ManualInputTests
             check(output.Disposed && output.Last == ControllerFrame.Neutral, "target second-client/focus/identity veto neutralizes held output");
         }
         await Wait(() => !input.Active); target.Valid = true;
+        using (var removed = await Connect(session))
+        {
+            var p = (await Read(removed))!; await Send(removed, Frame(p)); await Read(removed);
+            input.Permit(device.DeviceId, false);
+            await Wait(() => output.Disposed && !input.Active);
+            check(output.Disposed && input.Diagnostic.Code == "permission_removed",
+                "per-phone permission removal releases held output and preserves its diagnostic");
+        }
+        input.Permit(device.DeviceId, true);
         startupFailure = "backend_attach_failed";
         using (var failed = await Connect(session)) check(await Read(failed) is null, "backend startup failure closes phone connection");
         check(input.Diagnostic.Code == "backend_attach_failed", "backend attach failure survives cleanup in the PC diagnostic");

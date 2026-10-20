@@ -16,6 +16,8 @@ public sealed class WorkerOutput : IManualOutput
     }
     private long sequence;
     private bool sent, disposed;
+    private string status = "input_lease_ended";
+    public string StatusCode => status;
     private WorkerOutput(Process process) { this.process = process; }
     public static async Task<IManualOutput> Start(string backend)
     {
@@ -64,7 +66,8 @@ public sealed class WorkerOutput : IManualOutput
     }
     public void Send(ControllerFrame frame)
     {
-        if (disposed || process.HasExited) throw new InputBackendException("input_worker_stopped");
+        if (disposed || process.HasExited)
+        { status = "input_worker_stopped"; throw new InputBackendException(status); }
         sent = true;
         Write(frame);
     }
@@ -76,7 +79,7 @@ public sealed class WorkerOutput : IManualOutput
             WorkerWire.Write(process.StandardInput.BaseStream, WorkerPacket.Create(++sequence, frame), deadline.Token)
                 .WaitAsync(TimeSpan.FromMilliseconds(120)).GetAwaiter().GetResult();
         }
-        catch { Dispose(); throw new InputBackendException("input_worker_stopped"); }
+        catch { status = "input_worker_stopped"; Dispose(); throw new InputBackendException(status); }
     }
     public void Neutralize()
     {

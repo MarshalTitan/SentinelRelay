@@ -19,7 +19,7 @@ public interface IManualTarget : IDisposable
     string StatusCode => "target_unavailable";
     bool Allowed(ControllerOwner owner);
 }
-public interface IManualOutput : IControllerOutput, IDisposable { }
+public interface IManualOutput : IControllerOutput, IDisposable { string StatusCode => "input_lease_ended"; }
 public sealed record InputDiagnostic(string Phase, string Code, long AcceptedFrames);
 
 /// <summary>One socket and output per host. Permission is explicit, local, per-phone and memory-only.</summary>
@@ -87,6 +87,7 @@ public sealed class ManualInput : IDisposable
     };
     public void Permit(string deviceId, bool enabled)
     {
+        CancellationTokenSource? cancel = null;
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
@@ -101,10 +102,11 @@ public sealed class ManualInput : IDisposable
                 if (activeDevice == deviceId)
                 {
                     diagnostic = new("stopped", "permission_removed", diagnostic.AcceptedFrames);
-                    connection?.Cancel();
+                    cancel = connection;
                 }
             }
         }
+        try { cancel?.Cancel(); } catch (ObjectDisposedException) { }
     }
     public void Stop()
     {
@@ -161,7 +163,7 @@ public sealed class ManualInput : IDisposable
             lock (gate) current = lease;
             var acquired = lease.Acquire(owner);
             if (acquired.Result != ControllerResult.Acquired || acquired.LeaseId is not { } id)
-            { outcome = Volatile.Read(ref veto) is { Length: > 0 } why ? why : "input_lease_ended"; return; }
+            { outcome = Volatile.Read(ref veto) is { Length: > 0 } why ? why : output.StatusCode; return; }
             Report("starting", "waiting_first_frame");
             for (long sequence = 1; !life.IsCancellationRequested; sequence++)
             {
@@ -174,7 +176,7 @@ public sealed class ManualInput : IDisposable
                 if (!Accept(frame, poll, Stopwatch.GetElapsedTime(started))) { outcome = "input_frame_rejected"; return; }
                 var submitted = lease.Submit(id, owner, sequence, frame.ToFrame());
                 if (submitted != ControllerResult.Applied)
-                { outcome = Volatile.Read(ref veto) is { Length: > 0 } why ? why : "input_lease_ended"; return; }
+                { outcome = Volatile.Read(ref veto) is { Length: > 0 } why ? why : output.StatusCode; return; }
                 if (!authority.InputAllowed(owner, touch: true)) { outcome = "session_unavailable"; return; }
                 Report("active", "active", ++frames);
                 await Task.Delay(50, life.Token);
