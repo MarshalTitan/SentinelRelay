@@ -13,6 +13,8 @@ public sealed class MainForm : Form
     private readonly HostController host = new();
     private readonly NotifyIcon tray;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 8000 };
+    private readonly System.Windows.Forms.Timer inputTimer = new() { Interval = 200 };
+    private readonly Label inputStatus = TextLabel("Phone gamepad: off until allowed locally", 10, FontStyle.Bold);
     private readonly Label status = TextLabel("Set up your private phone connection.", 11);
     private readonly TextBox address = new() { ReadOnly = true, Dock = DockStyle.Fill };
     private readonly ListBox games = new() { Dock = DockStyle.Fill, Height = 95, DisplayMember = "" };
@@ -81,6 +83,22 @@ public sealed class MainForm : Form
         emergency = new Button { Text = "Disable all remote access", AutoSize = true, BackColor = Color.FromArgb(176, 42, 65), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Padding = new Padding(8) };
         emergency.Click += async (_, _) => await Disable();
         Add(page, Row(Work("Revoke selected phone", Revoke)));
+        Add(page, TextLabel("Phone gamepad", 13, FontStyle.Bold));
+        Add(page, TextLabel("Keep exactly one FFXIV client running, in the foreground, with other games closed. Gamepad permission is separate from rescue controls and resets when this host restarts."));
+        Add(page, Row(Work("Prepare gamepad support", async () =>
+        {
+            if (!host.Running) throw new SetupException("Click Connect securely first.");
+            await host.PrepareInput();
+            status.Text = "Gamepad component verified. Select a paired phone, then allow gamepad control.";
+        }), Work("Allow selected phone gamepad", () =>
+        {
+            if (devices.SelectedItem is not DeviceRow phone || !phone.Control)
+                throw new SetupException("Select a paired phone with rescue control permission first.");
+            host.PermitInput(phone.Id, true);
+            status.Text = "Gamepad allowed for " + phone.Label + " until this host restarts or you stop gamepad access.";
+            return Task.CompletedTask;
+        })));
+        Add(page, TextLabel("The signed controller component downloads from its official author. Install the official USBip x64 driver separately if Gamepad Check has not already passed on this PC."));
         Add(page, TextLabel("Right-click the tray icon beside the Windows clock to reopen this window or exit."));
         // Keep emergency access reachable even on short laptop displays and while the page scrolls.
         var safetyBar = new FlowLayoutPanel
@@ -88,13 +106,18 @@ public sealed class MainForm : Form
             Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true,
             Padding = new Padding(16, 6, 16, 6), BackColor = Color.White,
         };
+        var stopInput = new Button { Text = "Stop phone gamepad", AutoSize = true, Padding = new Padding(6) };
+        stopInput.Click += (_, _) => host.Input?.Stop();
         safetyBar.Controls.Add(emergency);
+        safetyBar.Controls.Add(stopInput);
+        safetyBar.Controls.Add(inputStatus);
         safetyBar.Controls.Add(new Label { Text = "Closing the window keeps the host running in the tray.", AutoSize = true, Padding = new Padding(10, 12, 0, 0) });
         Controls.Add(safetyBar);
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open Sentinel Remote", null, (_, _) => Restore());
         menu.Items.Add("Disable all remote access", null, async (_, _) => await Disable());
+        menu.Items.Add("Stop phone gamepad", null, (_, _) => host.Input?.Stop());
         menu.Items.Add("Exit", null, async (_, _) => await Exit());
         tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "Sentinel Remote", ContextMenuStrip = menu, Visible = !smoke };
         tray.DoubleClick += (_, _) => Restore();
@@ -122,6 +145,13 @@ public sealed class MainForm : Form
             }, false);
             refreshTimer.Start();
         };
+        inputTimer.Tick += (_, _) =>
+        {
+            inputStatus.Text = host.Input?.Status ?? "Phone gamepad: off";
+            inputStatus.ForeColor = host.Input?.Active == true ? Color.FromArgb(176, 42, 65) : ForeColor;
+            tray.Text = host.Input?.Active == true ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" : "Sentinel Remote";
+        };
+        if (!smoke) inputTimer.Start();
         Populate(admin.Snapshot());
     }
 
@@ -306,6 +336,7 @@ public sealed class MainForm : Form
     private Task Revoke()
     {
         if (devices.SelectedItem is not DeviceRow device) throw new SetupException("Select a paired phone first.");
+        host.Input?.Permit(device.Id, false);
         admin.Revoke(device.Id);
         Populate(admin.Snapshot());
         status.Text = "Phone access revoked.";
@@ -352,7 +383,7 @@ public sealed class MainForm : Form
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { refreshTimer.Dispose(); tray.Dispose(); }
+        if (disposing) { inputTimer.Dispose(); refreshTimer.Dispose(); tray.Dispose(); }
         base.Dispose(disposing);
     }
     private sealed record Slot(string Id, string Label) { public override string ToString() => Label; }

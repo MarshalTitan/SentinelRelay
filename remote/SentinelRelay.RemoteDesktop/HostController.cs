@@ -13,20 +13,33 @@ public sealed record DetectedGame(GameBinding Binding, string Character, string?
 public sealed class HostController : IAsyncDisposable
 {
     private WebApplication? app;
+    public ManualInput? Input { get; private set; }
+    private string? backend;
+    public async Task PrepareInput() { backend = await BackendPackage.Prepare(); }
+    public void PermitInput(string device, bool enabled)
+    {
+        if (Input is null || backend is null) throw new SetupException("Connect securely and prepare gamepad support first.");
+        Input.Permit(device, enabled);
+    }
     public bool Running => app is not null;
     public async Task Start(TailnetIdentity identity, IStateStore store)
     {
         if (app is not null) return;
-        var candidate = RemoteWeb.Create(new RemoteAuthority(store, gameBridge: new PipeGameBridge()), identity.Host, identity.Login);
-        try { await candidate.StartAsync(); app = candidate; }
+        var authority = new RemoteAuthority(store, gameBridge: new PipeGameBridge());
+        var input = new ManualInput(authority, ManualTarget.Create,
+            () => backend is null ? throw new IOException("input_not_prepared") : WorkerOutput.Start(backend));
+        var candidate = RemoteWeb.Create(authority, identity.Host, identity.Login, input: input);
+        try { await candidate.StartAsync(); app = candidate; Input = input; }
         catch
         {
+            input.Dispose();
             await candidate.DisposeAsync();
             throw new SetupException("The host could not start. Close the old PowerShell host window or another Sentinel Remote copy, then try again.");
         }
     }
     public async ValueTask DisposeAsync()
     {
+        Input?.Dispose(); Input = null;
         if (app is null) return;
         var current = app; app = null;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));

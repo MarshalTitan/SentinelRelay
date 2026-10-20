@@ -41,6 +41,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Publish Windows desktop candidate
         run: dotnet publish remote/SentinelRelay.RemoteDesktop -c Release -r win-x64 --self-contained true -o desktop-candidate
+      - name: Publish isolated gamepad worker
+        run: dotnet publish remote/SentinelRelay.RemoteInput -c Release -r win-x64 --self-contained true -o desktop-candidate/worker
       - name: Render desktop at wide and narrow sizes
         shell: pwsh
         run: |
@@ -66,7 +68,7 @@ jobs:
         shell: pwsh
         run: |
           $destination = Join-Path $env:RUNNER_TEMP 'SentinelRemote-install-check'
-          $installer = Get-Item 'desktop-installer/SentinelRemote-0.1.2-Windows-Setup.exe'
+          $installer = Get-Item 'desktop-installer/SentinelRemote-0.2.0-Windows-Setup.exe'
           $installed = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -WindowStyle Hidden -Wait -PassThru
           if ($installed.ExitCode -ne 0 -or !(Test-Path -LiteralPath "$destination/SentinelRemote.exe")) { throw 'Installer verification failed' }
           # Exercise the installed executable's real startup/token path too.

@@ -77,6 +77,48 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
         });
     }
 
+    // Input uses an independent sequence on a single bounded socket. Never wait on a
+    // status/screenshot operation while holding native input: contention fails closed.
+    public ControllerOwner? InputOwner(string? token, string instanceId)
+    {
+        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate)) return null;
+        try
+        {
+            Prune();
+            return store.Access(state =>
+            {
+                if (!sessions.TryGetValue(Protocol.Hash(token!), out var session)) return ((ControllerOwner?)null, false);
+                var device = state.Devices.FirstOrDefault(d => d.Id == session.DeviceId && !d.Revoked && d.Control);
+                var binding = state.Bindings.FirstOrDefault(b => b.InstanceId == instanceId);
+                return (state.Enabled && state.Epoch == session.Epoch && device is not null &&
+                    device.Instances.Contains(instanceId) && binding is not null
+                    ? new ControllerOwner(device.Id, Protocol.Hash(token!), state.Epoch, binding, "pending") : null, false);
+            });
+        }
+        catch { return null; }
+        finally { Monitor.Exit(gate); }
+    }
+
+    public bool InputAllowed(ControllerOwner owner, bool touch = false)
+    {
+        if (!Monitor.TryEnter(gate)) return false;
+        try
+        {
+            Prune();
+            var allowed = store.Access(state =>
+            {
+                var device = state.Devices.FirstOrDefault(d => d.Id == owner.DeviceId && !d.Revoked && d.Control);
+                return (state.Enabled && state.Epoch == owner.HostEpoch && device is not null &&
+                    device.Instances.Contains(owner.Binding.InstanceId) && state.Bindings.Contains(owner.Binding) &&
+                    sessions.TryGetValue(owner.SessionId, out var s) && s.DeviceId == owner.DeviceId && s.Epoch == owner.HostEpoch, false);
+            });
+            if (allowed && touch) sessions[owner.SessionId].LastSeen = time.GetTimestamp();
+            return allowed;
+        }
+        catch { return false; }
+        finally { Monitor.Exit(gate); }
+    }
+
     private sealed record GameIntent(string DeviceId, string Epoch, GameBinding? Binding, string Operation, string? ExpectedGameEpoch, Session Session);
     public Reply Handle(string? sessionToken, RemoteRequest request, CancellationToken cancellation = default)
     {

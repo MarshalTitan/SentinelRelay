@@ -8,7 +8,7 @@ namespace SentinelRelay.RemoteHost;
 
 public static class RemoteWeb
 {
-    public static WebApplication Create(RemoteAuthority authority, string tailnetHost, string tailnetUser, int port = 32179)
+    public static WebApplication Create(RemoteAuthority authority, string tailnetHost, string tailnetUser, int port = 32179, ManualInput? input = null)
     {
         var allowedUsers = tailnetUser.Split(',').ToHashSet(StringComparer.Ordinal);
         if (!Uri.CheckHostName(tailnetHost).Equals(UriHostNameType.Dns) || !tailnetHost.EndsWith(".ts.net", StringComparison.Ordinal) ||
@@ -38,6 +38,7 @@ public static class RemoteWeb
             { limiter.PermitLimit = 10; limiter.Window = TimeSpan.FromMinutes(1); limiter.QueueLimit = 0; });
         });
         var app = builder.Build();
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(10) });
         app.Use(async (context, next) =>
         {
             context.Response.Headers.CacheControl = "no-store";
@@ -49,6 +50,9 @@ public static class RemoteWeb
                 request.Host.Value != tailnetHost || !allowedUsers.Contains(request.Headers["Tailscale-User-Login"].ToString()) ||
                 (request.Headers.Origin.Count > 0 && request.Headers.Origin.ToString() != "https://" + tailnetHost))
             { context.Response.StatusCode = 403; return; }
+            if (input is not null && request.Path == "/remote/v1/gamepad" &&
+                context.WebSockets.IsWebSocketRequest && !request.QueryString.HasValue)
+            { await next(context); return; }
             if (request.QueryString.HasValue || request.Method != "POST" || !request.HasJsonContentType())
             { context.Response.StatusCode = 400; return; }
             if (request.ContentLength > 4096)
@@ -92,6 +96,13 @@ public static class RemoteWeb
             await request.ReadFromJsonAsync<SessionRequest>(Protocol.Json, request.HttpContext.RequestAborted) ?? throw new JsonException())));
         app.MapPost("/remote/v1/request", async (HttpRequest request) => Respond(authority.Handle(Bearer(request),
             await request.ReadFromJsonAsync<RemoteRequest>(Protocol.Json, request.HttpContext.RequestAborted) ?? throw new JsonException(), request.HttpContext.RequestAborted)));
+        if (input is not null)
+            app.MapGet("/remote/v1/gamepad", async (HttpContext context) =>
+            {
+                if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
+                using var socket = await context.WebSockets.AcceptWebSocketAsync();
+                await input.Run(socket, Bearer(context.Request), context.RequestAborted);
+            });
         return app;
     }
 }
