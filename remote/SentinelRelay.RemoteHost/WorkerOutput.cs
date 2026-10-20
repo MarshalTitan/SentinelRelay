@@ -9,6 +9,11 @@ public sealed class WorkerOutput : IManualOutput
 {
     private readonly Process process;
     internal int ProcessId => process.Id;
+    internal async Task<int> CompletionForTest()
+    {
+        await process.WaitForExitAsync();
+        return process.ExitCode;
+    }
     private long sequence;
     private bool sent, disposed;
     private WorkerOutput(Process process) { this.process = process; }

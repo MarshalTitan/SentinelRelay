@@ -20,7 +20,7 @@ static class WorkerStartupTests
         var second = await WorkerWire.Read(stream, life.Token);
         if (second.Sequence != first.Sequence + 1 || second.Buttons != 0x1000 ||
             second.LeftX != .5 || !WorkerWire.Accept(second, first.Sequence, Stopwatch.GetTimestamp())) return 4;
-        // Signal verified startup through the test's process lifetime, not through user-visible raw logs.
+        if (mode == "success") return 0;
         await Task.Delay(Timeout.Infinite, life.Token);
         return 0;
     }
@@ -38,10 +38,13 @@ static class WorkerStartupTests
         using (var output = await WorkerOutput.StartProcess(Info("success")))
         {
             output.Send(new(.5, 0, 0, 0, 0, 0, 0x1000));
+            check(await output.CompletionForTest().WaitAsync(TimeSpan.FromSeconds(3)) == 0,
+                "host worker startup sends fresh neutral then complete rising-sequence input through real pipe");
+        }
+        using (var output = await WorkerOutput.StartProcess(Info("hold")))
+        {
+            output.Send(new(.5, 0, 0, 0, 0, 0, 0x1000));
             var pid = output.ProcessId;
-            await Task.Delay(100);
-            using (var live = Process.GetProcessById(pid))
-                check(!live.HasExited, "host worker startup sends fresh neutral then complete rising-sequence input through real pipe");
             output.Dispose();
             var deadline = Stopwatch.GetTimestamp();
             bool Alive()
