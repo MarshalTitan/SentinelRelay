@@ -10,7 +10,7 @@ public sealed record InputPoll(int Version, long Sequence, string Challenge);
 public sealed record InputFrame(int Version, long Sequence, string Challenge,
     double LeftX, double LeftY, double RightX, double RightY, double LeftTrigger, double RightTrigger, ushort Buttons)
 {
-    public ControllerFrame Frame => new(LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger, Buttons);
+    public ControllerFrame ToFrame() => new(LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger, Buttons);
 }
 public interface IManualTarget : IDisposable
 {
@@ -56,7 +56,7 @@ public sealed class ManualInput : IDisposable
 
     public static bool Accept(InputFrame frame, InputPoll poll, TimeSpan age) =>
         frame.Version == 1 && frame.Sequence == poll.Sequence && frame.Sequence > 0 &&
-        frame.Challenge == poll.Challenge && age < TimeSpan.FromMilliseconds(250) && frame.Frame.IsValid;
+        frame.Challenge == poll.Challenge && age < TimeSpan.FromMilliseconds(250) && frame.ToFrame().IsValid;
 
     public async Task Run(WebSocket socket, string? session, CancellationToken cancellation)
     {
@@ -92,7 +92,7 @@ public sealed class ManualInput : IDisposable
                 await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(poll, Protocol.Json), WebSocketMessageType.Text, true, sendLimit.Token);
                 var frame = await Read<InputFrame>(socket, TimeSpan.FromMilliseconds(250), life.Token);
                 if (!Accept(frame, poll, Stopwatch.GetElapsedTime(started)) ||
-                    lease.Submit(id, owner, sequence, frame.Frame) != ControllerResult.Applied ||
+                    lease.Submit(id, owner, sequence, frame.ToFrame()) != ControllerResult.Applied ||
                     !authority.InputAllowed(owner, touch: true)) return;
                 await Task.Delay(50, life.Token); // At most 20 full states/sec; no push queue or retry.
             }

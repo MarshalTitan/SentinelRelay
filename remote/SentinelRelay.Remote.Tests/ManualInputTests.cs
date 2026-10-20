@@ -115,6 +115,16 @@ static class ManualInputTests
             check(output.Disposed && output.Last == ControllerFrame.Neutral, "replayed challenge releases held websocket controls");
         }
         await Wait(() => !input.Active);
+        using (var extra = await Connect(session))
+        {
+            var p = (await Read(extra))!; await Send(extra, Frame(p)); var next = (await Read(extra))!;
+            var body = JsonSerializer.Serialize(new { version = 1, sequence = next.Sequence, challenge = next.Challenge,
+                leftX = .5, leftY = 0, rightX = 0, rightY = 0, leftTrigger = 0, rightTrigger = 0, buttons = 0, frame = new { key = "denied" } }, Protocol.Json);
+            await extra.SendAsync(Encoding.UTF8.GetBytes(body), WebSocketMessageType.Text, true, CancellationToken.None);
+            await Wait(() => output.Disposed);
+            check(output.Disposed && output.Last == ControllerFrame.Neutral, "unknown input fields release held controls");
+        }
+        await Wait(() => !input.Active);
         using (var local = await Connect(session))
         {
             var p = (await Read(local))!; await Send(local, Frame(p)); await Read(local);
