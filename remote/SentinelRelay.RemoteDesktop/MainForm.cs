@@ -102,7 +102,7 @@ public sealed class MainForm : Form
         }), Work("Copy gamepad result", () =>
         {
             var result = host.Input?.Diagnostic;
-            Clipboard.SetText("Sentinel Remote gamepad 0.2.3" + Environment.NewLine +
+            Clipboard.SetText("Sentinel Remote gamepad 0.3.0" + Environment.NewLine +
                 "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
                 "Phase: " + (result?.Phase ?? "host_not_connected") + Environment.NewLine +
                 "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
@@ -111,8 +111,23 @@ public sealed class MainForm : Form
             return Task.CompletedTask;
         })));
         Add(page, TextLabel("The signed controller component downloads from its official author. Install the official USBip x64 driver separately if Gamepad Check has not already passed on this PC."));
+        Add(page, TextLabel("Desktop access", 13, FontStyle.Bold));
+        Add(page, TextLabel("Share the primary monitor with the selected phone. Desktop access lets it see and operate ordinary apps and files, including XIVLauncher and login screens. This separate permission resets when this host restarts."));
+        Add(page, Row(Work("Allow selected phone desktop", () =>
+        {
+            if (host.Desktop is null || devices.SelectedItem is not DeviceRow phone || !phone.Control)
+                throw new SetupException("Connect securely and select a paired phone with control permission first.");
+            host.Desktop.Permit(phone.Id, true);
+            status.Text = "Desktop view and touch/keyboard control allowed for " + phone.Label + ".";
+            return Task.CompletedTask;
+        }), Work("Stop desktop access", () =>
+        {
+            host.Desktop?.Stop();
+            status.Text = "Desktop access stopped; local permission cleared.";
+            return Task.CompletedTask;
+        })));
         Add(page, TextLabel("Launcher and window recovery", 13, FontStyle.Bold));
-        Add(page, TextLabel("Select XIVLauncher.exe once on this PC. Opening the launcher works with FFXIV closed. Each phone needs separate local recovery permission, which resets when this host restarts. Login-screen viewing and character-selection controls are not included yet."));
+        Add(page, TextLabel("Select XIVLauncher.exe once on this PC. Opening the launcher works with FFXIV closed. Each phone needs separate local recovery permission, which resets when this host restarts. Use the phone's Desktop view to click through the launcher and character selection."));
         Add(page, Row(Work("Choose XIVLauncher", () =>
         {
             using var choose = new OpenFileDialog { Title = "Select your installed XIVLauncher.exe", Filter = "XIVLauncher|XIVLauncher.exe", CheckFileExists = true };
@@ -179,9 +194,9 @@ public sealed class MainForm : Form
         };
         inputTimer.Tick += (_, _) =>
         {
-            inputStatus.Text = host.Input?.Status ?? "Phone gamepad: off";
+            inputStatus.Text = host.Desktop?.Active == true ? "PHONE DESKTOP ACTIVE" : host.Input?.Status ?? "Phone gamepad: off";
             inputStatus.ForeColor = host.Input?.Active == true ? Color.FromArgb(176, 42, 65) : ForeColor;
-            tray.Text = host.Input?.Diagnostic.Phase == "active" ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" :
+            tray.Text = host.Desktop?.Active == true ? "Sentinel Remote - PHONE DESKTOP ACTIVE" : host.Input?.Diagnostic.Phase == "active" ? "Sentinel Remote - PHONE GAMEPAD ACTIVE" :
                 host.Input?.Active == true ? "Sentinel Remote - starting gamepad" : "Sentinel Remote";
         };
         if (!smoke) inputTimer.Start();
@@ -377,6 +392,7 @@ public sealed class MainForm : Form
         if (devices.SelectedItem is not DeviceRow device) throw new SetupException("Select a paired phone first.");
         host.Input?.Permit(device.Id, false);
         host.Recovery.Permit(device.Id, false);
+        host.Desktop?.Permit(device.Id, false);
         admin.Revoke(device.Id);
         Populate(admin.Snapshot());
         status.Text = "Phone access revoked.";

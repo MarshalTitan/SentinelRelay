@@ -110,6 +110,17 @@ static class ManualInputTests
         check(input.Diagnostic.Code == "manual_not_permitted", "missing local manual permission has a stable startup diagnostic");
         input.Permit(device.DeviceId, true);
         store.Delay = 12;
+        var desktopOwner = authority.DesktopSession(session)!;
+        using var viewing = new CancellationTokenSource();
+        var desktopChecks = 0;
+        var viewChecks = Task.Run(async () =>
+        {
+            while (!viewing.IsCancellationRequested)
+            {
+                if (authority.DesktopAllowed(desktopOwner)) Interlocked.Increment(ref desktopChecks);
+                await Task.Delay(70);
+            }
+        });
         using (var sustained = await Connect(session))
         {
             var current = await Read(sustained);
@@ -124,6 +135,8 @@ static class ManualInputTests
                 "sustained input survives overlapping watchdog and frame authorization with slow state reads");
         }
         await Wait(() => !input.Active);
+        viewing.Cancel(); await viewChecks;
+        check(desktopChecks > 5, "desktop and native gamepad authorization coexist under delayed state reads");
         store.Delay = 0;
         using (var good = await Connect(session))
         {

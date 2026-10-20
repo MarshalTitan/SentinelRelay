@@ -15,6 +15,7 @@ public sealed class HostController : IAsyncDisposable
     private WebApplication? app;
     public ManualInput? Input { get; private set; }
     private string? backend;
+    public DesktopStream? Desktop { get; private set; }
     public RecoveryActions Recovery { get; } = new();
     public async Task PrepareInput() { backend = await BackendPackage.Prepare(); }
     public void PermitInput(string device, bool enabled)
@@ -29,17 +30,19 @@ public sealed class HostController : IAsyncDisposable
         var authority = new RemoteAuthority(store, gameBridge: new PipeGameBridge(), recovery: Recovery);
         var input = new ManualInput(authority, ManualTarget.Create,
             () => backend is null ? throw new SentinelRelay.RemoteInput.InputBackendException("input_not_prepared") : WorkerOutput.Start(backend));
-        var candidate = RemoteWeb.Create(authority, identity.Host, identity.Login, input: input);
-        try { await candidate.StartAsync(); app = candidate; Input = input; }
+        var desktop = new DesktopStream(authority, new DesktopAdapter());
+        var candidate = RemoteWeb.Create(authority, identity.Host, identity.Login, input: input, desktop: desktop);
+        try { await candidate.StartAsync(); app = candidate; Input = input; Desktop = desktop; }
         catch
         {
-            input.Dispose();
+            input.Dispose(); desktop.Dispose();
             await candidate.DisposeAsync();
             throw new SetupException("The host could not start. Close the old PowerShell host window or another Sentinel Remote copy, then try again.");
         }
     }
     public async ValueTask DisposeAsync()
     {
+        Desktop?.Dispose(); Desktop = null;
         Recovery.Clear();
         Input?.Dispose(); Input = null;
         if (app is null) return;

@@ -1,7 +1,7 @@
 [Setup]
 AppId={{90780B12-107E-4B91-B87E-9C6A9B6A2E41}
 AppName=Sentinel Remote
-AppVersion=0.2.3
+AppVersion=0.3.0
 AppPublisher=MarshalTitan
 DefaultDirName={localappdata}\Programs\SentinelRemote
 DefaultGroupName=Sentinel Remote
@@ -9,7 +9,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\..\desktop-installer
-OutputBaseFilename=SentinelRemote-0.2.3-Windows-Setup
+OutputBaseFilename=SentinelRemote-0.3.0-Windows-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

@@ -8,7 +8,7 @@ namespace SentinelRelay.RemoteHost;
 
 public static class RemoteWeb
 {
-    public static WebApplication Create(RemoteAuthority authority, string tailnetHost, string tailnetUser, int port = 32179, ManualInput? input = null)
+    public static WebApplication Create(RemoteAuthority authority, string tailnetHost, string tailnetUser, int port = 32179, ManualInput? input = null, DesktopStream? desktop = null)
     {
         var allowedUsers = tailnetUser.Split(',').ToHashSet(StringComparer.Ordinal);
         if (!Uri.CheckHostName(tailnetHost).Equals(UriHostNameType.Dns) || !tailnetHost.EndsWith(".ts.net", StringComparison.Ordinal) ||
@@ -50,7 +50,8 @@ public static class RemoteWeb
                 request.Host.Value != tailnetHost || !allowedUsers.Contains(request.Headers["Tailscale-User-Login"].ToString()) ||
                 (request.Headers.Origin.Count > 0 && request.Headers.Origin.ToString() != "https://" + tailnetHost))
             { context.Response.StatusCode = 403; return; }
-            if (input is not null && request.Path == "/remote/v1/gamepad" &&
+            if (((input is not null && request.Path == "/remote/v1/gamepad") ||
+                 (desktop is not null && request.Path == "/remote/v1/desktop")) &&
                 context.WebSockets.IsWebSocketRequest && !request.QueryString.HasValue)
             { await next(context); return; }
             if (request.QueryString.HasValue || request.Method != "POST" || !request.HasJsonContentType())
@@ -102,6 +103,13 @@ public static class RemoteWeb
                 if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
                 using var socket = await context.WebSockets.AcceptWebSocketAsync();
                 await input.Run(socket, Bearer(context.Request), context.RequestAborted);
+            });
+        if (desktop is not null)
+            app.MapGet("/remote/v1/desktop", async (HttpContext context) =>
+            {
+                if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
+                using var socket = await context.WebSockets.AcceptWebSocketAsync();
+                await desktop.Run(socket, Bearer(context.Request), context.RequestAborted);
             });
         return app;
     }
