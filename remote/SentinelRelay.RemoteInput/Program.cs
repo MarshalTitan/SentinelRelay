@@ -9,9 +9,12 @@ if (args.Length is < 2 or > 3 || args[0] != "--worker" || (args.Length == 3 && a
     return 1;
 }
 ViiperBackend? backend = null;
+var stage = BackendStage.File;
+var streaming = false;
+var sending = false;
 try
 {
-    backend = await ViiperBackend.Start(args[1], args.Length != 3);
+    backend = await ViiperBackend.Start(args[1], args.Length != 3, stageChanged: current => stage = current);
     using var stop = new ManualResetEventSlim();
     long lastFrame = Stopwatch.GetTimestamp();
     var watcher = new Thread(() =>
@@ -32,15 +35,18 @@ try
             ready = true, code = "worker_ready", backendPid = backend.ProcessId, apiPort = backend.ApiPort, usbPort = backend.UsbPort
         }));
         Console.Out.Flush();
+        streaming = true;
         var input = Console.OpenStandardInput();
         long sequence = 0;
         while (true)
         {
+            sending = false;
             var packet = await WorkerWire.Read(input, CancellationToken.None);
             var now = Stopwatch.GetTimestamp();
             if (!WorkerWire.Accept(packet, sequence, now)) throw new InvalidDataException("worker_frame_rejected");
             sequence = packet.Sequence;
             Interlocked.Exchange(ref lastFrame, now);
+            sending = true;
             backend.Send(packet.ToFrame());
         }
     }
@@ -50,7 +56,24 @@ catch (Exception error)
 {
     // Stable outcome only. Never forward backend logs, command text, paths, frames, or exceptions.
     Console.WriteLine(JsonSerializer.Serialize(new { ready = false,
-        code = error is InputBackendException failure ? failure.Code : "worker_stopped", kind = error.GetType().Name }));
+        code = error is InputBackendException failure ? failure.Code :
+            streaming ? error switch
+            {
+                EndOfStreamException => "worker_input_closed",
+                InvalidDataException => "worker_frame_rejected",
+                JsonException => "worker_frame_invalid",
+                _ => sending ? "worker_backend_write_failed" : "worker_stopped",
+            } : stage switch
+            {
+                BackendStage.File => "backend_file_failed",
+                BackendStage.Workspace => "backend_workspace_failed",
+                BackendStage.Start => "backend_start_failed",
+                BackendStage.Job => "backend_job_failed",
+                BackendStage.WaitReady => "backend_wait_ready_failed",
+                BackendStage.CreateBus => "backend_create_bus_failed",
+                BackendStage.AddDevice => "backend_add_device_failed",
+                _ => "backend_connect_failed",
+            }, kind = error.GetType().Name }));
     return 2;
 }
 finally { backend?.Dispose(); }

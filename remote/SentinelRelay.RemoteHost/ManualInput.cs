@@ -82,6 +82,13 @@ public sealed class ManualInput : IDisposable
         "phone_frame_timeout" => "phone frame did not arrive in time",
         "input_frame_rejected" => "phone frame was stale or invalid",
         "input_lease_ended" => "input lease ended",
+        "backend_workspace_failed" => "controller workspace could not be prepared",
+        "backend_start_failed" => "controller process could not start",
+        "backend_job_failed" => "controller process ownership failed",
+        "backend_create_bus_failed" => "controller bus could not be created",
+        "backend_add_device_failed" => "controller device could not be added",
+        "backend_connect_failed" => "controller stream could not connect",
+        "worker_frame_rejected" => "worker rejected a stale or invalid frame",
         "input_worker_timeout" => "controller startup timed out",
         _ => "stopped; copy gamepad result",
     };
@@ -146,11 +153,14 @@ public sealed class ManualInput : IDisposable
             target = await targetFactory(owner.Binding);
             if (target.GameEpoch is not { } epoch) { outcome = target.StatusCode; return; }
             owner = owner with { GameEpoch = epoch };
+            // The lease serializes every guard invocation, including the watchdog.
+            // Keep session activity here too: a second authority call outside the lease
+            // races the watchdog's nonblocking authority lock and revokes our own input.
             bool Allowed(ControllerOwner o)
             {
                 var code = life.IsCancellationRequested ? "phone_disconnected" :
                     !Permitted(o.DeviceId) ? "permission_removed" :
-                    !authority.InputAllowed(o) ? "session_unavailable" :
+                    !authority.InputAllowed(o, touch: true) ? "session_unavailable" :
                     !target.Allowed(o) ? target.StatusCode : "";
                 if (code.Length != 0) Volatile.Write(ref veto, code);
                 return code.Length == 0;
@@ -177,7 +187,6 @@ public sealed class ManualInput : IDisposable
                 var submitted = lease.Submit(id, owner, sequence, frame.ToFrame());
                 if (submitted != ControllerResult.Applied)
                 { outcome = Volatile.Read(ref veto) is { Length: > 0 } why ? why : output.StatusCode; return; }
-                if (!authority.InputAllowed(owner, touch: true)) { outcome = "session_unavailable"; return; }
                 Report("active", "active", ++frames);
                 await Task.Delay(50, life.Token);
             }
@@ -212,6 +221,9 @@ public sealed class ManualInput : IDisposable
         "backend_attach_failed" or "backend_request_rejected" or "backend_readiness" or "backend_version" or
         "backend_exited_before_ready" or "backend_hash_mismatch" or "backend_endpoint_owner_changed" or
         "backend_did_not_exit" or "worker_stopped" or "input_worker_unavailable" or "input_worker_timeout" or
+        "backend_file_failed" or "backend_workspace_failed" or "backend_start_failed" or "backend_job_failed" or
+        "backend_wait_ready_failed" or "backend_create_bus_failed" or "backend_add_device_failed" or "backend_connect_failed" or
+        "worker_frame_rejected" or "worker_input_closed" or "worker_frame_invalid" or "worker_backend_write_failed" or
         "input_worker_reply_invalid" or "input_worker_stopped" ? code : "input_backend_unavailable";
 
     private static async Task<T> Read<T>(WebSocket socket, TimeSpan limit, CancellationToken cancellation)

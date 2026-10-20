@@ -100,7 +100,7 @@ public sealed class MainForm : Form
         }), Work("Copy gamepad result", () =>
         {
             var result = host.Input?.Diagnostic;
-            Clipboard.SetText("Sentinel Remote gamepad 0.2.1" + Environment.NewLine +
+            Clipboard.SetText("Sentinel Remote gamepad 0.2.2" + Environment.NewLine +
                 "Windows: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription + Environment.NewLine +
                 "Phase: " + (result?.Phase ?? "host_not_connected") + Environment.NewLine +
                 "Code: " + (result?.Code ?? "host_not_connected") + Environment.NewLine +
