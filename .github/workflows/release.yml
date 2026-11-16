@@ -1,9 +1,8 @@
 name: Publish Release
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [release-0.5]
 
 permissions:
   contents: write
@@ -14,7 +13,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]') || contains(github.event.head_commit.message, '[verify-live]'))
+    if: github.ref == 'refs/heads/release-0.5' && contains(github.event.head_commit.message, '[publish-live]')
     runs-on: windows-latest
 
     steps:
@@ -44,12 +43,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          VERIFY_EXISTING: ${{ contains(github.event.head_commit.message, '[verify-live]') }}
         run: |
           [xml]$project = Get-Content -LiteralPath 'SentinelRelay.csproj' -Raw
           $version = [string]$project.Project.PropertyGroup.Version
-          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "Version must contain four numeric components: $version"
+          if ($version -notmatch '^0\.5\.\d+\.\d+$') {
+            throw "Expected a 0.5.x.x maintenance version: $version"
           }
           $tag = "v$version"
           $entries = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json)
@@ -58,13 +56,13 @@ jobs:
           }
           if ([bool]($entries | Where-Object InternalName -eq 'SentinelRelay').IsTestingExclusive) { throw 'Live releases must not be testing exclusive.' }
           $releaseExists = $false
-          gh release view $tag --repo '${{ github.repository }}' *> $null
+          $existingJson = gh release view $tag --repo '${{ github.repository }}' --json targetCommitish,isDraft,isPrerelease,assets 2>$null
           if ($LASTEXITCODE -eq 0) {
-            if ('${{ github.event_name }}' -ne 'workflow_dispatch' -and $env:VERIFY_EXISTING -ne 'true') {
+            $release = $existingJson | ConvertFrom-Json
+            if ($release.targetCommitish -ne '${{ github.sha }}' -or $release.isDraft -or $release.isPrerelease) {
               throw "Release '$tag' already exists. Increment the version; published assets are immutable."
             }
 
-            $release = gh release view $tag --repo '${{ github.repository }}' --json assets | ConvertFrom-Json
             if (@($release.assets | Where-Object name -eq 'SentinelRelay.zip').Count -ne 1) {
               throw "Existing release '$tag' does not contain exactly one SentinelRelay.zip asset."
             }
@@ -106,7 +104,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Adds localized map names alongside territory IDs in SRank status and recovery replies, with numeric fallback when game data is unavailable. Compatible with SRankSentinel 0.7.62.0; permissions, recovery behavior and saved configuration are unchanged."
+            --notes "Forwarded incoming tells now alert once regardless of keywords. Relay mentions only the character's configured Discord alert user. Channel choices, outgoing tells, other keyword rules and existing replies and SRank controls stay unchanged. Built on the published 0.5 series."
 
       - name: Verify public release asset
         shell: pwsh
