@@ -21,7 +21,7 @@ public static class WebhookMessageFormatter
             : MessageSanitizer.SanitizeForDiscord(chat.Message);
         var senderLabel = includeWorld && world.Length > 0 ? $"{sender} @ {world}" : sender;
         var channel = ChannelPolicy.GetShortLabel(chat.ChatType);
-        var alert = BuildAlert(matchedKeywords, mentionUserId);
+        var alert = BuildAlert(chat.ChatType, matchedKeywords, mentionUserId);
 
         if (useEmbeds)
         {
@@ -73,22 +73,36 @@ public static class WebhookMessageFormatter
         .Where(line => line.Length > 0));
 
     private static (string? Content, DiscordAllowedMentions AllowedMentions) BuildAlert(
+        RelayChatType channel,
         IReadOnlyList<KeywordRule>? matches,
         string? mentionUserId)
     {
-        if (matches is null || matches.Count == 0)
-            return (null, NoMentions);
+        var incomingTell = channel == RelayChatType.IncomingTell;
+        string label;
+        bool requestPing;
+        if (incomingTell)
+        {
+            label = "Incoming tell";
+            requestPing = true;
+        }
+        else
+        {
+            if (matches is null || matches.Count == 0)
+                return (null, NoMentions);
 
-        var labels = string.Join(", ", matches
-            .Select(rule => $"\"{MessageSanitizer.SanitizeForDiscord(rule.Keyword)}\"")
-            .Distinct(StringComparer.OrdinalIgnoreCase));
-        var canPing = matches.Any(rule => rule.PingDiscordUser)
-            && WebhookEndpoint.IsValidDiscordUserId(mentionUserId);
+            var labels = string.Join(", ", matches
+                .Select(rule => $"\"{MessageSanitizer.SanitizeForDiscord(rule.Keyword)}\"")
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+            label = $"Keyword alert: {labels}";
+            requestPing = matches.Any(rule => rule.PingDiscordUser);
+        }
+
+        var canPing = requestPing && WebhookEndpoint.IsValidDiscordUserId(mentionUserId);
         var mention = canPing ? $"<@{mentionUserId}> " : string.Empty;
         var allowed = canPing
             ? new DiscordAllowedMentions([], [mentionUserId!])
             : NoMentions;
-        return ($"{mention}🔔 Keyword alert: {labels}", allowed);
+        return ($"{mention}🔔 {label}", allowed);
     }
 
     internal static IReadOnlyList<string> SplitByRune(string value, int maxCharacters)

@@ -446,16 +446,16 @@ public sealed partial class Plugin : IDalamudPlugin
             || activeIdentity is null)
             return;
 
-        var keywordMatches = KeywordMatcher.FindMatches(
-            activeProfile!.Keywords,
-            chat.ChatType,
-            chat.Message);
+        var profile = activeProfile!;
+        var keywordMatches = chat.ChatType == RelayChatType.IncomingTell
+            ? null
+            : KeywordMatcher.FindMatches(profile.Keywords, chat.ChatType, chat.Message);
         var payloads = WebhookMessageFormatter.Format(
             chat,
-            activeProfile.IncludeSenderWorld,
-            activeProfile.UseDiscordEmbeds || chat.ChatType == RelayChatType.RewardsHuntResults,
+            profile.IncludeSenderWorld,
+            profile.UseDiscordEmbeds || chat.ChatType == RelayChatType.RewardsHuntResults,
             keywordMatches,
-            activeProfile.DiscordMentionUserId);
+            profile.DiscordMentionUserId);
         webhookRelay.TryEnqueue(activeIdentity.CharacterKey, activeWebhookEndpoint, payloads);
     }
 

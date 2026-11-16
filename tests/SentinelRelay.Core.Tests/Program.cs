@@ -32,6 +32,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Discord mention sanitation neutralizes mentions", Sync(MentionSanitizationWorks)),
     ("keyword matching is case-insensitive and channel-scoped", Sync(KeywordMatchingWorks)),
     ("explicit keyword alert can ping only configured user", Sync(KeywordPingIsExplicit)),
+    ("forwarded incoming tells ping once independently of keyword rules", Sync(IncomingTellAlerts)),
     ("duplicate filter suppresses immediate duplicates", Sync(DuplicateFilterWorks)),
     ("bounded queue preserves order", Sync(QueuePreservesOrder)),
     ("bounded queue rejects overflow", Sync(QueueRejectsOverflow)),
@@ -294,6 +295,63 @@ static void KeywordPingIsExplicit()
     Assert(payload.Content?.Contains("<@123456789012345678>", StringComparison.Ordinal) == true, "explicit ping missing");
     Assert(payload.AllowedMentions.Users?.SequenceEqual(["123456789012345678"]) == true, "wrong allowed user");
     Assert(payload.AllowedMentions.Parse.Count == 0, "broad mentions were enabled");
+}
+
+static void IncomingTellAlerts()
+{
+    const string user = "123456789012345678";
+    const string mention = "<@123456789012345678>";
+    var rule = new KeywordRule
+    {
+        Keyword = "ready",
+        PingDiscordUser = true,
+        Channels = [RelayChatType.IncomingTell, RelayChatType.FreeCompany],
+    };
+
+    var profile = new CharacterProfile { ProtectedWebhookUrl = "protected", DiscordMentionUserId = user };
+    Assert(!RelayFilter.ShouldForward(profile, RelayChatType.IncomingTell), "Tell alerts must not bypass channel opt-in");
+    profile.EnabledInboundChannels.Add(RelayChatType.IncomingTell);
+    Assert(RelayFilter.ShouldForward(profile, RelayChatType.IncomingTell), "Enabled tells should forward");
+    profile.Paused = true;
+    Assert(!RelayFilter.ShouldForward(profile, RelayChatType.IncomingTell), "Tell alerts must respect pause");
+
+    foreach (var embeds in new[] { false, true })
+    {
+        IReadOnlyList<DiscordWebhookPayload> Format(RelayChatType channel, string message, string? recipient = user)
+        {
+            var chat = SampleChat(message) with { ChatType = channel };
+            return WebhookMessageFormatter.Format(chat, includeWorld: true, useEmbeds: embeds,
+                KeywordMatcher.FindMatches([rule], channel, message), recipient);
+        }
+
+        foreach (var message in new[] { "hello", "ready " + new string('x', 6000) })
+        {
+            var tells = Format(RelayChatType.IncomingTell, message);
+            Assert(tells[0].Content?.Contains(mention + " 🔔 Incoming tell", StringComparison.Ordinal) == true,
+                "Forwarded tell must ping with or without a keyword");
+            Assert(tells[0].AllowedMentions.Users?.SequenceEqual([user]) == true
+                && tells.All(payload => payload.AllowedMentions.Parse.Count == 0), "Tell mentions must allow only the configured user");
+            Assert(tells.Count(payload => payload.Content?.Contains(mention, StringComparison.Ordinal) == true) == 1
+                && tells.Skip(1).All(payload => (payload.AllowedMentions.Users?.Count ?? 0) == 0),
+                "Matched or split tell must ping once");
+        }
+
+        var missingUser = Format(RelayChatType.IncomingTell, "hello", null)[0];
+        Assert(missingUser.Content?.Contains("🔔 Incoming tell", StringComparison.Ordinal) == true
+            && (missingUser.AllowedMentions.Users?.Count ?? 0) == 0,
+            "Tell must still be highlighted without a configured mention recipient");
+
+        var outgoing = Format(RelayChatType.OutgoingTell, "ready")[0];
+        Assert((outgoing.AllowedMentions.Users?.Count ?? 0) == 0
+            && outgoing.Content?.Contains("🔔 Incoming tell", StringComparison.Ordinal) != true,
+            "Outgoing tell must not get the incoming alert");
+        var fcPlain = Format(RelayChatType.FreeCompany, "hello")[0];
+        Assert((fcPlain.AllowedMentions.Users?.Count ?? 0) == 0
+            && fcPlain.Content?.Contains("🔔", StringComparison.Ordinal) != true, "Unmatched FC chat must remain quiet");
+        var fcMatch = Format(RelayChatType.FreeCompany, "ready")[0];
+        Assert(fcMatch.Content?.Contains(mention + " 🔔 Keyword alert:", StringComparison.Ordinal) == true
+            && fcMatch.AllowedMentions.Users?.SequenceEqual([user]) == true, "Matched FC keyword behavior changed");
+    }
 }
 
 static void DuplicateFilterWorks()
