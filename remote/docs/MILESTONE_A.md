@@ -38,7 +38,7 @@ These are independent per-character opt-ins; view alone needs only the first. No
 In PowerShell opened in the extracted host folder:
 
 ```powershell
-./SentinelRelay.RemoteHost.exe add-instance 'Wrothy Minioa'
+./SentinelRelay.RemoteHost.exe add-instance 'Primary Tester'
 ./SentinelRelay.RemoteHost.exe status
 ./SentinelRelay.RemoteHost.exe bind INSTANCE_ID GAME_PID
 ./SentinelRelay.RemoteHost.exe enable

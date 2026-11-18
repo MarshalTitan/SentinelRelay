@@ -22,8 +22,8 @@ var admin = new LocalAdministration(store, clock);
 var authority = new RemoteAuthority(store, clock);
 Code(authority.Enroll(new(1, Protocol.Secret())), "remote_disabled", "disabled by default");
 admin.SetEnabled(true);
-var a = admin.AddInstance("Wrothy");
-var b = admin.AddInstance("Elektra");
+var a = admin.AddInstance("Primary Tester");
+var b = admin.AddInstance("Secondary Tester");
 DeviceCredential Pair(string label, string[] grants, bool control)
 {
     var invitation = admin.Invite(label, grants, control);
