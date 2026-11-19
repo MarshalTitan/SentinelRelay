@@ -874,7 +874,7 @@ public sealed class MainWindow : Window, IDisposable
             SentinelModernSettingsRow.Draw(
                 "SentinelRelay.KeywordUserId",
                 "Keyword alert Discord user ID",
-                "Optional explicit user mention for matched keyword rules.",
+                "Optional user mention for forwarded incoming tells and matching keyword rules that allow pings.",
                 drawKeywordUserIdInput,
                 controlWidth: 220f,
                 scale: ImGuiHelpers.GlobalScale);
@@ -894,8 +894,8 @@ public sealed class MainWindow : Window, IDisposable
                 profile.DiscordMentionUserId = trimmed;
                 mentionUserId = trimmed;
                 keywordFeedback = trimmed.Length == 0
-                    ? "Keyword ping user cleared; highlighting remains available."
-                    : "Keyword ping user saved for this character.";
+                    ? "Alert user cleared; incoming tells and matched keywords can still be highlighted."
+                    : "Alert user saved for this character.";
                 keywordFeedbackIsError = false;
                 save();
             }
@@ -905,6 +905,7 @@ public sealed class MainWindow : Window, IDisposable
                 keywordFeedbackIsError = true;
             }
         }
+        ImGui.TextWrapped("Incoming tells ping this user whenever Incoming Tell forwarding is enabled.");
         ImGui.TextDisabled("Discord: User Settings → Advanced → Developer Mode, then right-click your name → Copy User ID.");
         if (!string.IsNullOrWhiteSpace(keywordFeedback))
         {
