@@ -104,7 +104,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Forwarded incoming tells now alert once regardless of keywords. Relay mentions only the character's configured Discord alert user. Channel choices, outgoing tells, other keyword rules and existing replies and SRank controls stay unchanged. Built on the published 0.5 series."
+            --notes "Privacy maintenance: replace personal copyright attribution in bundled Core package and assembly metadata with project attribution. Runtime source, saved configuration, character identity, Discord routing, and gameplay behavior are unchanged."
 
       - name: Verify public release asset
         shell: pwsh
