@@ -6,4 +6,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../SentinelRelay.Remote/SentinelRelay.Remote.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SentinelRelay.RemoteInput/SentinelRelay.RemoteInput.csproj" />
+    <Compile Include="../SentinelRelay.RemoteInputCheck/SignatureCheck.cs" Link="SignatureCheck.cs" />
+  </ItemGroup>
 </Project>

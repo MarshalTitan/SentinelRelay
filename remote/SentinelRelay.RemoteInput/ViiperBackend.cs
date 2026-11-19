@@ -9,6 +9,8 @@ using SentinelRelay.Remote;
 
 namespace SentinelRelay.RemoteInput;
 
+public enum BackendStage { File, Workspace, Start, Job, WaitReady, CreateBus, AddDevice, Connect }
+
 /// <summary>
 /// Experimental, worker-owned backend. Never connects to an already running VIIPER.
 /// The host must authorize the target before launching a worker; this class has no network-facing API.
@@ -33,9 +35,10 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         this.process = process; this.job = job; this.directory = directory; ApiPort = apiPort; UsbPort = usbPort;
     }
 
-    public static async Task<ViiperBackend> Start(string executable, bool attach, CancellationToken cancellation = default)
+    public static async Task<ViiperBackend> Start(string executable, bool attach, CancellationToken cancellation = default, Action<BackendStage>? stageChanged = null)
     {
         if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+        stageChanged?.Invoke(BackendStage.File);
         executable = Path.GetFullPath(executable);
         if (!File.Exists(executable) || (File.GetAttributes(executable) & FileAttributes.ReparsePoint) != 0)
             throw new InvalidDataException("backend_file");
@@ -45,6 +48,7 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
             if (!Convert.ToHexString(SHA256.HashData(file)).Equals(expected, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("backend_hash_mismatch");
         }
+        stageChanged?.Invoke(BackendStage.Workspace);
         var directory = Path.Combine(Path.GetTempPath(), "SentinelInput-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         if (OperatingSystem.IsWindows())
@@ -78,22 +82,29 @@ public sealed class ViiperBackend : IControllerOutput, IDisposable
         Process? process = null; WindowsChildJob? job = null; ViiperBackend? backend = null;
         try
         {
+            stageChanged?.Invoke(BackendStage.Job);
             if (OperatingSystem.IsWindows()) job = new WindowsChildJob();
+            stageChanged?.Invoke(BackendStage.Start);
             process = Process.Start(start) ?? throw new InputBackendException("backend_start");
+            stageChanged?.Invoke(BackendStage.Job);
             if (job is not null) job.Add(process); // Before creating a device. Worker death closes this handle.
             _ = Drain(process.StandardOutput);
             _ = Drain(process.StandardError); // Never forward passwords, arbitrary logs, or input values.
             backend = new(process, job, directory, apiPort, usbPort);
+            stageChanged?.Invoke(BackendStage.WaitReady);
             await backend.WaitReady(cancellation);
+            stageChanged?.Invoke(BackendStage.CreateBus);
             using var busReply = await ViiperWire.Request(apiPort, "bus/create", cancellation, backend.OwnsEndpoints);
             var bus = busReply.RootElement.GetProperty("busId").GetUInt32();
             if (bus == 0) throw new InvalidDataException("backend_bus");
+            stageChanged?.Invoke(BackendStage.AddDevice);
             using var added = await ViiperWire.Request(apiPort, "bus/" + bus + "/add {\"type\":\"xbox360\"}", cancellation, backend.OwnsEndpoints);
             var id = added.RootElement.GetProperty("devId").GetString();
             if (id is null || id.Length is < 1 or > 10 || !uint.TryParse(id, out var device) || device == 0 ||
                 added.RootElement.GetProperty("busId").GetUInt32() != bus ||
                 added.RootElement.GetProperty("type").GetString() != "xbox360")
                 throw new InvalidDataException("backend_device");
+            stageChanged?.Invoke(BackendStage.Connect);
             var tcp = new TcpClient(AddressFamily.InterNetwork) { NoDelay = true, SendTimeout = 100, ReceiveBufferSize = 1024 };
             backend.controller = tcp;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);

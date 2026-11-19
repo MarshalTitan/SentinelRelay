@@ -3,7 +3,7 @@ using Microsoft.Win32;
 
 namespace SentinelRelay.RemoteDesktop;
 
-public sealed record DesktopPreferences(string? Host = null, string? Login = null, bool ResumeOnLaunch = false)
+public sealed record DesktopPreferences(string? Host = null, string? Login = null, bool ResumeOnLaunch = false, string? LauncherPath = null, string? LauncherHash = null)
 {
     public static DesktopPreferences Load(string directory)
     {

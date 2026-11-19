@@ -41,8 +41,8 @@ public sealed class RemoteState
     public List<Invitation> Invitations { get; set; } = [];
     public List<GameBinding> Bindings { get; set; } = [];
 }
-public sealed record Device(string Id, string Label, string TokenHash, string[] Instances, bool Control, bool Revoked = false);
-public sealed record Invitation(string Hash, DateTimeOffset Expires, string Label, string[] Instances, bool Control);
+public sealed record Device(string Id, string Label, string TokenHash, string[] Instances, bool Control, bool Revoked = false, bool Trusted = false);
+public sealed record Invitation(string Hash, DateTimeOffset Expires, string Label, string[] Instances, bool Control, bool Trusted = false);
 public sealed record AuditEvent(DateTimeOffset At, string Code, string? DeviceId = null, string? InstanceId = null);
 
 public interface IStateStore

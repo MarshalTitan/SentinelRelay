@@ -1,7 +1,7 @@
 namespace SentinelRelay.Remote;
 
-/// <summary>Serializes authorization and one-shot intent. No game, shell, filesystem, or input dispatcher.</summary>
-public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null, IGameBridge? gameBridge = null)
+/// <summary>Serializes authorization and one-shot intent. Fixed game/recovery intents only; no remote shell or arbitrary input dispatcher.</summary>
+public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = null, IGameBridge? gameBridge = null, IRecoveryActions? recovery = null)
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
     private readonly object gate = new();
@@ -51,7 +51,7 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (state.Devices.Count >= 32) return (new Reply(false, "device_limit"), true);
             var token = Protocol.Secret();
             var id = Guid.NewGuid().ToString("N");
-            state.Devices.Add(new(id, invitation.Label, Protocol.Hash(token), invitation.Instances, invitation.Control));
+            state.Devices.Add(new(id, invitation.Label, Protocol.Hash(token), invitation.Instances, invitation.Control, Trusted: invitation.Trusted && invitation.Control));
             Record("device_paired", id);
             return (new Reply(true, "paired", new DeviceCredential(id, token, state.HostId)), true);
         });
@@ -75,6 +75,83 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             Record("session_opened", device.Id);
             return (new Reply(true, "session_opened", new SessionCredential(token, session.Expires)), false);
         });
+    }
+
+    // Input uses an independent sequence on a single bounded socket. Never wait on a
+    // status/screenshot operation while holding native input: contention beyond the bounded 40 ms authorization wait fails closed.
+    public ControllerOwner? InputOwner(string? token, string instanceId)
+    {
+        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return null;
+        try
+        {
+            Prune();
+            return store.Access(state =>
+            {
+                if (!sessions.TryGetValue(Protocol.Hash(token!), out var session)) return ((ControllerOwner?)null, false);
+                var device = state.Devices.FirstOrDefault(d => d.Id == session.DeviceId && !d.Revoked && d.Control);
+                var binding = state.Bindings.FirstOrDefault(b => b.InstanceId == instanceId);
+                return (state.Enabled && state.Epoch == session.Epoch && device is not null &&
+                    device.Instances.Contains(instanceId) && binding is not null
+                    ? new ControllerOwner(device.Id, Protocol.Hash(token!), state.Epoch, binding, "pending") : null, false);
+            });
+        }
+        catch { return null; }
+        finally { Monitor.Exit(gate); }
+    }
+
+    public bool InputAllowed(ControllerOwner owner, bool touch = false)
+    {
+        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return false;
+        try
+        {
+            Prune();
+            var allowed = store.Access(state =>
+            {
+                var device = state.Devices.FirstOrDefault(d => d.Id == owner.DeviceId && !d.Revoked && d.Control);
+                return (state.Enabled && state.Epoch == owner.HostEpoch && device is not null &&
+                    device.Instances.Contains(owner.Binding.InstanceId) && state.Bindings.Contains(owner.Binding) &&
+                    sessions.TryGetValue(owner.SessionId, out var s) && s.DeviceId == owner.DeviceId && s.Epoch == owner.HostEpoch, false);
+            });
+            if (allowed && touch) sessions[owner.SessionId].LastSeen = time.GetTimestamp();
+            return allowed;
+        }
+        catch { return false; }
+        finally { Monitor.Exit(gate); }
+    }
+
+    // Desktop access is a separate explicit PC-wide capability, independent of bindings.
+    public DesktopOwner? DesktopSession(string? token)
+    {
+        if (!Protocol.IsSecret(token) || !Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return null;
+        try
+        {
+            Prune();
+            return store.Access(state =>
+            {
+                if (!sessions.TryGetValue(Protocol.Hash(token!), out var session)) return ((DesktopOwner?)null, false);
+                var device = state.Devices.FirstOrDefault(d => d.Id == session.DeviceId && !d.Revoked && d.Control);
+                return (state.Enabled && state.Epoch == session.Epoch && device is not null
+                    ? new DesktopOwner(device.Id, Protocol.Hash(token!), state.Epoch) : null, false);
+            });
+        }
+        catch { return null; }
+        finally { Monitor.Exit(gate); }
+    }
+    public bool DesktopAllowed(DesktopOwner owner)
+    {
+        if (!Monitor.TryEnter(gate, TimeSpan.FromMilliseconds(40))) return false;
+        try
+        {
+            Prune();
+            var allowed = store.Access(state => (state.Enabled && state.Epoch == owner.HostEpoch &&
+                state.Devices.Any(d => d.Id == owner.DeviceId && !d.Revoked && d.Control) &&
+                sessions.TryGetValue(owner.SessionId, out var session) && session.DeviceId == owner.DeviceId &&
+                session.Epoch == owner.HostEpoch, false));
+            if (allowed) sessions[owner.SessionId].LastSeen = time.GetTimestamp();
+            return allowed;
+        }
+        catch { return false; }
+        finally { Monitor.Exit(gate); }
     }
 
     private sealed record GameIntent(string DeviceId, string Epoch, GameBinding? Binding, string Operation, string? ExpectedGameEpoch, Session Session);
@@ -113,6 +190,34 @@ public sealed class RemoteAuthority(IStateStore store, TimeProvider? clock = nul
             if (request.Operation == "instances.list")
                 return (End(true, "instances", state.Instances.Where(i => device.Instances.Contains(i.InstanceId)).ToArray()), false);
             if (request.Operation == "session.ping") return (End(true, "alive", new { state.HostId, ProtocolVersion = Protocol.Version }), false);
+            if (request.Operation is "launcher.open" or "game.restore")
+            {
+                if (!device.Control) return (End(false, "control_not_authorized"), false);
+                if (request.Confirmation is not null) return (End(false, "invalid_request"), false);
+                GameBinding? target = null;
+                if (request.Operation == "launcher.open")
+                {
+                    if (request.InstanceId is not null) return (End(false, "invalid_request"), false);
+                }
+                else
+                {
+                    if (!device.Instances.Contains(request.InstanceId ?? "") ||
+                        !state.Instances.Any(i => i.InstanceId == request.InstanceId))
+                        return (End(false, "instance_not_authorized"), false);
+                    target = state.Bindings.FirstOrDefault(b => b.InstanceId == request.InstanceId);
+                    if (target is null) return (End(false, "process_exited"), false);
+                }
+                if (recovery is null) return (End(false, "recovery_unavailable"), false);
+                var budget = "recovery:" + device.Id;
+                if (!mutationTimes.TryGetValue(budget, out var recent)) mutationTimes[budget] = recent = new();
+                while (recent.TryPeek(out var stamp) && time.GetElapsedTime(stamp) >= TimeSpan.FromSeconds(30)) recent.Dequeue();
+                if (recent.Count >= 3) return (End(false, "cooldown"), false);
+                recent.Enqueue(time.GetTimestamp());
+                // Execute under this serialized authorization/state access. Local actions are
+                // one-shot, never queued/retried, and have no phone-supplied executable/arguments.
+                var result = recovery.Execute(device.Id, request.Operation, target);
+                return (End(result.Success, result.Code, result.Data), false);
+            }
             if (request.Operation is not ("srank.status" or "screenshot" or "srank.skip" or "srank.reset.request" or "srank.reset.confirm"))
                 return (End(false, "operation_not_allowed"), false);
             if (!device.Instances.Contains(request.InstanceId) || !state.Instances.Any(i => i.InstanceId == request.InstanceId))

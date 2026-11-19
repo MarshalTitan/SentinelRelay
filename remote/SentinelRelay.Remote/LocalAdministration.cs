@@ -18,30 +18,48 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
         state.Instances.Add(instance);
         return (instance, true);
     });
-    public string Invite(string label, string[] instances, bool control) => store.Access(state =>
+    public string Invite(string label, string[] instances, bool control, bool trusted = false) => store.Access(state =>
     {
         ValidateLabel(label);
         if (!state.Enabled) throw new InvalidOperationException("remote_disabled");
-        if (instances.Length == 0 || instances.Distinct().Count() != instances.Length || instances.Any(id => !state.Instances.Any(i => i.InstanceId == id)))
+        if ((instances.Length == 0 && !(trusted && control)) || instances.Distinct().Count() != instances.Length || instances.Any(id => !state.Instances.Any(i => i.InstanceId == id)))
             throw new InvalidOperationException("invalid_instance_grant");
+        if (trusted && !control) throw new InvalidOperationException("control_required");
         var now = (clock ?? TimeProvider.System).GetUtcNow();
         state.Invitations.RemoveAll(i => now >= i.Expires);
         if (state.Invitations.Count >= 8) throw new InvalidOperationException("invitation_limit");
         var secret = Protocol.Secret();
-        state.Invitations.Add(new(Protocol.Hash(secret), now.AddMinutes(2), label, instances.ToArray(), control));
+        state.Invitations.Add(new(Protocol.Hash(secret), now.AddMinutes(2), label, instances.ToArray(), control, trusted));
         return (secret, true);
     });
     public bool Revoke(string id) => store.Access(state =>
     {
         var index = state.Devices.FindIndex(d => d.Id == id);
         if (index < 0) return (false, false);
-        state.Devices[index] = state.Devices[index] with { Revoked = true };
+        state.Devices[index] = state.Devices[index] with { Revoked = true, Trusted = false };
+        return (true, true);
+    });
+    // Only this local capability can persist unattended desktop/gamepad approval.
+    public void TrustPhone(string id, bool trusted) => store.Access(state =>
+    {
+        var index = state.Devices.FindIndex(d => d.Id == id && !d.Revoked);
+        if (index < 0) throw new InvalidOperationException("unknown_device");
+        if (trusted && !state.Devices[index].Control) throw new InvalidOperationException("control_required");
+        state.Devices[index] = state.Devices[index] with { Trusted = trusted };
+        return (true, true);
+    });
+    public void PauseTrustedPhones() => store.Access(state =>
+    {
+        for (var i = 0; i < state.Devices.Count; i++)
+            state.Devices[i] = state.Devices[i] with { Trusted = false };
+        // A previously displayed full-access invitation must not restore approval later.
+        state.Invitations.RemoveAll(i => i.Trusted);
         return (true, true);
     });
     public object Status() => store.Access(state => ((object)new
     {
         state.Enabled, state.HostId, state.Instances,
-        Devices = state.Devices.Select(d => new { d.Id, d.Label, d.Instances, d.Control, d.Revoked }).ToArray(),
+        Devices = state.Devices.Select(d => new { d.Id, d.Label, d.Instances, d.Control, d.Revoked, d.Trusted }).ToArray(),
     }, false));
     public void Bind(GameBinding binding) => store.Access(state =>
     {
@@ -55,7 +73,7 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
     });
     public LocalHostSnapshot Snapshot() => store.Access(state => (new LocalHostSnapshot(
         state.Enabled, state.Instances.ToArray(), state.Bindings.ToArray(),
-        state.Devices.Select(d => new LocalDevice(d.Id, d.Label, d.Control, d.Revoked)).ToArray()), false));
+        state.Devices.Select(d => new LocalDevice(d.Id, d.Label, d.Control, d.Revoked, d.Trusted)).ToArray()), false));
 
     public InstanceInfo ConnectGame(GameBinding candidate, string label) => store.Access(state =>
     {
@@ -76,6 +94,12 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
             throw new InvalidOperationException("process_already_bound");
         state.Bindings.RemoveAll(b => b.InstanceId == instance.InstanceId);
         state.Bindings.Add(candidate with { InstanceId = instance.InstanceId });
+        // Full-PC trust explicitly includes characters subsequently approved here on this PC.
+        // View/rescue-only devices keep their original per-character grants.
+        for (var i = 0; i < state.Devices.Count; i++)
+            if (state.Devices[i] is { Trusted: true, Control: true, Revoked: false } device &&
+                !device.Instances.Contains(instance.InstanceId))
+                state.Devices[i] = device with { Instances = [.. device.Instances, instance.InstanceId] };
         state.Epoch = Guid.NewGuid().ToString("N");
         return (instance, true);
     });
@@ -99,5 +123,5 @@ public sealed class LocalAdministration(IStateStore store, TimeProvider? clock =
     }
 }
 
-public sealed record LocalDevice(string Id, string Label, bool Control, bool Revoked);
+public sealed record LocalDevice(string Id, string Label, bool Control, bool Revoked, bool Trusted = false);
 public sealed record LocalHostSnapshot(bool Enabled, InstanceInfo[] Instances, GameBinding[] Bindings, LocalDevice[] Devices);

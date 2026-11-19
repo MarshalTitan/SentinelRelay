@@ -62,11 +62,12 @@ public sealed class PipeGameBridge : IGameBridge
             return reply;
         }
     }
-    public BridgeSnapshot? Read(GameBinding binding)
+    public BridgeSnapshot? Read(GameBinding binding) => ReadBounded(binding, CancellationToken.None);
+    public BridgeSnapshot? ReadBounded(GameBinding binding, CancellationToken cancellation)
     {
         try
         {
-            var reply = Call(binding, new(1, "hello"), CancellationToken.None);
+            var reply = Call(binding, new(1, "hello"), cancellation);
             var snapshot = reply.Success ? reply.Snapshot : null;
             if (snapshot is null || snapshot.CharacterKey != binding.CharacterKey) return null;
             lastKnown[binding.InstanceId] = snapshot;
