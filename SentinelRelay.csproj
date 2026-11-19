@@ -14,7 +14,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="MarshalTitan.SentinelCore.UI" Version="[0.3.1]" />
+    <PackageReference Include="MarshalTitan.SentinelCore.UI" Version="[0.3.1.1]" />
     <Compile Remove="tests/**/*.cs" />
     <Compile Remove="remote/**/*.cs" />
     <None Include="assets/icon.png" CopyToOutputDirectory="PreserveNewest" />
