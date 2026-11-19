@@ -58,18 +58,18 @@ Logs: typed RemoteControlRequested/Rejected/Confirmed/Executed/Failed with corre
 ID, operation, configured character, resulting state and fixed reason. No bot token,
 webhook, Discord IDs, raw command text or full status text is logged.
 
-## Wrothy first — supervised test
+## Primary Tester first — supervised test
 
 Use Dalamud's normal plugin updater with the permanent Sentinel repository:
 `https://raw.githubusercontent.com/MarshalTitan/Sentinel/main/repo.json`.
 Keep dev copies disabled; update/reload the live plugins and confirm SRank **0.7.62.0**
-and Relay **0.5.0.7**. Do not delete config. Do not enable Elektra yet.
+and Relay **0.5.0.7**. Do not delete config. Do not enable Secondary Tester yet.
 
-1. Log into Wrothy Minioa. In `/srelay`, retain the existing Wrothy webhook, bot
+1. Log into the Primary Tester character. In `/srelay`, retain that character's existing webhook, bot
    credential, channel and authorized user. Replies & Controls → Remote Sentinel
    Controls: enable **Allow SRankSentinel remote controls**, then **Save Reply
    Permissions**. Wait for the Discord reader to connect. Chat replies need not be on.
-2. Send ordinary text `/srank status` in #relay-wrothy. Version/enabled/state/status/
+2. Send ordinary text `/srank status` in the configured Relay test channel. Version/enabled/state/status/
    hunt/queue must match the SRank UI. A missing provider must report unavailable.
 3. In a safe supervised hunt where skip is appropriate, note the queue; send
    `/srank skip`. Expect exactly the existing **SKIP CURRENT + KEEP QUEUE** behavior,
@@ -77,9 +77,9 @@ and Relay **0.5.0.7**. Do not delete config. Do not enable Elektra yet.
 4. In another safe situation, send `/srank reset`: no game action yet. Send
    `/srank reset confirm` within 30s: expect exactly **STOP + RESET THROUGH UL'DAH**
    (queue cleared, normal enabled state retained). A late/second confirm must not act.
-5. Keep Elektra's new permission OFF. Wrothy-channel messages must not control her
-   client. Turn Wrothy's permission OFF/save; `/srank status` must no longer return
-   private state or execute recovery. Test Elektra separately only after Wrothy passes.
+5. Keep Secondary Tester's new permission OFF. Primary Tester channel messages must not control the Secondary Tester
+   client. Turn Primary Tester's permission OFF/save; `/srank status` must no longer return
+   private state or execute recovery. Test Secondary Tester separately only after Primary Tester passes.
 
 Return PASS/FAIL for status, skip/queue, reset/confirmation, isolation and permission
 OFF. On failure only: timestamp, plugin versions, command and concise sanitized
