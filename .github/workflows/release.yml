@@ -104,7 +104,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Relay ${{ steps.version.outputs.value }}" `
-            --notes "Privacy maintenance: replace personal copyright attribution in bundled Core package and assembly metadata with project attribution. Runtime source, saved configuration, character identity, Discord routing, and gameplay behavior are unchanged."
+            --notes "Saved keyword rules now monitor their selected channels independently of normal Chat Filters. Matching messages use one relay delivery with existing alerts and configured-user pings. Saved rules have a compact expand/collapse arrow to inspect their channels. Pause, character isolation, incoming-tell alerts, duplicate suppression, reward batching, replies, screenshots and remote controls are preserved."
 
       - name: Verify public release asset
         shell: pwsh

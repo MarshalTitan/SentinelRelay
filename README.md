@@ -86,6 +86,10 @@ Sentinel Relay connected successfully for Example Character.
 
 Keyword matching remains entirely local. Rules support case-insensitive contains matching, optional whole-word matching, and per-rule chat-channel selection.
 
+Normal **Chat Filters** forward every message from an enabled channel. **Keywords** independently forward matching messages from each rule's selected channels, even when that channel's normal filter is off. When both apply, Relay sends one message with the existing keyword alert and optional configured-user ping. Pause blocks both paths. Rewards / Hunt Results keeps its normal batching; with its normal filter off, only matching reward lines enter the batch.
+
+Saved rules start collapsed. Use the small arrow beside a keyword to inspect its saved channels using their friendly names. This inspection state does not change the rule or its saved settings.
+
 A match can be highlighted in the relay channel and optionally ping one explicitly configured Discord user ID. Normal relayed text cannot create mentions. Incoming webhooks cannot send Discord DMs, so DM alerts are not part of this no-backend design.
 
 ## Commands
