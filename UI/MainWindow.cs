@@ -184,6 +184,7 @@ public sealed class MainWindow : Window, IDisposable
     private bool newKeywordWholeWord;
     private bool newKeywordPing = true;
     private readonly HashSet<RelayChatType> newKeywordChannels = [];
+    private readonly HashSet<Guid> expandedKeywordRules = [];
     private bool keywordChannelsInitialized;
     private string? lastCharacterKey;
     private string botTokenInput = string.Empty;
@@ -345,6 +346,7 @@ public sealed class MainWindow : Window, IDisposable
             if (profile is not null)
                 outboundChannels.UnionWith(profile.EnabledOutboundChannels.Where(ChannelPolicy.ImplementedOutboundChannels.Contains));
             newKeywordChannels.Clear();
+            expandedKeywordRules.Clear();
             keywordChannelsInitialized = false;
         }
 
@@ -1086,6 +1088,18 @@ public sealed class MainWindow : Window, IDisposable
         foreach (var rule in profile.Keywords.ToArray())
         {
             ImGui.PushID(rule.Id.ToString("N"));
+            var expanded = expandedKeywordRules.Contains(rule.Id);
+            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(2, 0));
+            if (ImGui.ArrowButton("expand", expanded ? ImGuiDir.Down : ImGuiDir.Right))
+            {
+                expanded = !expanded;
+                if (expanded)
+                    expandedKeywordRules.Add(rule.Id);
+                else
+                    expandedKeywordRules.Remove(rule.Id);
+            }
+            ImGui.PopStyleVar();
+            ImGui.SameLine();
             ImGui.TextUnformatted(rule.Keyword);
             ImGui.SameLine();
             ImGui.TextDisabled($"{(rule.WholeWord ? "whole word" : "contains")} | {rule.Channels.Count} channel(s) | {(rule.PingDiscordUser ? "highlight + ping" : "highlight")}");
@@ -1093,7 +1107,23 @@ public sealed class MainWindow : Window, IDisposable
             if (ImGui.SmallButton("Remove"))
             {
                 profile.Keywords.Remove(rule);
+                expandedKeywordRules.Remove(rule.Id);
                 save();
+            }
+            else if (expanded)
+            {
+                ImGui.Indent();
+                ImGui.TextDisabled("Channels");
+                if (ImGui.BeginTable("saved-keyword-channels", 2))
+                {
+                    foreach (var channel in ChannelPolicy.InboundChannels.Where(rule.Channels.Contains))
+                    {
+                        ImGui.TableNextColumn();
+                        ImGui.TextUnformatted(ChannelPolicy.GetLabel(channel));
+                    }
+                    ImGui.EndTable();
+                }
+                ImGui.Unindent();
             }
             ImGui.PopID();
         }
