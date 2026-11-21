@@ -18,6 +18,7 @@
     <Compile Include="../../Core/DiscordReplyPolicy.cs" Link="Core/DiscordReplyPolicy.cs" />
     <Compile Include="../../Core/DiscordSnowflake.cs" Link="Core/DiscordSnowflake.cs" />
     <Compile Include="../../Core/KeywordMatcher.cs" Link="Core/KeywordMatcher.cs" />
+    <Compile Include="../../Core/InboundChatRelay.cs" Link="Core/InboundChatRelay.cs" />
     <Compile Include="../../Core/MessageSanitizer.cs" Link="Core/MessageSanitizer.cs" />
     <Compile Include="../../Core/ModernRelayStatusPolicy.cs" Link="Core/ModernRelayStatusPolicy.cs" />
     <Compile Include="../../Core/PngEncoder.cs" Link="Core/PngEncoder.cs" />

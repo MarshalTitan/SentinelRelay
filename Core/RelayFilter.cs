@@ -4,8 +4,17 @@ namespace SentinelRelay.Core;
 
 public static class RelayFilter
 {
-    public static bool ShouldForward(CharacterProfile? profile, RelayChatType channel) =>
+    public static bool CanRelay(CharacterProfile? profile) =>
         profile is { Paused: false }
-        && profile.EnabledInboundChannels.Contains(channel)
         && !string.IsNullOrWhiteSpace(profile.ProtectedWebhookUrl);
+
+    public static bool IsNormallyEnabled(CharacterProfile? profile, RelayChatType channel) =>
+        profile?.EnabledInboundChannels.Contains(channel) == true;
+
+    public static bool ShouldForward(
+        CharacterProfile? profile,
+        RelayChatType channel,
+        IReadOnlyList<KeywordRule>? keywordMatches = null) =>
+        CanRelay(profile)
+        && (IsNormallyEnabled(profile, channel) || keywordMatches is { Count: > 0 });
 }
