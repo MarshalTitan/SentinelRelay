@@ -117,6 +117,14 @@ internal static class InboundChatRelayTests
         Check(content.Contains("Keyword alert:", StringComparison.Ordinal), "keyword highlighting missing");
         foreach (var keyword in keywords)
             Check(content.Contains($"\"{keyword}\"", StringComparison.Ordinal), "matching keyword missing from alert");
+        CheckOnePing(h);
+    }
+
+    private static void CheckOnePing(Harness h)
+    {
+        Check(h.Handler.Bodies.Count == 1, "expected exactly one Discord HTTP request");
+        using var json = JsonDocument.Parse(h.Handler.Bodies.Single());
+        var content = json.RootElement.GetProperty("content").GetString()!;
         Check(content.Split($"<@{UserId}>", StringSplitOptions.None).Length == 2, "expected one configured-user mention");
         var mentions = json.RootElement.GetProperty("allowed_mentions");
         Check(mentions.GetProperty("parse").GetArrayLength() == 0, "broad mentions enabled");
@@ -213,7 +221,12 @@ internal static class InboundChatRelayTests
             await h.Capture(profile, Chat("good morning", channel));
             await h.Capture(profile, Chat("READY?", channel));
             await h.Flush(profile);
-            CheckAlert(h, "ready");
+            // Stable Relay already alerts on every forwarded incoming tell.
+            // Keep that formatter behavior while testing keyword-only admission.
+            if (channel == RelayChatType.IncomingTell)
+                CheckOnePing(h);
+            else
+                CheckAlert(h, "ready");
         }
     }
 
