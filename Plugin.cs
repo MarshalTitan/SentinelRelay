@@ -46,8 +46,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private readonly GameChatSender gameChatSender = new();
     private readonly BoundedOrderedQueue<DiscordReplyCommand> outboundQueue = new(5);
     private readonly SlidingWindowRateLimiter outboundRateLimiter = new(5, TimeSpan.FromSeconds(30));
-    private readonly DuplicateMessageFilter duplicateFilter = new();
-    private readonly RewardMessageBatcher rewardBatcher = new();
+    private readonly InboundChatRelay inboundRelay = new();
     private readonly ChatCaptureService chatCapture;
     private readonly MainWindow mainWindow;
     private CharacterIdentity? activeIdentity;
@@ -178,7 +177,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
         ProcessOutboundQueue(now);
         UpdateMobileBridge();
-        QueueCapturedChat(rewardBatcher.FlushIfDue(now));
+        QueueCapturedChat(inboundRelay.FlushIfDue(now));
     }
 
     private void RefreshCharacter(bool force)
@@ -193,13 +192,12 @@ public sealed partial class Plugin : IDalamudPlugin
         remoteScreenshotService.Cancel();
         outboundQueue.Clear();
         outboundRateLimiter.Clear();
-        rewardBatcher.Clear();
+        inboundRelay.Clear();
         chatCapture.RewardDiagnostics.Clear();
         lastOutboundError = null;
         lastIncomingTellUtc = null;
         lastAcceptedScreenshotUtc = null;
         lastRemoteScreenshotError = null;
-        duplicateFilter.Clear();
         activeIdentity = identity;
         activeProfile = null;
         activeWebhookEndpoint = null;
@@ -421,41 +419,21 @@ public sealed partial class Plugin : IDalamudPlugin
         if (chat.ChatType == RelayChatType.IncomingTell)
             lastIncomingTellUtc = DateTime.UtcNow;
 
-        if (!RelayFilter.ShouldForward(activeProfile, chat.ChatType) || activeWebhookEndpoint is null || activeIdentity is null)
-            return;
-        if (duplicateFilter.IsDuplicate(chat, DateTime.UtcNow))
+        if (activeWebhookEndpoint is null || activeIdentity is null)
             return;
 
-        if (chat.ChatType == RelayChatType.RewardsHuntResults)
-        {
-            QueueCapturedChat(rewardBatcher.Add(chat, DateTime.UtcNow));
-            return;
-        }
-
-        // Preserve event order when ordinary chat arrives before the short
-        // reward batching window expires.
-        QueueCapturedChat(rewardBatcher.Flush());
-        QueueCapturedChat(chat);
+        foreach (var admittedChat in inboundRelay.Capture(activeProfile, chat, DateTime.UtcNow))
+            QueueCapturedChat(admittedChat);
     }
 
     private void QueueCapturedChat(CapturedChat? chat)
     {
-        if (chat is null
-            || !RelayFilter.ShouldForward(activeProfile, chat.ChatType)
-            || activeWebhookEndpoint is null
-            || activeIdentity is null)
+        if (activeWebhookEndpoint is null
+            || activeIdentity is null
+            || characterContext.Current?.CharacterKey != activeIdentity.CharacterKey
+            || !InboundChatRelay.TryPrepare(activeProfile, chat, out var payloads))
             return;
 
-        var keywordMatches = KeywordMatcher.FindMatches(
-            activeProfile!.Keywords,
-            chat.ChatType,
-            chat.Message);
-        var payloads = WebhookMessageFormatter.Format(
-            chat,
-            activeProfile.IncludeSenderWorld,
-            activeProfile.UseDiscordEmbeds || chat.ChatType == RelayChatType.RewardsHuntResults,
-            keywordMatches,
-            activeProfile.DiscordMentionUserId);
         webhookRelay.TryEnqueue(activeIdentity.CharacterKey, activeWebhookEndpoint, payloads);
     }
 
@@ -675,7 +653,7 @@ public sealed partial class Plugin : IDalamudPlugin
             discordReplyReader.Stop();
             remoteScreenshotService.Cancel();
             outboundQueue.Clear();
-            rewardBatcher.Clear();
+            inboundRelay.ClearPendingRewards();
         }
         SaveConfiguration();
         if (!paused)

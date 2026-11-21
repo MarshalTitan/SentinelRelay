@@ -7,6 +7,7 @@ using SentinelRelay.Models;
 using SentinelRelay.Services;
 
 SRankRemoteControlTests.Run();
+await InboundChatRelayTests.Run();
 
 var tests = new (string Name, Func<Task> Run)[]
 {
