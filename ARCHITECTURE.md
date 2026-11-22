@@ -2,7 +2,7 @@
 
 > CURRENT SUPPORT STATUS - 21 November 2026: the separate SentinelRemote Android repository is retired. Earlier companion-client setup references are historical. Relay itself, its internal host/bridge protocols, Discord and SRank remote capabilities, and existing local configuration remain unchanged.
 
-The optional [Sentinel Remote companion](remote/docs/ARCHITECTURE.md) adds an independent PC host and a default-off per-character local bridge in the 0.6.0.0 candidate, with an Android client in SentinelRemote. The released Discord flows below remain independent. Use the [Milestone A checklist](remote/docs/MILESTONE_A.md) before claiming real-device readiness.
+Relay's [internal remote foundation](remote/docs/ARCHITECTURE.md) retains its PC host and default-off per-character local bridge in the 0.6.0.0 candidate. The separate Android client repository is retired; it is not a supported installation path. The released Discord flows below remain independent. The older Milestone A checklist is retained as engineering history.
 
 ## Scope
 

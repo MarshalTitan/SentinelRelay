@@ -2,7 +2,7 @@
 
 > CURRENT SUPPORT STATUS - 21 November 2026: the separate SentinelRemote Android repository is retired. Earlier companion-client setup references are historical. Relay itself, its internal host/bridge protocols, Discord and SRank remote capabilities, and existing local configuration remain unchanged.
 
-This document describes the released Discord plugin. The optional [Sentinel Remote PC host foundation](remote/README.md) is a new, independent project for future mobile rescue functionality; it does not restore the retired hosted backend or add a dependency for existing Relay users.
+This document describes the released Discord plugin. Relay's [internal PC host foundation](remote/README.md) remains candidate engineering material; the separate SentinelRemote Android repository is retired. No dependency is added for existing Relay users, and the retired hosted backend remains unused.
 
 Sentinel Relay no longer has or requires a backend service.
 
