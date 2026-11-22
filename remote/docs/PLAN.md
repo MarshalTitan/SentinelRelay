@@ -1,5 +1,7 @@
 # Sentinel Remote implementation and acceptance plan
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 Phase 0 is documented in the architecture audit. The Phase 1 host and Milestone A Android/bridge software are implemented as candidates. Milestone A has partial real-device evidence recorded in [Desktop setup](DESKTOP_SETUP.md); the full [consolidated checklist](MILESTONE_A.md) is still open. Skip + Keep Queue queue preservation is explicitly deferred because consecutive S Rank spawns are unavailable; it does not block independent development. The original staged work table below describes each gate, not a claim that every later phase is implemented.
 
 | Stage | Software work | Acceptance gate |

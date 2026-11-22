@@ -1,5 +1,7 @@
 # Sentinel Remote PC foundation
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 Status: Milestone A software candidate. The Android app and opt-in local game bridge now provide status, screenshots and existing SRank rescue operations. This optional host remains independent of Discord. Manual input, live video and launcher recovery are later stages. For the Windows installer and terminal-free setup candidate, start with [Desktop setup](docs/DESKTOP_SETUP.md). The [Milestone A checklist](docs/MILESTONE_A.md) retains the original console setup and full acceptance matrix.
 
 - [Architecture and live-source audit](docs/ARCHITECTURE.md)

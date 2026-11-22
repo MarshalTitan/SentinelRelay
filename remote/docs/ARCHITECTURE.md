@@ -1,5 +1,7 @@
 # Sentinel Remote architecture and feasibility audit
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 Implementation update: the Android client now exists in `MarshalTitan/SentinelRemote`; Relay 0.6.0.0 is the Milestone A bridge candidate. The historical audit below records the pre-foundation baseline. Current bridge details and supervised setup are in [MILESTONE_A.md](MILESTONE_A.md).
 
 Audit date: 2026-10-19 UTC. Live source outranks the supplied project brief and older chat history. All implementations here are independent MIT code; no streaming, controller, or launcher project source was copied.

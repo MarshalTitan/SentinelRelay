@@ -1,5 +1,7 @@
 # Milestone B: manual gamepad control
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 ## Scope and current state
 
 The user approved exactly one running FFXIV client per PC for the first manual-control version. Status and existing bounded rescue commands retain their multi-client design. If any second FFXIV client appears, even unbound or not opted into Relay, manual input must release and stay unavailable. Unknown process visibility also vetoes control. This is a product limitation, not proof that a virtual device is process-isolated.

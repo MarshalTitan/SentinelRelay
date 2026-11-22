@@ -163,7 +163,6 @@ The installable package is written to `bin/Release/SentinelRelay/latest.zip`. Gi
 
 Sentinel Relay is intended for the private/custom `MarshalTitan/Sentinel` Dalamud catalog. It is not affiliated with or endorsed by Square Enix, Discord, Dalamud, or XIVLauncher.
 
-## Sentinel Remote foundation
+## Relay remote capabilities
 
-The optional [Sentinel Remote companion](remote/README.md) has Android and local game-bridge software ready as Milestone A candidates. The Windows installer candidate provides [desktop setup without PowerShell](remote/docs/DESKTOP_SETUP.md), including game discovery, pairing, tray disable, and verified reconnect. The [Milestone A checklist](remote/docs/MILESTONE_A.md) retains console setup and the full acceptance matrix. Manual input, live streaming and launcher recovery remain later stages. Existing Discord functionality continues independently; the production catalog is not changed by the candidate build.
-
+The separate MarshalTitan/SentinelRemote Android project is retired and is not offered as a current client. Existing Discord replies, screenshots, SRank recovery controls, profile routing, and Relay internal remote/bridge code are preserved. Source under `remote/` remains Relay engineering material; old Android setup instructions are historical, not a supported installation path. Future phone or desktop access may use compatible Relay functionality or external remote-desktop software.

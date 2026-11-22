@@ -1,5 +1,7 @@
 # Sentinel Remote - Windows setup candidate
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 This candidate replaces terminal setup with a per-user Windows installer and a desktop/tray app. Android 0.1.0 keeps its existing pairing protocol. iPhone distribution is a separate stage.
 
 ## Install and connect

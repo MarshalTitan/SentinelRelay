@@ -1,5 +1,7 @@
 # Remote foundation security and protocol v1
 
+> STANDALONE CLIENT RETIRED - 21 November 2026. The separate SentinelRemote Android project is unsupported. Android installation/pairing steps below are historical references, not current onboarding. Relay-owned host, bridge, protocol and recovery functionality is retained independently.
+
 ## Milestone A implementation update
 
 The host now supports explicitly bound game clients through a default-off per-character local pipe server in the Relay plugin. The Android app exists in SentinelRemote. Earlier Phase 1 statements below are the historical foundation boundary; these additions apply to the 0.6.0.0 candidate:
