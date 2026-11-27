@@ -4,12 +4,12 @@ param()
 $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'Prepare-NavigationCore.ps1')
 
-$expectedVersion = '0.4.1.2'
-$expectedUiHash = 'ee2aec0d063eb1ee1da815de58c58bb2c8ff2199ce395c118c1c3976606a4c1d'
-$expectedCoreHash = '82057104351fb05bbcbc579a62a3373ce7f17b46a9f39b06e872c72262c4f949'
-$packageRoot = '.packages/SentinelCore/v0.4.1.2'
-$uiPackage = Join-Path $packageRoot 'MarshalTitan.SentinelCore.UI.0.4.1.2.nupkg'
-$corePackage = Join-Path $packageRoot 'MarshalTitan.SentinelCore.0.4.1.2.nupkg'
+$expectedVersion = '0.4.1.3'
+$expectedUiHash = 'e24369d5736eb3c10939de6c1e3f7565c06b34943a98dce4df9ec84a9662189c'
+$expectedCoreHash = '71ecf832ac9c03d1e709bd84875e6a569abc9a71bc9def9bec11ccb2744a825d'
+$packageRoot = '.packages/SentinelCore/v0.4.1.3'
+$uiPackage = Join-Path $packageRoot 'MarshalTitan.SentinelCore.UI.0.4.1.3.nupkg'
+$corePackage = Join-Path $packageRoot 'MarshalTitan.SentinelCore.0.4.1.3.nupkg'
 
 foreach ($package in @($uiPackage, $corePackage)) {
     if (-not (Test-Path -LiteralPath $package -PathType Leaf)) {
@@ -41,7 +41,7 @@ $lockedCore = $framework.'MarshalTitan.SentinelCore'
 if ($lockedUi.requested -ne "[$expectedVersion, $expectedVersion]" `
     -or $lockedUi.resolved -ne $expectedVersion `
     -or $lockedCore.resolved -ne $expectedVersion) {
-    throw 'packages.lock.json does not pin SentinelCore.UI and SentinelCore to 0.4.1.2.'
+    throw 'packages.lock.json does not pin SentinelCore.UI and SentinelCore to 0.4.1.3.'
 }
 
 Write-Host "Validated SentinelCore.UI $expectedVersion and vendored package SHA-256 $uiHash."
