@@ -406,7 +406,6 @@ public sealed class MainWindow : Window, IDisposable
     private void DrawModernShell(CharacterIdentity? identity, CharacterProfile? profile)
     {
         themeState.SelectTheme(SentinelThemeKind.Modern);
-        var direction = profile?.DiscordRepliesEnabled == true || profile?.RemoteSRankControlsEnabled == true ? "FFXIV ↔ Discord" : "FFXIV → Discord";
         var options = new SentinelModernAppShellOptions(
             "SentinelRelay.Modern2",
             "Sentinel Relay",
@@ -414,7 +413,6 @@ public sealed class MainWindow : Window, IDisposable
         {
             DrawPluginIcon = drawModernPluginIcon,
             Scale = ImGuiHelpers.GlobalScale,
-            ContextLabel = $"{identity?.CharacterName ?? "No character"} · {direction}",
             Status = GetModernStatus(identity, profile),
             DeltaTime = ImGui.GetIO().DeltaTime,
             ReducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion,
@@ -423,6 +421,7 @@ public sealed class MainWindow : Window, IDisposable
             EnableWindowDragging = true,
             RequestCollapse = requestModernCollapse,
             CollapseTooltip = configuration.ModernWindowCollapsed ? "Expand" : "Minimize",
+            IsCollapsed = configuration.ModernWindowCollapsed,
             RequestClose = requestModernClose,
         };
 
